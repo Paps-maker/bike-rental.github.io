@@ -28,12 +28,11 @@ th { background:#27ae60; color:white; }
 #addWalkinForm { margin-top:20px; background:#ecf0f1; padding:15px; border-radius:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 #addWalkinForm input, #addWalkinForm textarea, #addWalkinForm select { width:auto; flex:1; min-width:120px; }
 #addWalkinForm button { flex:0 0 auto; }
-#walkinCostDisplay { width:100%; font-weight:bold; }
+#walkinCostDisplay { width:100%; margin-top:5px; font-weight:bold; }
 #logs { margin-top:20px; background:#ecf0f1; padding:15px; border-radius:10px; max-height:200px; overflow-y:auto; }
 #searchBar { margin-top:20px; }
 .charts { display:flex; flex-wrap:wrap; gap:20px; margin-top:20px; justify-content:center; }
 .chart-box { background:white; padding:15px; border-radius:10px; box-shadow:0 6px 15px rgba(0,0,0,0.1); flex:1; min-width:280px; max-width:600px; }
-
 @media(max-width:768px){
   th, td{font-size:0.8em; padding:8px;}
   #addWalkinForm{flex-direction:column; align-items:flex-start;}
@@ -58,7 +57,7 @@ th { background:#27ae60; color:white; }
   <button class="logout-btn" onclick="logout()">Logout</button>
   <p>Welcome, <span id="adminEmail"></span> 🎉</p>
 
-  <!-- Add Walk-in Customer -->
+  <!-- Walk-in Customer -->
   <div id="addWalkinForm">
     <input type="text" id="walkinName" placeholder="Customer Name">
     <input type="text" id="walkinPhone" placeholder="Phone Number">
@@ -76,11 +75,11 @@ th { background:#27ae60; color:white; }
   </div>
 
   <div id="searchBar">
-    <input type="text" id="searchInput" placeholder="Search by bike or customer..." oninput="renderAdminTable()">
+    <input type="text" id="searchInput" placeholder="Search by bike or customer..." oninput="renderReservations()">
   </div>
 
   <div class="table-container">
-    <table id="adminTable">
+    <table id="reservationTable">
       <thead>
         <tr>
           <th>Bicycle</th>
@@ -89,9 +88,8 @@ th { background:#27ae60; color:white; }
           <th>Start Time</th>
           <th>End Time</th>
           <th>Status</th>
-          <th>Total Time</th>
-          <th>Extra/Early</th>
-          <th>Total Cost</th>
+          <th>Total Time (min)</th>
+          <th>Extra/Early (min)</th>
           <th>Deposited Items</th>
           <th>Timer</th>
           <th>Actions</th>
@@ -122,11 +120,11 @@ th { background:#27ae60; color:white; }
   </div>
 </div>
 
-<!-- Firebase and Admin Logic -->
+<!-- Firebase Setup -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
 // Firebase config
 const firebaseConfig = {
@@ -139,60 +137,86 @@ const firebaseConfig = {
   measurementId: "G-XFS1MNQ15W"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
 const ratePerMinute = 1;
 let activeTimers = {};
-let bikeUsageChart=null, peakHoursChart=null, revenueChart=null;
+let reservations = [];
 
-// Login & Logout
-async function login(){
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  try { await signInWithEmailAndPassword(auth,email,password); document.getElementById('loginError').innerText=''; } 
-  catch(e){ document.getElementById('loginError').innerText=e.message; }
-}
-async function logout(){ await signOut(auth); }
+// ----- Expose login/logout globally -----
+window.login = async function() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    document.getElementById("loginError").innerText = "";
+  } catch (e) {
+    document.getElementById("loginError").innerText = e.message;
+  }
+};
 
-onAuthStateChanged(auth, async (user)=>{
+window.logout = async function() {
+  await signOut(auth);
+};
+
+// ----- Auth state -----
+onAuthStateChanged(auth, async (user) => {
   if(user){
-    document.getElementById('loginForm').style.display='none';
-    document.getElementById('dashboard').style.display='block';
-    document.getElementById('adminEmail').innerText=user.email;
-    renderAdminTable();
-    renderCharts();
-    renderLogs();
+    document.getElementById("loginForm").style.display="none";
+    document.getElementById("dashboard").style.display="block";
+    document.getElementById("adminEmail").innerText = user.email;
+    await loadReservations();
+    renderReservations();
   } else {
-    document.getElementById('loginForm').style.display='block';
-    document.getElementById('dashboard').style.display='none';
+    document.getElementById("loginForm").style.display="block";
+    document.getElementById("dashboard").style.display="none";
   }
 });
 
-// Add Walk-in Customer
-document.getElementById('walkinDuration').addEventListener('input',()=>{
+// ----- Load reservations from Firestore -----
+async function loadReservations(){
+  reservations = [];
+  const querySnapshot = await getDocs(collection(db,"reservations"));
+  querySnapshot.forEach(docSnap=>{
+    const data = docSnap.data();
+    reservations.push({...data, id: docSnap.id});
+  });
+}
+
+// ----- Add walk-in -----
+document.getElementById('walkinDuration').addEventListener('input', ()=>{
   const dur = parseInt(document.getElementById('walkinDuration').value);
   document.getElementById('walkinCostDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
 });
 
-async function addWalkinCustomer(){
+window.addWalkinCustomer = async function(){
   const name=document.getElementById('walkinName').value.trim();
   const phone=document.getElementById('walkinPhone').value.trim();
   const bike=document.getElementById('walkinBike').value;
   const start=document.getElementById('walkinStart').value;
   const duration=parseInt(document.getElementById('walkinDuration').value);
   const items=document.getElementById('walkinItems').value.split(',').map(i=>i.trim()).filter(i=>i);
+
   if(!name||!phone||!bike||!start||!duration){ alert('Fill all fields'); return; }
 
   const startTime = new Date(start);
   const endTime = new Date(startTime.getTime() + duration*60000);
 
-  // Add to Firestore
-  await addDoc(collection(db,'reservations'),{
-    bike, customerName:name, phone, start:startTime, end:endTime,
-    picked:false, returned:false, cancelled:false, depositedItems: items,
-    createdBy:auth.currentUser.email
-  });
+  // Check conflicts
+  if(reservations.some(r=>r.bike===bike && ((startTime<new Date(r.end))&&(endTime>new Date(r.start))))){
+    alert('Bike already reserved at this time'); return;
+  }
+
+  const newRes = {
+    bike, customerName:name, phone, start:startTime.toISOString(), end:endTime.toISOString(),
+    picked:false, returned:false, cancelled:false, depositedItems: items
+  };
+
+  const docRef = await addDoc(collection(db,"reservations"), newRes);
+  reservations.push({...newRes, id: docRef.id});
 
   // Clear form
   document.getElementById('walkinName').value='';
@@ -202,32 +226,29 @@ async function addWalkinCustomer(){
   document.getElementById('walkinDuration').value='';
   document.getElementById('walkinItems').value='';
   document.getElementById('walkinCostDisplay').innerText='Estimated Cost: 0 Ksh';
-  
-  renderAdminTable();
-  addLog(bike,'added walk-in customer');
-}
 
-// Fetch and Render Table
-async function renderAdminTable(){
-  const searchTerm = document.getElementById('searchInput')?.value.toLowerCase()||'';
-  const snapshot = await getDocs(collection(db,'reservations'));
-  const tbody = document.querySelector('#adminTable tbody');
-  tbody.innerHTML='';
-  let index=0;
-  snapshot.forEach(docSnap=>{
-    const r = docSnap.data();
-    if(searchTerm && !r.bike.toLowerCase().includes(searchTerm) && !r.customerName.toLowerCase().includes(searchTerm)) return;
+  renderReservations();
+};
 
-    const start = new Date(r.start.seconds*1000);
-    const end = new Date(r.end.seconds*1000);
-    const now = new Date();
+// ----- Render reservations table -----
+function renderReservations(){
+  const tbody = document.querySelector("#reservationTable tbody");
+  tbody.innerHTML = '';
+  const now = new Date();
+  const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+
+  reservations.sort((a,b)=>new Date(b.start)-new Date(a.start));
+
+  reservations.forEach((r,index)=>{
+    if(searchTerm && !r.bike.toLowerCase().includes(searchTerm) && !r.customerName?.toLowerCase().includes(searchTerm)) return;
+    const start = new Date(r.start);
+    const end = new Date(r.end);
     const status = r.picked?'Riding':(r.returned?'Returned':(now<start?'Upcoming':'Waiting'));
-    const totalTime = r.returnedTime ? Math.floor((r.returnedTime.seconds*1000-start)/60000) : (r.picked?Math.floor((now-start)/60000):'');
-    const rideDuration=Math.floor((end-start)/60000);
-    const extraEarly=totalTime ? totalTime-rideDuration : 0;
-    const totalCost=totalTime ? rideDuration + (extraEarly>0?extraEarly:0) : '';
-    
-    const tr=document.createElement('tr');
+    const totalTime = r.returnedTime ? Math.floor((new Date(r.returnedTime)-start)/60000) : (r.picked?Math.floor((now-start)/60000):'');
+    const rideDuration = Math.floor((end-start)/60000);
+    const extraEarly = totalTime ? totalTime-rideDuration : 0;
+
+    const tr = document.createElement('tr');
     tr.innerHTML=`
       <td>${r.bike}</td>
       <td>${r.customerName||'-'}</td>
@@ -237,109 +258,69 @@ async function renderAdminTable(){
       <td>${status}</td>
       <td>${totalTime||''}</td>
       <td>${extraEarly>0?`Extra: ${extraEarly}`:(extraEarly<0?`Early: ${-extraEarly}`:'')}</td>
-      <td>${totalCost||''}</td>
-      <td>${r.depositedItems ? r.depositedItems.join(', ') : ''}</td>
+      <td>${r.depositedItems?.join(', ')||''}</td>
       <td id="timer-${index}" class="timer">${r.picked && !r.returned ? totalTime : ''}</td>
       <td>
-        <button class="start-btn" onclick="startRide('${docSnap.id}')">Start Ride</button>
-        <button class="return-btn" onclick="returnBike('${docSnap.id}')" >Return</button>
-      </td>`;
+        <button class="start-btn" onclick="startRide(${index})" ${r.picked||r.returned?'disabled':''}>Start</button>
+        <button class="return-btn" onclick="returnBike(${index})" ${!r.picked||r.returned?'disabled':''}>Return</button>
+        <button class="cancel-btn" onclick="cancelRide(${index})" ${r.picked||r.returned?'disabled':''}>Cancel</button>
+        <button class="delete-btn" onclick="deleteRide(${index})">Delete</button>
+      </td>
+    `;
     tbody.appendChild(tr);
-    index++;
   });
 }
 
-// --- Start Ride ---
-async function startRide(id){
-  const resRef = doc(db,'reservations',id);
-  const rDoc = await resRef.get();
-  const r = (await getDoc(resRef)).data();
-  await updateDoc(resRef,{picked:true});
-  addLog(r.bike,'started');
-  startTimer(id);
-  renderAdminTable();
-}
-
-// --- Return Bike ---
-async function returnBike(id){
-  const resRef = doc(db,'reservations',id);
+// ----- Ride actions -----
+window.startRide = async function(index){
+  const r = reservations[index];
   const now = new Date();
-  await updateDoc(resRef,{picked:false, returned:true, returnedTime:now});
-  addLog('Bike','returned');
-  renderAdminTable();
-}
+  if(now < new Date(r.start)-600000){ alert('Cannot start ride yet. Max 10 min early.'); return; }
+  r.picked=true;
+  await updateDoc(doc(db,"reservations",r.id), {picked:true});
+  startTimer(index);
+  renderReservations();
+};
 
-// --- Timer ---
-function startTimer(id){
-  if(activeTimers[id]) clearInterval(activeTimers[id]);
-  const timerCell = document.getElementById('timer-'+id);
-  activeTimers[id] = setInterval(async ()=>{
-    const rDoc = await getDoc(doc(db,'reservations',id));
-    if(!rDoc.exists()) return;
-    const r = rDoc.data();
-    const startTime = new Date(r.start.seconds*1000);
-    const now = new Date();
-    const elapsedSec = Math.floor((now-startTime)/1000);
-    timerCell.innerText = formatTime(elapsedSec);
+window.returnBike = async function(index){
+  const r = reservations[index];
+  if(!r.picked || r.returned){ alert('Cannot return'); return; }
+  if(activeTimers[index]) clearInterval(activeTimers[index]);
+  const now = new Date();
+  const totalTime = Math.floor((now-new Date(r.start))/60000);
+  const rideDuration = Math.floor((new Date(r.end)-new Date(r.start))/60000);
+  const extraEarly = totalTime-rideDuration;
+
+  r.picked=false; r.returned=true; r.returnedTime=now.toISOString();
+  await updateDoc(doc(db,"reservations",r.id), {picked:false, returned:true, returnedTime:r.returnedTime});
+  renderReservations();
+};
+
+window.cancelRide = async function(index){
+  const r = reservations[index];
+  if(r.picked){ alert('Cannot cancel ride that started'); return; }
+  r.cancelled=true;
+  await updateDoc(doc(db,"reservations",r.id), {cancelled:true});
+  renderReservations();
+};
+
+window.deleteRide = async function(index){
+  const r = reservations[index];
+  await deleteDoc(doc(db,"reservations",r.id));
+  reservations.splice(index,1);
+  renderReservations();
+};
+
+// ----- Timer -----
+function startTimer(index){
+  if(activeTimers[index]) clearInterval(activeTimers[index]);
+  const r = reservations[index];
+  const startTime = new Date();
+  activeTimers[index]=setInterval(()=>{
+    const elapsed = Math.floor((new Date()-startTime)/60000);
+    document.getElementById('timer-'+index).innerText=`${elapsed} min`;
   },1000);
 }
-
-function formatTime(sec){
-  const h=Math.floor(sec/3600);
-  const m=Math.floor((sec%3600)/60);
-  const s=sec%60;
-  return `${h>0?h+'h ':''}${m}m ${s}s`;
-}
-
-// --- Logs ---
-async function addLog(bike,action){
-  await addDoc(collection(db,'logs'),{admin:auth.currentUser.email,bike,action,time:new Date()});
-  renderLogs();
-}
-async function renderLogs(){
-  const snapshot = await getDocs(collection(db,'logs'));
-  const ul=document.getElementById('logList');
-  ul.innerHTML='';
-  snapshot.forEach(docSnap=>{
-    const log = docSnap.data();
-    const li=document.createElement('li');
-    li.innerText=`[${new Date(log.time.seconds*1000).toLocaleString()}] ${log.admin} ${log.action} ${log.bike}`;
-    ul.appendChild(li);
-  });
-}
-
-// --- Charts ---
-async function renderCharts(){
-  const snapshot = await getDocs(collection(db,'reservations'));
-  const bikeCounts={}, hourCounts={}, revenueByDate={};
-  snapshot.forEach(docSnap=>{
-    const r=docSnap.data();
-    const bike=r.bike; bikeCounts[bike]=(bikeCounts[bike]||0)+1;
-    const hour=new Date(r.start.seconds*1000).getHours(); hourCounts[hour]=(hourCounts[hour]||0)+1;
-    const duration=Math.floor((new Date(r.end.seconds*1000)-new Date(r.start.seconds*1000))/60000);
-    const date=new Date(r.start.seconds*1000).toLocaleDateString();
-    revenueByDate[date]=(revenueByDate[date]||0)+duration*ratePerMinute;
-  });
-
-  if(bikeUsageChart) bikeUsageChart.destroy();
-  bikeUsageChart=new Chart(document.getElementById('bikeUsageChart'),{
-    type:'bar',
-    data:{labels:Object.keys(bikeCounts), datasets:[{label:'Usage Count', data:Object.values(bikeCounts), backgroundColor:'#27ae60'}]}
-  });
-
-  if(peakHoursChart) peakHoursChart.destroy();
-  peakHoursChart=new Chart(document.getElementById('peakHoursChart'),{
-    type:'line',
-    data:{labels:Object.keys(hourCounts), datasets:[{label:'Reservations', data:Object.values(hourCounts), borderColor:'#2980b9', fill:false}]}
-  });
-
-  if(revenueChart) revenueChart.destroy();
-  revenueChart=new Chart(document.getElementById('revenueChart'),{
-    type:'line',
-    data:{labels:Object.keys(revenueByDate), datasets:[{label:'Revenue (Ksh)', data:Object.values(revenueByDate), borderColor:'#e67e22', fill:false}]}
-  });
-}
-
 </script>
 </body>
 </html>
