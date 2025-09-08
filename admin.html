@@ -6,15 +6,15 @@
 <title>Bicycle Rental - Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- Favicon -->
 <link rel="icon" href="img/cycling-logo-by-dkm721-brandcrowd.png" type="image/png">
 <style>
 body { font-family: 'Roboto', sans-serif; background:#f0f0f0; margin:0; padding:20px; }
 h1 { text-align:center; color:#2c3e50; margin-bottom:20px; }
 #loginForm, #dashboard { max-width:1200px; margin:auto; }
-input, textarea { padding:8px; margin:5px 0; width:100%; border-radius:5px; border:1px solid #ccc; box-sizing:border-box; }
-button { padding:8px 16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; margin:2px; box-sizing:border-box; }
+input, textarea, select { padding:8px; margin:5px 0; width:100%; border-radius:5px; border:1px solid #ccc; box-sizing:border-box; }
+button { padding:8px 16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; margin:2px; }
 button:hover { opacity:0.9; }
+.logout-btn { background:#c0392b; color:white; float:right; margin-bottom:10px; }
 .table-container { margin-top:20px; overflow-x:auto; }
 table { width:100%; border-collapse:collapse; background:white; border-radius:10px; overflow:hidden; box-shadow:0 6px 15px rgba(0,0,0,0.1); }
 th, td { padding:12px; text-align:center; border-bottom:1px solid #ddd; font-size:0.9em; }
@@ -25,43 +25,38 @@ th { background:#27ae60; color:white; }
 .cancel-btn { background:#7f8c8d; color:white; }
 .delete-btn { background:#7f8c8d; color:white; }
 .timer { font-weight:bold; color:red; }
-#addAdminForm, #addWalkinForm { margin-top:20px; background:#ecf0f1; padding:15px; border-radius:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-#addAdminForm input, #addWalkinForm input, #addWalkinForm textarea, #addWalkinForm select { width:auto; flex:1; min-width:120px; }
-#addAdminForm button, #addWalkinForm button { flex:0 0 auto; }
+#addWalkinForm { margin-top:20px; background:#ecf0f1; padding:15px; border-radius:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+#addWalkinForm input, #addWalkinForm textarea, #addWalkinForm select { width:auto; flex:1; min-width:120px; }
+#addWalkinForm button { flex:0 0 auto; }
+#walkinCostDisplay { width:100%; font-weight:bold; }
 #logs { margin-top:20px; background:#ecf0f1; padding:15px; border-radius:10px; max-height:200px; overflow-y:auto; }
 #searchBar { margin-top:20px; }
-.logout-btn { background:#c0392b; color:white; float:right; margin-bottom:10px; }
 .charts { display:flex; flex-wrap:wrap; gap:20px; margin-top:20px; justify-content:center; }
 .chart-box { background:white; padding:15px; border-radius:10px; box-shadow:0 6px 15px rgba(0,0,0,0.1); flex:1; min-width:280px; max-width:600px; }
 
 @media(max-width:768px){
   th, td{font-size:0.8em; padding:8px;}
-  #addAdminForm, #addWalkinForm{flex-direction:column; align-items:flex-start;}
+  #addWalkinForm{flex-direction:column; align-items:flex-start;}
   .charts{flex-direction:column;}
 }
 </style>
 </head>
 <body>
 
+<!-- Login Form -->
 <div id="loginForm">
   <h1>Admin Login</h1>
-  <input type="text" id="username" placeholder="Username">
+  <input type="email" id="email" placeholder="Email">
   <input type="password" id="password" placeholder="Password">
   <button onclick="login()">Login</button>
   <p id="loginError" style="color:red;"></p>
 </div>
 
+<!-- Dashboard -->
 <div id="dashboard" style="display:none;">
   <h1>🚲 Bicycle Rental - Admin Dashboard</h1>
   <button class="logout-btn" onclick="logout()">Logout</button>
-
-  <!-- Add Admin -->
-  <div id="addAdminForm">
-    <input type="text" id="newAdminUser" placeholder="Username">
-    <input type="password" id="newAdminPass" placeholder="Password">
-    <button onclick="addNewAdmin()">Add Admin</button>
-    <p id="adminMsg" style="color:green; width:100%;"></p>
-  </div>
+  <p>Welcome, <span id="adminEmail"></span> 🎉</p>
 
   <!-- Add Walk-in Customer -->
   <div id="addWalkinForm">
@@ -81,7 +76,7 @@ th { background:#27ae60; color:white; }
   </div>
 
   <div id="searchBar">
-    <input type="text" id="searchInput" placeholder="Search by bike, admin, or customer..." oninput="renderAdminTable()">
+    <input type="text" id="searchInput" placeholder="Search by bike or customer..." oninput="renderAdminTable()">
   </div>
 
   <div class="table-container">
@@ -94,9 +89,9 @@ th { background:#27ae60; color:white; }
           <th>Start Time</th>
           <th>End Time</th>
           <th>Status</th>
-          <th>Total Time (min)</th>
-          <th>Extra/Early (min)</th>
-          <th>Total Cost (Ksh)</th>
+          <th>Total Time</th>
+          <th>Extra/Early</th>
+          <th>Total Cost</th>
           <th>Deposited Items</th>
           <th>Timer</th>
           <th>Actions</th>
@@ -127,85 +122,79 @@ th { background:#27ae60; color:white; }
   </div>
 </div>
 
-<script>
-let admins = JSON.parse(localStorage.getItem('admins')) || [{username:"admin1", password:"pass123"}];
-localStorage.setItem('admins', JSON.stringify(admins));
-let reservations = JSON.parse(localStorage.getItem('reservations')) || [];
-let logs = JSON.parse(localStorage.getItem('logs')) || [];
-let activeTimers = {};
-let currentAdmin = localStorage.getItem('loggedAdmin') || null;
-const ratePerMinute = 1;
+<!-- Firebase and Admin Logic -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-// --------------- Login ---------------
-function login(){
-  const user=document.getElementById('username').value.trim();
-  const pass=document.getElementById('password').value;
-  admins = JSON.parse(localStorage.getItem('admins')) || admins;
-  const admin = admins.find(a=>a.username===user && a.password===pass);
-  if(admin){
-    currentAdmin=user;
-    localStorage.setItem('loggedAdmin',user);
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyB8d4sLlqCZ4bQxlUBEYT3axhz1wbJjHaI",
+  authDomain: "bicycle-rental-5ca9f.firebaseapp.com",
+  projectId: "bicycle-rental-5ca9f",
+  storageBucket: "bicycle-rental-5ca9f.firebasestorage.app",
+  messagingSenderId: "244319467774",
+  appId: "1:244319467774:web:e2a2c790663ea3e7200daf",
+  measurementId: "G-XFS1MNQ15W"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const ratePerMinute = 1;
+let activeTimers = {};
+let bikeUsageChart=null, peakHoursChart=null, revenueChart=null;
+
+// Login & Logout
+async function login(){
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  try { await signInWithEmailAndPassword(auth,email,password); document.getElementById('loginError').innerText=''; } 
+  catch(e){ document.getElementById('loginError').innerText=e.message; }
+}
+async function logout(){ await signOut(auth); }
+
+onAuthStateChanged(auth, async (user)=>{
+  if(user){
     document.getElementById('loginForm').style.display='none';
     document.getElementById('dashboard').style.display='block';
+    document.getElementById('adminEmail').innerText=user.email;
     renderAdminTable();
-    renderLogs();
     renderCharts();
-  } else { document.getElementById('loginError').innerText="Invalid username or password!"; }
-}
+    renderLogs();
+  } else {
+    document.getElementById('loginForm').style.display='block';
+    document.getElementById('dashboard').style.display='none';
+  }
+});
 
-function logout(){
-  currentAdmin=null;
-  localStorage.removeItem('loggedAdmin');
-  document.getElementById('dashboard').style.display='none';
-  document.getElementById('loginForm').style.display='block';
-}
-
-// --------------- Add Admin ---------------
-function addNewAdmin(){
-  const newUser=document.getElementById('newAdminUser').value.trim();
-  const newPass=document.getElementById('newAdminPass').value;
-  if(!newUser||!newPass){ alert("Fill both fields"); return; }
-  admins=JSON.parse(localStorage.getItem('admins')) || admins;
-  if(admins.find(a=>a.username===newUser)){ alert("Username exists!"); return; }
-  admins.push({username:newUser,password:newPass});
-  localStorage.setItem('admins',JSON.stringify(admins));
-  document.getElementById('adminMsg').innerText=`New admin "${newUser}" added successfully!`;
-  document.getElementById('newAdminUser').value=''; document.getElementById('newAdminPass').value='';
-}
-
-// --------------- Walk-in Customer ---------------
-document.getElementById('walkinDuration').addEventListener('input', ()=>{
+// Add Walk-in Customer
+document.getElementById('walkinDuration').addEventListener('input',()=>{
   const dur = parseInt(document.getElementById('walkinDuration').value);
   document.getElementById('walkinCostDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
 });
 
-function addWalkinCustomer(){
+async function addWalkinCustomer(){
   const name=document.getElementById('walkinName').value.trim();
   const phone=document.getElementById('walkinPhone').value.trim();
   const bike=document.getElementById('walkinBike').value;
   const start=document.getElementById('walkinStart').value;
   const duration=parseInt(document.getElementById('walkinDuration').value);
   const items=document.getElementById('walkinItems').value.split(',').map(i=>i.trim()).filter(i=>i);
-
   if(!name||!phone||!bike||!start||!duration){ alert('Fill all fields'); return; }
 
   const startTime = new Date(start);
   const endTime = new Date(startTime.getTime() + duration*60000);
 
-  // check conflicts
-  if(reservations.some(r=>r.bike===bike && ((startTime<new Date(r.end))&&(endTime>new Date(r.start))))){
-    alert('Bike already reserved at this time'); return;
-  }
-
-  const newRes = {
+  // Add to Firestore
+  await addDoc(collection(db,'reservations'),{
     bike, customerName:name, phone, start:startTime, end:endTime,
-    picked:false, returned:false, cancelled:false, depositedItems: items
-  };
+    picked:false, returned:false, cancelled:false, depositedItems: items,
+    createdBy:auth.currentUser.email
+  });
 
-  reservations.push(newRes);
-  localStorage.setItem('reservations', JSON.stringify(reservations));
-
-  // clear form
+  // Clear form
   document.getElementById('walkinName').value='';
   document.getElementById('walkinPhone').value='';
   document.getElementById('walkinBike').value='';
@@ -213,32 +202,31 @@ function addWalkinCustomer(){
   document.getElementById('walkinDuration').value='';
   document.getElementById('walkinItems').value='';
   document.getElementById('walkinCostDisplay').innerText='Estimated Cost: 0 Ksh';
-
+  
   renderAdminTable();
   addLog(bike,'added walk-in customer');
 }
 
-// --------------- Table Rendering ---------------
-function renderAdminTable(){
-  reservations=JSON.parse(localStorage.getItem('reservations'))||[];
-  const tbody=document.querySelector('#adminTable tbody');
+// Fetch and Render Table
+async function renderAdminTable(){
+  const searchTerm = document.getElementById('searchInput')?.value.toLowerCase()||'';
+  const snapshot = await getDocs(collection(db,'reservations'));
+  const tbody = document.querySelector('#adminTable tbody');
   tbody.innerHTML='';
-  const now=new Date();
-  const searchTerm=document.getElementById('searchInput')?.value.toLowerCase()||'';
+  let index=0;
+  snapshot.forEach(docSnap=>{
+    const r = docSnap.data();
+    if(searchTerm && !r.bike.toLowerCase().includes(searchTerm) && !r.customerName.toLowerCase().includes(searchTerm)) return;
 
-  reservations.sort((a,b)=>new Date(b.start)-new Date(a.start));
-
-  reservations.forEach((r,index)=>{
-    if(searchTerm && !r.bike.toLowerCase().includes(searchTerm) && !r.customerName?.toLowerCase().includes(searchTerm) && !r.phone?.includes(searchTerm)) return;
-
-    const start=new Date(r.start);
-    const end=new Date(r.end);
-    const status=r.picked?'Riding':(r.returned?'Returned':(now<start?'Upcoming':'Waiting'));
-    const totalTime=r.returnedTime ? Math.floor((new Date(r.returnedTime)-start)/60000) : (r.picked?Math.floor((now-start)/60000):'');
+    const start = new Date(r.start.seconds*1000);
+    const end = new Date(r.end.seconds*1000);
+    const now = new Date();
+    const status = r.picked?'Riding':(r.returned?'Returned':(now<start?'Upcoming':'Waiting'));
+    const totalTime = r.returnedTime ? Math.floor((r.returnedTime.seconds*1000-start)/60000) : (r.picked?Math.floor((now-start)/60000):'');
     const rideDuration=Math.floor((end-start)/60000);
     const extraEarly=totalTime ? totalTime-rideDuration : 0;
     const totalCost=totalTime ? rideDuration + (extraEarly>0?extraEarly:0) : '';
-
+    
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${r.bike}</td>
@@ -253,158 +241,104 @@ function renderAdminTable(){
       <td>${r.depositedItems ? r.depositedItems.join(', ') : ''}</td>
       <td id="timer-${index}" class="timer">${r.picked && !r.returned ? totalTime : ''}</td>
       <td>
-        <button class="edit-btn" onclick="editReservation(${index})">Edit</button>
-        <button class="start-btn" onclick="startRide(${index})" ${r.picked||r.returned?'disabled':''}>Start Ride</button>
-        <button class="return-btn" onclick="returnBike(${index})" ${!r.picked||r.returned?'disabled':''}>Return</button>
-        <button class="cancel-btn" onclick="cancelRide(${index})" ${r.picked||r.returned?'disabled':''}>Cancel</button>
-        <button class="delete-btn" onclick="deleteRide(${index})" ${!(r.returned || r.cancelled)?'disabled':''}>Delete</button>
-      </td>
-    `;
+        <button class="start-btn" onclick="startRide('${docSnap.id}')">Start Ride</button>
+        <button class="return-btn" onclick="returnBike('${docSnap.id}')" >Return</button>
+      </td>`;
     tbody.appendChild(tr);
+    index++;
   });
-  renderCharts();
 }
 
-// --------------- Ride Actions ---------------
-function startRide(index){
-  const r=reservations[index];
-  const now=new Date();
-  if(now < new Date(r.start)-600000){ alert('Cannot start ride yet. Max 10 min early.'); return; }
-  r.picked=true; localStorage.setItem('reservations',JSON.stringify(reservations));
+// --- Start Ride ---
+async function startRide(id){
+  const resRef = doc(db,'reservations',id);
+  const rDoc = await resRef.get();
+  const r = (await getDoc(resRef)).data();
+  await updateDoc(resRef,{picked:true});
   addLog(r.bike,'started');
-  startTimer(index); renderAdminTable(); renderLogs();
+  startTimer(id);
+  renderAdminTable();
 }
 
-function returnBike(index){
-  const r=reservations[index];
-  if(!r.picked || r.returned){ alert('Cannot return. Ride not started or already returned'); return; }
-  if(activeTimers[index]) clearInterval(activeTimers[index]);
-  const now=new Date();
-  const totalTime=Math.floor((now-new Date(r.start))/60000);
-  const rideDuration=Math.floor((new Date(r.end)-new Date(r.start))/60000);
-  const extraEarly=totalTime-rideDuration;
-  const totalCost=rideDuration+(extraEarly>0?extraEarly:0);
-  r.picked=false; r.returned=true; r.returnedTime=now;
-  localStorage.setItem('reservations',JSON.stringify(reservations));
-  addLog(r.bike,'returned');
-  renderAdminTable(); renderLogs();
-  notifyAdmin('Bike Returned', `${r.bike} returned by ${r.customerName||'Unknown'}.\nTotal Time: ${totalTime} min\nTotal Cost: ${totalCost} Ksh`);
+// --- Return Bike ---
+async function returnBike(id){
+  const resRef = doc(db,'reservations',id);
+  const now = new Date();
+  await updateDoc(resRef,{picked:false, returned:true, returnedTime:now});
+  addLog('Bike','returned');
+  renderAdminTable();
 }
 
-function cancelRide(index){
-  const r=reservations[index];
-  if(r.picked){ alert('Cannot cancel ride that has started'); return; }
-  r.cancelled=true;
-  localStorage.setItem('reservations',JSON.stringify(reservations));
-  addLog(r.bike,'cancelled');
-  renderAdminTable(); renderLogs();
-  notifyAdmin('Reservation Cancelled', `${r.bike} reservation cancelled`);
-}
-
-function deleteRide(index){
-  const r=reservations[index];
-  reservations.splice(index,1);
-  localStorage.setItem('reservations',JSON.stringify(reservations));
-  renderAdminTable(); renderLogs();
-  notifyAdmin('Ride Deleted', `${r.bike} removed from records`);
-}
-
-// --------------- Timer ---------------
-function startTimer(index){
-  if(activeTimers[index]) clearInterval(activeTimers[index]);
-  const r=reservations[index];
-  const startTime=new Date();
-  activeTimers[index]=setInterval(()=>{
-    const elapsed=Math.floor((new Date()-startTime)/60000);
-    document.getElementById('timer-'+index).innerText=`${elapsed} min`;
+// --- Timer ---
+function startTimer(id){
+  if(activeTimers[id]) clearInterval(activeTimers[id]);
+  const timerCell = document.getElementById('timer-'+id);
+  activeTimers[id] = setInterval(async ()=>{
+    const rDoc = await getDoc(doc(db,'reservations',id));
+    if(!rDoc.exists()) return;
+    const r = rDoc.data();
+    const startTime = new Date(r.start.seconds*1000);
+    const now = new Date();
+    const elapsedSec = Math.floor((now-startTime)/1000);
+    timerCell.innerText = formatTime(elapsedSec);
   },1000);
 }
 
-// --------------- Edit Reservation ---------------
-function editReservation(index){
-  const r=reservations[index];
-  const newBike=prompt('Bicycle Name:',r.bike);
-  const newCustomer=prompt('Customer Name:',r.customerName||'');
-  const newPhone=prompt('Phone Number:',r.phone||'');
-  const newStart=prompt('Start datetime (YYYY-MM-DDTHH:MM):', new Date(r.start).toISOString().slice(0,16));
-  const newEnd=prompt('End datetime (YYYY-MM-DDTHH:MM):', new Date(r.end).toISOString().slice(0,16));
-  const newItems=prompt('Deposited Items (comma separated):', r.depositedItems ? r.depositedItems.join(', ') : '');
-  if(newBike && newStart && newEnd){
-    r.bike=newBike; r.customerName=newCustomer; r.phone=newPhone; r.start=new Date(newStart); r.end=new Date(newEnd);
-    r.depositedItems=newItems.split(',').map(i=>i.trim()).filter(i=>i);
-    localStorage.setItem('reservations',JSON.stringify(reservations));
-    renderAdminTable();
-  }
+function formatTime(sec){
+  const h=Math.floor(sec/3600);
+  const m=Math.floor((sec%3600)/60);
+  const s=sec%60;
+  return `${h>0?h+'h ':''}${m}m ${s}s`;
 }
 
-// --------------- Logs ---------------
-function addLog(bike,action){
-  logs.push({admin:currentAdmin,bike:bike,action:action,time:new Date()});
-  localStorage.setItem('logs',JSON.stringify(logs));
+// --- Logs ---
+async function addLog(bike,action){
+  await addDoc(collection(db,'logs'),{admin:auth.currentUser.email,bike,action,time:new Date()});
+  renderLogs();
 }
-function renderLogs(){
-  logs=JSON.parse(localStorage.getItem('logs'))||[];
+async function renderLogs(){
+  const snapshot = await getDocs(collection(db,'logs'));
   const ul=document.getElementById('logList');
   ul.innerHTML='';
-  logs.slice(-20).reverse().forEach(log=>{
+  snapshot.forEach(docSnap=>{
+    const log = docSnap.data();
     const li=document.createElement('li');
-    li.innerText=`[${new Date(log.time).toLocaleString()}] ${log.admin} ${log.action} ${log.bike}`;
+    li.innerText=`[${new Date(log.time.seconds*1000).toLocaleString()}] ${log.admin} ${log.action} ${log.bike}`;
     ul.appendChild(li);
   });
 }
 
-// --------------- Charts ---------------
-let bikeUsageChart=null, peakHoursChart=null, revenueChart=null;
-function renderCharts(){
+// --- Charts ---
+async function renderCharts(){
+  const snapshot = await getDocs(collection(db,'reservations'));
   const bikeCounts={}, hourCounts={}, revenueByDate={};
-  reservations.forEach(r=>{
+  snapshot.forEach(docSnap=>{
+    const r=docSnap.data();
     const bike=r.bike; bikeCounts[bike]=(bikeCounts[bike]||0)+1;
-    const hour=new Date(r.start).getHours(); hourCounts[hour]=(hourCounts[hour]||0)+1;
-    const duration=Math.floor((new Date(r.end)-new Date(r.start))/60000);
-    const cost=duration*ratePerMinute;
-    const date=new Date(r.start).toLocaleDateString();
-    revenueByDate[date]=(revenueByDate[date]||0)+cost;
+    const hour=new Date(r.start.seconds*1000).getHours(); hourCounts[hour]=(hourCounts[hour]||0)+1;
+    const duration=Math.floor((new Date(r.end.seconds*1000)-new Date(r.start.seconds*1000))/60000);
+    const date=new Date(r.start.seconds*1000).toLocaleDateString();
+    revenueByDate[date]=(revenueByDate[date]||0)+duration*ratePerMinute;
   });
 
-  // Bike Usage
   if(bikeUsageChart) bikeUsageChart.destroy();
   bikeUsageChart=new Chart(document.getElementById('bikeUsageChart'),{
-    type:'bar', data:{
-      labels:Object.keys(bikeCounts),
-      datasets:[{label:'Usage Count', data:Object.values(bikeCounts), backgroundColor:'#27ae60'}]
-    }
+    type:'bar',
+    data:{labels:Object.keys(bikeCounts), datasets:[{label:'Usage Count', data:Object.values(bikeCounts), backgroundColor:'#27ae60'}]}
   });
 
-  // Peak Hours
   if(peakHoursChart) peakHoursChart.destroy();
   peakHoursChart=new Chart(document.getElementById('peakHoursChart'),{
-    type:'line', data:{
-      labels:Object.keys(hourCounts),
-      datasets:[{label:'Reservations', data:Object.values(hourCounts), borderColor:'#2980b9', fill:false}]
-    }
+    type:'line',
+    data:{labels:Object.keys(hourCounts), datasets:[{label:'Reservations', data:Object.values(hourCounts), borderColor:'#2980b9', fill:false}]}
   });
 
-  // Revenue
   if(revenueChart) revenueChart.destroy();
   revenueChart=new Chart(document.getElementById('revenueChart'),{
-    type:'line', data:{
-      labels:Object.keys(revenueByDate),
-      datasets:[{label:'Revenue (Ksh)', data:Object.values(revenueByDate), borderColor:'#e67e22', fill:false}]
-    }
+    type:'line',
+    data:{labels:Object.keys(revenueByDate), datasets:[{label:'Revenue (Ksh)', data:Object.values(revenueByDate), borderColor:'#e67e22', fill:false}]}
   });
 }
-
-// --------------- Notifications ---------------
-function notifyAdmin(title,message){
-  if(Notification.permission==='granted'){
-    new Notification(title,{body:message});
-  } else {
-    Notification.requestPermission();
-  }
-}
-
-// Initialize
-if(currentAdmin){ document.getElementById('loginForm').style.display='none'; document.getElementById('dashboard').style.display='block'; renderAdminTable(); renderLogs(); renderCharts(); }
 
 </script>
 </body>
