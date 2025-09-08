@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bicycle Rental</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<!-- Favicon -->
+<link rel="icon" href="img/cycling-logo-by-dkm721-brandcrowd.png" type="image/png">
+
+<style>
+body { font-family: 'Roboto', sans-serif; background:#f0f0f0; margin:0; padding:20px; }
+h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
+.bike-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; justify-content: center; }
+.bike-card { max-width: 250px; width:100%; background:white; border-radius:10px; overflow:hidden; box-shadow:0 6px 15px rgba(0,0,0,0.1); display:flex; flex-direction:column; transition: transform 0.3s, box-shadow 0.3s;}
+.bike-card:hover { transform:translateY(-5px); box-shadow:0 12px 25px rgba(0,0,0,0.2);}
+.bike-card img { width:100%; height:auto; max-height:300px; object-fit:cover; display:block; border-bottom:1px solid #ddd;}
+@media(max-width:768px){.bike-card img{max-height:250px;}} 
+@media(max-width:480px){.bike-card img{max-height:200px;}}
+.bike-info { padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between;}
+.bike-info h3{margin:0 0 5px 0;color:#2c3e50;font-size:1.1em;}
+.bike-info p{margin:0 0 10px 0;color:#7f8c8d;font-size:0.9em;}
+.bike-info button { padding:8px 12px; width:auto; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; align-self:flex-start;}
+.bike-info button:disabled{background:#ccc; cursor:not-allowed;}
+.status-text{margin-top:10px; font-size:0.9em;}
+.status-upcoming{color:#e67e22; font-weight:bold;}
+.status-riding{color:#27ae60; font-weight:bold;}
+.popup{display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;}
+.popup-content{background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; position:relative;}
+.popup-content h2{margin-top:0;}
+.popup-content label{display:block;margin:10px 0 5px;}
+.popup-content input{width:100%; padding:8px; border-radius:5px; border:1px solid #ccc;}
+.popup-content button{margin-top:10px; padding:10px; width:100%; border:none; border-radius:5px; cursor:pointer; font-weight:bold; background:#27ae60; color:white;}
+.popup-content button:hover{background:#219150;}
+.close-popup{position:absolute; top:10px; right:15px; cursor:pointer; font-size:20px; color:#333;}
+#costDisplay{font-weight:bold; color:#2980b9; margin-top:10px;}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🚲 Bicycle Rental</h1>
+  <div class="bike-grid" id="bikeGrid">
+    <div class="bike-card" data-name="Mountain Bike">
+      <img src="img/1.jpg" alt="Mountain Bike">
+      <div class="bike-info">
+        <h3>Mountain Bike</h3>
+        <p>Perfect for rough trails and adventurous rides.</p>
+        <button onclick="openPopup('Mountain Bike')">Reserve</button>
+        <div class="status-text" id="status-Mountain Bike"></div>
+      </div>
+    </div>
+    <div class="bike-card" data-name="Road Bike">
+      <img src="img/2.jpg" alt="Road Bike">
+      <div class="bike-info">
+        <h3>Road Bike</h3>
+        <p>Fast and smooth for city roads and commuting.</p>
+        <button onclick="openPopup('Road Bike')">Reserve</button>
+        <div class="status-text" id="status-Road Bike"></div>
+      </div>
+    </div>
+    <div class="bike-card" data-name="Electric Bike">
+      <img src="img/3.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/4.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/5.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/6.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/7.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/8.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/9.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+	<div class="bike-card" data-name="Electric Bike">
+      <img src="img/10.jpg" alt="Electric Bike">
+      <div class="bike-info">
+        <h3>Electric Bike</h3>
+        <p>Effortless rides with battery-powered assistance.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popup" id="popup">
+  <div class="popup-content">
+    <span class="close-popup" onclick="closePopup()">&times;</span>
+    <h2 id="popupBikeName"></h2>
+    <label>Customer Name:</label>
+    <input type="text" id="customerName">
+    <label>Phone Number:</label>
+    <input type="text" id="customerPhone">
+    <label>Pick-up Date & Time:</label>
+    <input type="datetime-local" id="pickupTime">
+    <label>Estimated Duration (minutes):</label>
+    <input type="number" id="duration" min="1">
+    <div id="costDisplay">Estimated Cost: 0 Ksh</div>
+    <button onclick="reserveBike()">Reserve</button>
+  </div>
+</div>
+
+<script>
+let selectedBike = null;
+let reservations = JSON.parse(localStorage.getItem('reservations')) || [];
+let countdownIntervals = {};
+const ratePerMinute = 1; // 1 KSh per minute
+
+function openPopup(bikeName){
+  selectedBike = bikeName;
+  document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName}`;
+  document.getElementById('popup').style.display = 'flex';
+  document.getElementById('customerName').value='';
+  document.getElementById('customerPhone').value='';
+  document.getElementById('pickupTime').value='';
+  document.getElementById('duration').value='';
+  document.getElementById('costDisplay').innerText = 'Estimated Cost: 0 Ksh';
+}
+
+// Close popup
+function closePopup(){
+  document.getElementById('popup').style.display='none';
+}
+
+// Reserve bike
+function reserveBike(){
+  const name=document.getElementById('customerName').value.trim();
+  const phone=document.getElementById('customerPhone').value.trim();
+  const pickup=document.getElementById('pickupTime').value;
+  const duration=parseInt(document.getElementById('duration').value);
+  if(!name||!phone||!pickup||!duration){ alert('Fill all fields'); return; }
+
+  const start = new Date(pickup);
+  const end = new Date(start.getTime()+duration*60000);
+
+  if(reservations.some(r=>r.bike===selectedBike && ((start<new Date(r.end))&&(end>new Date(r.start))))){
+    alert('Bike already reserved at this time'); return;
+  }
+
+  const newRes = {bike:selectedBike, customerName:name, phone:phone, start:start, end:end, picked:false, returned:false, cancelled:false};
+  reservations.push(newRes);
+  localStorage.setItem('reservations', JSON.stringify(reservations));
+  closePopup();
+  renderStatuses();
+}
+
+// Update cost live when duration input changes
+document.getElementById('duration').addEventListener('input', ()=>{
+  const dur = parseInt(document.getElementById('duration').value);
+  document.getElementById('costDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
+});
+
+// Render bike statuses
+function renderStatuses(){
+  reservations = JSON.parse(localStorage.getItem('reservations')) || [];
+  const bikes = ['Mountain Bike','Road Bike','Electric Bike'];
+
+  bikes.forEach(bike=>{
+    const div = document.getElementById('status-'+bike);
+    const res = reservations.filter(r=>r.bike===bike && !r.returned && !r.cancelled)
+                            .sort((a,b)=>new Date(a.start)-new Date(b.start));
+
+    if(res.length===0){ 
+      div.innerHTML=''; 
+      clearInterval(countdownIntervals[bike]);
+      return; 
+    }
+
+    let statusText='';
+    res.forEach(r=>{
+      const now = new Date();
+      let status='', colorClass='', remainingMinutes=0;
+      if(r.picked){
+        status='Riding';
+        colorClass='status-riding';
+      } else if(now<new Date(r.start)){
+        status='Upcoming';
+        colorClass='status-upcoming';
+      }
+      remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
+      const extraCost = r.picked && remainingMinutes<0 ? Math.abs(remainingMinutes)*ratePerMinute : 0;
+      statusText+=`<span class="${colorClass}">${status} (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - <span id="timer-${bike}">${remainingMinutes}</span> min left</span>`;
+      if(extraCost>0) statusText+=` <span style="color:red;">Extra Charge: ${extraCost} Ksh</span>`;
+      statusText+='<br>';
+    });
+    div.innerHTML=statusText;
+
+    clearInterval(countdownIntervals[bike]);
+    countdownIntervals[bike] = setInterval(()=>{
+      const timerSpan=document.getElementById('timer-'+bike);
+      if(timerSpan && res[0]){
+        const now=new Date();
+        let remaining=Math.max(Math.ceil((new Date(res[0].end)-now)/60000),0);
+        timerSpan.innerText=remaining;
+      }
+    },1000);
+  });
+}
+
+window.addEventListener('storage', renderStatuses);
+renderStatuses();
+</script>
+
+</body>
+</html>
