@@ -21,7 +21,6 @@ th, td { padding:12px; text-align:center; border-bottom:1px solid #ddd; font-siz
 th { background:#27ae60; color:white; }
 .start-btn { background:#2980b9; color:white; }
 .return-btn { background:#c0392b; color:white; }
-.edit-btn { background:#f39c12; color:white; }
 .cancel-btn { background:#7f8c8d; color:white; }
 .delete-btn { background:#7f8c8d; color:white; }
 .timer { font-weight:bold; color:red; }
@@ -124,7 +123,7 @@ th { background:#27ae60; color:white; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
 // Firebase config
 const firebaseConfig = {
@@ -143,10 +142,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 const ratePerMinute = 1;
-let activeTimers = {};
 let reservations = [];
+let activeTimers = {};
+let bikeUsageChart, peakHoursChart, revenueChart;
+let lastReservationsJSON = '';
 
-// ----- Expose login/logout globally -----
+// ----- Auth -----
 window.login = async function() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
@@ -162,36 +163,37 @@ window.logout = async function() {
   await signOut(auth);
 };
 
-// ----- Auth state -----
 onAuthStateChanged(auth, async (user) => {
   if(user){
     document.getElementById("loginForm").style.display="none";
     document.getElementById("dashboard").style.display="block";
     document.getElementById("adminEmail").innerText = user.email;
-    await loadReservations();
-    renderReservations();
+    loadReservationsRealtime();
   } else {
     document.getElementById("loginForm").style.display="block";
     document.getElementById("dashboard").style.display="none";
   }
 });
 
-// ----- Load reservations from Firestore -----
-async function loadReservations(){
-  reservations = [];
-  const querySnapshot = await getDocs(collection(db,"reservations"));
-  querySnapshot.forEach(docSnap=>{
-    const data = docSnap.data();
-    reservations.push({...data, id: docSnap.id});
+// ----- Load Reservations Realtime -----
+function loadReservationsRealtime(){
+  const collRef = collection(db,"reservations");
+  onSnapshot(collRef, snapshot=>{
+    reservations = [];
+    snapshot.forEach(docSnap=>{
+      const data = docSnap.data();
+      reservations.push({...data, id: docSnap.id});
+    });
   });
 }
 
-// ----- Add walk-in -----
+// ----- Walk-in Cost Calculation -----
 document.getElementById('walkinDuration').addEventListener('input', ()=>{
   const dur = parseInt(document.getElementById('walkinDuration').value);
   document.getElementById('walkinCostDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
 });
 
+// ----- Add Walk-in Customer -----
 window.addWalkinCustomer = async function(){
   const name=document.getElementById('walkinName').value.trim();
   const phone=document.getElementById('walkinPhone').value.trim();
@@ -205,8 +207,7 @@ window.addWalkinCustomer = async function(){
   const startTime = new Date(start);
   const endTime = new Date(startTime.getTime() + duration*60000);
 
-  // Check conflicts
-  if(reservations.some(r=>r.bike===bike && ((startTime<new Date(r.end))&&(endTime>new Date(r.start))))){
+  if(reservations.some(r=>r.bike===bike && !r.cancelled && ((startTime<new Date(r.end))&&(endTime>new Date(r.start))))){
     alert('Bike already reserved at this time'); return;
   }
 
@@ -216,9 +217,6 @@ window.addWalkinCustomer = async function(){
   };
 
   const docRef = await addDoc(collection(db,"reservations"), newRes);
-  reservations.push({...newRes, id: docRef.id});
-
-  // Clear form
   document.getElementById('walkinName').value='';
   document.getElementById('walkinPhone').value='';
   document.getElementById('walkinBike').value='';
@@ -226,11 +224,9 @@ window.addWalkinCustomer = async function(){
   document.getElementById('walkinDuration').value='';
   document.getElementById('walkinItems').value='';
   document.getElementById('walkinCostDisplay').innerText='Estimated Cost: 0 Ksh';
-
-  renderReservations();
 };
 
-// ----- Render reservations table -----
+// ----- Render Reservations -----
 function renderReservations(){
   const tbody = document.querySelector("#reservationTable tbody");
   tbody.innerHTML = '';
@@ -271,15 +267,13 @@ function renderReservations(){
   });
 }
 
-// ----- Ride actions -----
+// ----- Ride Actions -----
 window.startRide = async function(index){
   const r = reservations[index];
   const now = new Date();
   if(now < new Date(r.start)-600000){ alert('Cannot start ride yet. Max 10 min early.'); return; }
   r.picked=true;
   await updateDoc(doc(db,"reservations",r.id), {picked:true});
-  startTimer(index);
-  renderReservations();
 };
 
 window.returnBike = async function(index){
@@ -287,13 +281,8 @@ window.returnBike = async function(index){
   if(!r.picked || r.returned){ alert('Cannot return'); return; }
   if(activeTimers[index]) clearInterval(activeTimers[index]);
   const now = new Date();
-  const totalTime = Math.floor((now-new Date(r.start))/60000);
-  const rideDuration = Math.floor((new Date(r.end)-new Date(r.start))/60000);
-  const extraEarly = totalTime-rideDuration;
-
   r.picked=false; r.returned=true; r.returnedTime=now.toISOString();
   await updateDoc(doc(db,"reservations",r.id), {picked:false, returned:true, returnedTime:r.returnedTime});
-  renderReservations();
 };
 
 window.cancelRide = async function(index){
@@ -301,26 +290,87 @@ window.cancelRide = async function(index){
   if(r.picked){ alert('Cannot cancel ride that started'); return; }
   r.cancelled=true;
   await updateDoc(doc(db,"reservations",r.id), {cancelled:true});
-  renderReservations();
 };
 
 window.deleteRide = async function(index){
   const r = reservations[index];
   await deleteDoc(doc(db,"reservations",r.id));
-  reservations.splice(index,1);
-  renderReservations();
 };
 
-// ----- Timer -----
-function startTimer(index){
-  if(activeTimers[index]) clearInterval(activeTimers[index]);
-  const r = reservations[index];
-  const startTime = new Date();
-  activeTimers[index]=setInterval(()=>{
-    const elapsed = Math.floor((new Date()-startTime)/60000);
-    document.getElementById('timer-'+index).innerText=`${elapsed} min`;
-  },1000);
+// ----- Timers -----
+function updateTimers(){
+  const now = new Date();
+  reservations.forEach((r,index)=>{
+    if(r.picked && !r.returned){
+      const startTime = new Date(r.start);
+      const elapsed = Math.floor((now - startTime)/60000);
+      const timerEl = document.getElementById('timer-'+index);
+      if(timerEl) timerEl.innerText = `${elapsed} min`;
+    }
+  });
 }
+
+// ----- Charts -----
+function updateCharts(){
+  const bikeCounts = {}, hourCounts = {}, bikeRevenue = {};
+  const now = new Date();
+
+  reservations.forEach(r=>{
+    if(!r.cancelled){
+      bikeCounts[r.bike] = (bikeCounts[r.bike]||0)+1;
+
+      const startHour = new Date(r.start).getHours();
+      hourCounts[startHour] = (hourCounts[startHour]||0)+1;
+
+      let endTime = r.returnedTime ? new Date(r.returnedTime) : now;
+      const duration = Math.floor((endTime - new Date(r.start))/60000);
+      bikeRevenue[r.bike] = (bikeRevenue[r.bike]||0) + duration*ratePerMinute;
+    }
+  });
+
+  // Bike Usage
+  const bikeLabels = Object.keys(bikeCounts);
+  const bikeData = Object.values(bikeCounts);
+  if(bikeUsageChart) bikeUsageChart.destroy();
+  bikeUsageChart = new Chart(document.getElementById('bikeUsageChart').getContext('2d'), {
+    type:'bar',
+    data:{labels: bikeLabels, datasets:[{label:'Usage Count', data: bikeData, backgroundColor:'#27ae60'}]},
+    options:{responsive:true, plugins:{legend:{display:false}}}
+  });
+
+  // Peak Hours
+  const hourLabels12 = Array.from({length:24}, (_,i)=>`${i%12===0?12:i%12} ${i<12?'AM':'PM'}`);
+  const hourData = hourLabels12.map((_,i)=> hourCounts[i]||0);
+  if(peakHoursChart) peakHoursChart.destroy();
+  peakHoursChart = new Chart(document.getElementById('peakHoursChart').getContext('2d'), {
+    type:'line',
+    data:{labels:hourLabels12, datasets:[{label:'Reservations', data:hourData, borderColor:'#2980b9', fill:false}]},
+    options:{responsive:true, plugins:{legend:{display:false}}}
+  });
+
+  // Revenue
+  const revenueLabels = Object.keys(bikeRevenue);
+  const revenueData = Object.values(bikeRevenue);
+  if(revenueChart) revenueChart.destroy();
+  revenueChart = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+    type:'doughnut',
+    data:{labels:revenueLabels, datasets:[{data:revenueData, backgroundColor:['#f39c12','#2980b9','#27ae60','#8e44ad','#e74c3c']}]},
+    options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+// ----- Main Loop -----
+setInterval(()=>{
+  renderReservations();
+  updateTimers();
+
+  const currentJSON = JSON.stringify(reservations.map(r=>({picked:r.picked, returned:r.returned, cancelled:r.cancelled, start:r.start, end:r.end, bike:r.bike})));
+  if(currentJSON !== lastReservationsJSON){
+    updateCharts();
+    lastReservationsJSON = currentJSON;
+  }
+},1000);
+
 </script>
 </body>
 </html>
