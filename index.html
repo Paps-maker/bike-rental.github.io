@@ -130,6 +130,7 @@ let selectedBike = null;
 let userPhone = null;
 const ratePerMinute = 1;
 
+// Open Reservation Popup
 function openPopup(bikeName){
   selectedBike = bikeName;
   document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName}`;
@@ -169,54 +170,80 @@ async function reserveBike(){
   } catch (e) { console.error("Error adding reservation:", e); }
 }
 
+// Update Estimated Cost
 document.getElementById('duration').addEventListener('input', ()=>{
   const dur = parseInt(document.getElementById('duration').value);
   document.getElementById('costDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
 });
 
+// Check My Reservations
 function checkReservations(){
   const phone = document.getElementById('checkPhone').value.trim();
   if(!phone){ alert('Enter your phone number'); return; }
   userPhone = phone;
-  showReservationsPopup();
-}
-
-function showReservationsPopup(){
-  const listEl = document.getElementById('myReservationsList');
-  listEl.innerHTML = '';
   document.getElementById('myReservationsPopup').style.display = 'flex';
-  
-  onSnapshot(query(collection(db, "reservations")), snapshot => {
-    listEl.innerHTML = '';
-    snapshot.forEach(docSnap => {
-      const r = docSnap.data();
-      if(r.phone===userPhone && !r.cancelled){
-        const now = new Date();
-        let status='', colorClass='';
-        if(r.picked){ status='Riding'; colorClass='status-riding'; }
-        else if(now<new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
-        else { status='Waiting'; colorClass='status-upcoming'; }
-
-        const remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
-        const li = document.createElement('li');
-        li.innerHTML = `<div><strong>${r.bike}</strong> (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - <span class="${colorClass}">${status} - ${remainingMinutes} min left</span></div>`;
-        
-        const cancelBtn = document.createElement('button');
-        cancelBtn.classList.add('cancel-btn');
-        cancelBtn.innerText = 'Cancel';
-        cancelBtn.onclick = async () => {
-          await updateDoc(doc(db, "reservations", docSnap.id), { cancelled: true });
-          alert('Reservation cancelled');
-        };
-        li.appendChild(cancelBtn);
-        listEl.appendChild(li);
-      }
-    });
-    if(listEl.innerHTML==='') listEl.innerHTML='<li>No reservations found</li>';
-  });
 }
 
+// Close My Reservations Popup
 function closeMyReservationsPopup(){ document.getElementById('myReservationsPopup').style.display='none'; }
+
+// Real-time Status & My Reservations
+onSnapshot(query(collection(db, "reservations")), snapshot => {
+  const reservations = [];
+  const myReservationsList = document.getElementById('myReservationsList');
+  myReservationsList.innerHTML = '';
+
+  snapshot.forEach(docSnap => {
+    const r = docSnap.data();
+    r.id = docSnap.id;
+    reservations.push(r);
+
+    // Show my reservations if phone matches
+    if(userPhone && r.phone === userPhone && !r.cancelled){
+      const now = new Date();
+      let status='', colorClass='';
+      if(r.picked){ status='Riding'; colorClass='status-riding'; }
+      else if(now<new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
+      else { status='Waiting'; colorClass='status-upcoming'; }
+
+      const remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
+      const li = document.createElement('li');
+      li.innerHTML = `<div><strong>${r.bike}</strong> (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - <span class="${colorClass}">${status} - ${remainingMinutes} min left</span></div>`;
+      const cancelBtn = document.createElement('button');
+      cancelBtn.classList.add('cancel-btn');
+      cancelBtn.innerText = 'Cancel';
+      cancelBtn.onclick = async () => {
+        await updateDoc(doc(db, "reservations", r.id), { cancelled: true });
+        alert('Reservation cancelled');
+      };
+      li.appendChild(cancelBtn);
+      myReservationsList.appendChild(li);
+    }
+  });
+
+  if(userPhone && myReservationsList.innerHTML==='') myReservationsList.innerHTML='<li>No reservations found</li>';
+
+  // Update status under each bike
+  const bikeNames = ['Mountain Bike','Road Bike','BMX'];
+  bikeNames.forEach(bike=>{
+    const div = document.getElementById('status-'+bike);
+    const res = reservations.filter(r=>r.bike===bike && !r.returned && !r.cancelled)
+                            .sort((a,b)=>new Date(a.start)-new Date(b.start));
+    if(res.length===0){ div.innerHTML=''; return; }
+
+    let statusText='';
+    res.forEach(r=>{
+      const now = new Date();
+      let status='', colorClass='';
+      if(r.picked){ status='Riding'; colorClass='status-riding'; }
+      else if(now<new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
+
+      const remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
+      statusText+=`<span class="${colorClass}">${status} (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - ${remainingMinutes} min left</span><br>`;
+    });
+    div.innerHTML=statusText;
+  });
+});
 
 window.openPopup = openPopup;
 window.closePopup = closePopup;
