@@ -8,50 +8,20 @@
 <link rel="icon" href="img/cycling-logo-by-dkm721-brandcrowd.png" type="image/png">
 <style>
 body { font-family: 'Roboto', sans-serif; background:#f0f0f0; margin:0; padding:20px; }
-h1, h2 { text-align:center; color:#2c3e50; margin-bottom:20px; }
-
-.bike-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
-  justify-content: center;
-}
-
-.bike-card {
-  max-width: 250px;
-  width: 100%;
-  background:white;
-  border-radius:10px;
-  overflow:hidden;
-  box-shadow:0 6px 15px rgba(0,0,0,0.1);
-  display:flex;
-  flex-direction:column;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
+h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
+.bike-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; justify-content: center; }
+.bike-card { max-width: 250px; width: 100%; background:white; border-radius:10px; overflow:hidden; box-shadow:0 6px 15px rgba(0,0,0,0.1); display:flex; flex-direction:column; transition: transform 0.3s, box-shadow 0.3s; }
 .bike-card:hover { transform:translateY(-5px); box-shadow:0 12px 25px rgba(0,0,0,0.2); }
-
-.bike-card img {
-  width:100%;
-  height:auto;
-  max-height:300px;
-  object-fit:cover;
-  display:block;
-  border-bottom:1px solid #ddd;
-}
-
+.bike-card img { width:100%; height:auto; max-height:300px; object-fit:cover; display:block; border-bottom:1px solid #ddd; }
+@media(max-width:768px){ .bike-card img { max-height:300px; } }
 .bike-info { padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between; }
 .bike-info h3{margin:0 0 5px 0;color:#2c3e50;font-size:1.1em;}
 .bike-info p{margin:0 0 10px 0;color:#7f8c8d;font-size:0.9em;}
 .bike-info button { padding:8px 12px; width:auto; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; align-self:flex-start;}
 .bike-info button:disabled{background:#ccc; cursor:not-allowed;}
-.cancel-btn { background:#c0392b; margin-top:5px; cursor:pointer; color:white; border:none; border-radius:5px; padding:5px 10px; }
-
 .status-text{margin-top:10px; font-size:0.9em;}
 .status-upcoming{color:#e67e22; font-weight:bold;}
 .status-riding{color:#27ae60; font-weight:bold;}
-.status-cancelled{color:#c0392b; font-weight:bold;}
-
 .popup{display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;}
 .popup-content{background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; position:relative;}
 .popup-content h2{margin-top:0;}
@@ -61,24 +31,17 @@ h1, h2 { text-align:center; color:#2c3e50; margin-bottom:20px; }
 .popup-content button:hover{background:#219150;}
 .close-popup{position:absolute; top:10px; right:15px; cursor:pointer; font-size:20px; color:#333;}
 #costDisplay{font-weight:bold; color:#2980b9; margin-top:10px;}
-
-#myReservations{margin-top:40px; max-width:600px; margin-left:auto; margin-right:auto; background:white; padding:20px; border-radius:10px; box-shadow:0 6px 15px rgba(0,0,0,0.1);}
-.reservation-item{border-bottom:1px solid #ddd; padding:10px 0;}
-.reservation-item:last-child{border-bottom:none;}
+#myReservationsContainer { margin:20px 0; text-align:center; }
+#myReservationsContainer button { padding:10px 15px; background:#2980b9; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
+#myReservationsList button { background:#c0392b; margin-top:5px; }
 </style>
 </head>
 <body>
 
 <div class="container">
   <h1>🚲 BLADE Bicycle Rental</h1>
-
-  <div id="phoneEntry">
-    <label style="display:block; text-align:center; margin-bottom:10px;">Enter Your Phone Number to Personalize Reservations:</label>
-    <input type="text" id="userPhone" placeholder="Your Phone Number" style="display:block; margin:0 auto 10px; padding:8px; border-radius:5px; border:1px solid #ccc;">
-    <button onclick="setUserPhone()" style="display:block; margin:0 auto 20px; padding:8px 12px; border:none; border-radius:5px; background:#2980b9; color:white; cursor:pointer;">Submit</button>
-  </div>
-
   <div class="bike-grid" id="bikeGrid">
+    <!-- Example bikes -->
     <div class="bike-card" data-name="Mountain Bike">
       <img src="img/1.jpg" alt="Mountain Bike">
       <div class="bike-info">
@@ -86,39 +49,32 @@ h1, h2 { text-align:center; color:#2c3e50; margin-bottom:20px; }
         <p>Perfect for rough trails and adventurous rides.</p>
         <button onclick="openPopup('Mountain Bike')">Reserve</button>
         <div class="status-text" id="status-Mountain Bike"></div>
-        <div id="cancel-Mountain Bike"></div>
       </div>
     </div>
     <div class="bike-card" data-name="Road Bike">
       <img src="img/2.jpg" alt="Road Bike">
       <div class="bike-info">
         <h3>Road Bike</h3>
-        <p>Perfect for smooth rides and long distances.</p>
+        <p>Perfect for smooth rides and speed enthusiasts.</p>
         <button onclick="openPopup('Road Bike')">Reserve</button>
         <div class="status-text" id="status-Road Bike"></div>
-        <div id="cancel-Road Bike"></div>
       </div>
     </div>
     <div class="bike-card" data-name="BMX">
       <img src="img/3.jpg" alt="BMX">
       <div class="bike-info">
         <h3>BMX</h3>
-        <p>Perfect for stunts and short rides.</p>
+        <p>Perfect for stunts and small tracks.</p>
         <button onclick="openPopup('BMX')">Reserve</button>
         <div class="status-text" id="status-BMX"></div>
-        <div id="cancel-BMX"></div>
       </div>
     </div>
   </div>
 
-  <!-- My Reservations Section -->
-  <div id="myReservations">
-    <h2>My Reservations</h2>
-    <div id="reservationList"></div>
-  </div>
+  <div id="myReservationsContainer"></div>
 </div>
 
-<!-- Reservation Popup -->
+<!-- Reserve Popup -->
 <div class="popup" id="popup">
   <div class="popup-content">
     <span class="close-popup" onclick="closePopup()">&times;</span>
@@ -136,9 +92,18 @@ h1, h2 { text-align:center; color:#2c3e50; margin-bottom:20px; }
   </div>
 </div>
 
+<!-- My Reservations Popup -->
+<div class="popup" id="reservationsPopup">
+  <div class="popup-content">
+    <span class="close-popup" onclick="closeReservationsPopup()">&times;</span>
+    <h2>My Reservations</h2>
+    <div id="myReservationsList"></div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB8d4sLlqCZ4bQxlUBEYT3axhz1wbJjHaI",
@@ -152,26 +117,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
-let selectedBike = null;
 const ratePerMinute = 1;
-let userPhoneNumber = null;
+let selectedBike = null;
+let userPhone = '';
+let allReservations = [];
 
-function setUserPhone(){
-  const phone = document.getElementById('userPhone').value.trim();
-  if(!phone) return alert('Enter your phone number');
-  userPhoneNumber = phone;
-  document.getElementById('phoneEntry').style.display='none';
-  updateBikeCards();
-  loadMyReservations();
-}
-
+// Popup Functions
 function openPopup(bikeName){
   selectedBike = bikeName;
   document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName}`;
   document.getElementById('popup').style.display = 'flex';
   document.getElementById('customerName').value='';
-  document.getElementById('customerPhone').value=userPhoneNumber || '';
+  document.getElementById('customerPhone').value='';
   document.getElementById('pickupTime').value='';
   document.getElementById('duration').value='';
   document.getElementById('costDisplay').innerText = 'Estimated Cost: 0 Ksh';
@@ -179,14 +136,16 @@ function openPopup(bikeName){
 
 function closePopup(){ document.getElementById('popup').style.display='none'; }
 
+// Reserve Bike
 async function reserveBike(){
-  const name=document.getElementById('customerName').value.trim();
-  const phone=document.getElementById('customerPhone').value.trim();
-  const pickup=document.getElementById('pickupTime').value;
-  const duration=parseInt(document.getElementById('duration').value);
-  if(!name||!phone||!pickup||!duration){ alert('Fill all fields'); return; }
-  const start=new Date(pickup);
-  const end=new Date(start.getTime()+duration*60000);
+  const name = document.getElementById('customerName').value.trim();
+  const phone = document.getElementById('customerPhone').value.trim();
+  const pickup = document.getElementById('pickupTime').value;
+  const duration = parseInt(document.getElementById('duration').value);
+  if(!name || !phone || !pickup || !duration){ alert('Fill all fields'); return; }
+
+  const start = new Date(pickup);
+  const end = new Date(start.getTime() + duration*60000);
 
   try {
     await addDoc(collection(db, "reservations"), {
@@ -199,96 +158,90 @@ async function reserveBike(){
       returned: false,
       cancelled: false
     });
+    userPhone = phone; // Track phone for dynamic updates
     closePopup();
-    alert('Reservation added!');
-    updateBikeCards();
-    loadMyReservations();
   } catch(e){ console.error(e); }
 }
 
-async function cancelReservation(reservationId){
-  if(!reservationId) return;
-  try {
-    await updateDoc(doc(db, "reservations", reservationId), { cancelled:true });
-    alert('Reservation cancelled.');
-    updateBikeCards();
-    loadMyReservations();
-  } catch(e){ console.error(e); }
-}
-
+// Update estimated cost
 document.getElementById('duration').addEventListener('input', ()=>{
-  const dur=parseInt(document.getElementById('duration').value);
+  const dur = parseInt(document.getElementById('duration').value);
   document.getElementById('costDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
 });
 
-onSnapshot(query(collection(db,"reservations")), snapshot=>{
-  updateBikeCards(snapshot.docs);
-});
+// Reservations Popup
+function showReservationsPopup(){
+  const listDiv = document.getElementById('myReservationsList');
+  listDiv.innerHTML = '';
+  const userRes = allReservations.filter(r=>r.phone===userPhone && !r.cancelled);
+  userRes.forEach(r=>{
+    const start = new Date(r.start).toLocaleString();
+    const end = new Date(r.end).toLocaleString();
+    listDiv.innerHTML += `
+      <div style="border-bottom:1px solid #ccc; padding:5px 0;">
+        <strong>${r.bike}</strong> <br>
+        ${start} - ${end} <br>
+        Status: ${r.picked ? 'Riding' : 'Upcoming'}
+        ${!r.picked ? `<button onclick="cancelMyReservation('${r.id}')">Cancel</button>` : ''}
+      </div>
+    `;
+  });
+  document.getElementById('reservationsPopup').style.display='flex';
+}
+function closeReservationsPopup(){ document.getElementById('reservationsPopup').style.display='none'; }
 
-async function updateBikeCards(snapshotDocs=null){
-  if(!userPhoneNumber) return;
-  let reservations = [];
-  if(snapshotDocs){
-    reservations = snapshotDocs.map(doc => ({...doc.data(), id: doc.id}));
-  } else {
-    const snap = await getDocs(collection(db,"reservations"));
-    reservations = snap.docs.map(doc => ({...doc.data(), id: doc.id}));
-  }
+async function cancelMyReservation(resId){
+  await updateDoc(doc(db,"reservations",resId), {cancelled:true});
+  alert('Reservation cancelled');
+  closeReservationsPopup();
+}
 
-  const bikeCards = document.querySelectorAll('.bike-card');
-  bikeCards.forEach(card=>{
-    const bikeName = card.getAttribute('data-name');
-    const statusDiv = document.getElementById('status-'+bikeName);
-    const cancelDiv = document.getElementById('cancel-'+bikeName);
-    const res = reservations.filter(r=>r.bike===bikeName && !r.returned);
-    if(res.length===0){ statusDiv.innerHTML=''; cancelDiv.innerHTML=''; return; }
+// Update "My Reservations" Button
+function updateMyReservationsButton(){
+  const container = document.getElementById('myReservationsContainer');
+  const hasRes = allReservations.some(r=>r.phone===userPhone && !r.cancelled);
+  container.innerHTML = hasRes ? '<button onclick="showReservationsPopup()">My Reservations</button>' : '';
+}
 
+// Update status under each bike
+function updateBikeStatus(){
+  const bikes = ['Mountain Bike','Road Bike','BMX'];
+  bikes.forEach(bike=>{
+    const div = document.getElementById('status-'+bike);
+    const res = allReservations.filter(r=>r.bike===bike && !r.returned && !r.cancelled)
+                              .sort((a,b)=>new Date(a.start)-new Date(b.start));
+    if(res.length===0){ div.innerHTML=''; return; }
     let statusText='';
-    cancelDiv.innerHTML='';
-
     res.forEach(r=>{
       const now = new Date();
       let status='', colorClass='';
-      if(r.cancelled){ status='Cancelled'; colorClass='status-cancelled'; }
-      else if(r.picked){ status='Riding'; colorClass='status-riding'; }
-      else if(now < new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
-      const remainingMinutes=Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
-      statusText+=`<span class="${colorClass}">${status} (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - ${remainingMinutes} min left</span><br>`;
-
-      // Show Cancel button only for this user's Upcoming reservations
-      if(!r.cancelled && status==='Upcoming' && r.phone===userPhoneNumber){
-        cancelDiv.innerHTML+=`<button class="cancel-btn" onclick="cancelReservation('${r.id}')">Cancel</button>`;
-      }
+      if(r.picked){ status='Riding'; colorClass='status-riding'; }
+      else if(now<new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
+      const remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
+      statusText += `<span class="${colorClass}">${status} (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - ${remainingMinutes} min left</span><br>`;
     });
-    statusDiv.innerHTML=statusText;
+    div.innerHTML = statusText;
   });
 }
 
-async function loadMyReservations(){
-  if(!userPhoneNumber) return;
-  const listDiv = document.getElementById('reservationList');
-  listDiv.innerHTML='';
-  const snap = await getDocs(collection(db,"reservations"));
-  snap.forEach(docSnap=>{
-    const r=docSnap.data();
-    if(r.phone===userPhoneNumber){
-      const now=new Date();
-      const status=r.cancelled?'Cancelled':(r.picked?'Riding':(now<new Date(r.start)?'Upcoming':'Completed'));
-      const item=document.createElement('div');
-      item.className='reservation-item';
-      item.innerHTML=`Bike: ${r.bike} | ${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()} | Status: ${status}
-        ${!r.cancelled && status!=='Completed'?`<button class="cancel-btn" onclick="cancelReservation('${docSnap.id}')">Cancel</button>`:''}`;
-      listDiv.appendChild(item);
-    }
+// Real-time Firestore listener
+onSnapshot(query(collection(db,"reservations")), snapshot=>{
+  allReservations = [];
+  snapshot.forEach(docSnap=>{
+    const r = docSnap.data();
+    r.id = docSnap.id;
+    allReservations.push(r);
   });
-}
+  updateBikeStatus();
+  updateMyReservationsButton();
+});
 
-window.openPopup=openPopup;
-window.closePopup=closePopup;
-window.reserveBike=reserveBike;
-window.cancelReservation=cancelReservation;
-window.loadMyReservations=loadMyReservations;
-window.setUserPhone=setUserPhone;
+window.reserveBike = reserveBike;
+window.openPopup = openPopup;
+window.closePopup = closePopup;
+window.showReservationsPopup = showReservationsPopup;
+window.closeReservationsPopup = closeReservationsPopup;
+window.cancelMyReservation = cancelMyReservation;
 </script>
 </body>
 </html>
