@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaming Admin Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body { font-family: 'Segoe UI', sans-serif; background:#f8f9fc; }
+.sidebar { height:100vh; width:240px; position:fixed; top:0; left:0; background:#1e1e2f; color:#fff; padding-top:1rem; transition:all 0.3s; display:none; z-index:999; }
+.sidebar.active { display:block; }
+.sidebar h3 { text-align:center; font-weight:bold; margin-bottom:2rem; }
+.sidebar a { display:block; color:#ccc; padding:12px 20px; text-decoration:none; border-radius:8px; margin:5px 10px; transition:all 0.2s; }
+.sidebar a:hover, .sidebar a.active { background:#00b894; color:#fff; }
+.content-wrapper { margin-left:250px; padding:2rem; display:none; transition:all 0.3s; }
+.content-wrapper.active { display:block; }
+.card { border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
+.navbar-custom { background:#fff; border-bottom:1px solid #e5e5e5; padding:1rem; margin-left:250px; display:none; justify-content:space-between; align-items:center; }
+.navbar-custom.active { display:flex; }
+.small-stat { font-size:1.1rem; }
+.stat-value { font-size:1.6rem; font-weight:700; }
+#loginScreen { height:100vh; display:flex; align-items:center; justify-content:center; background:#f8f9fc; }
+@media(max-width:768px){
+  .sidebar{width:200px;}
+  .content-wrapper{margin-left:0; padding:1rem;}
+  .navbar-custom{margin-left:0;}
+  table { font-size:0.9rem; }
+  .card { padding:1rem; }
+}
+.bonus { background:#ffeaa7 !important; }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="shadow p-4 card" style="width:350px;">
+    <h4 class="mb-3 text-center">Admin Login</h4>
+    <form id="loginForm">
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" id="email" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" class="form-control" required>
+      </div>
+      <button type="submit" class="w-100 btn btn-success">Login</button>
+    </form>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <h3>🎮 PS5 Admin</h3>
+  <a href="#" id="linkDashboard" class="active">Dashboard</a>
+  <a href="#" id="linkSessions">Sessions</a>
+  <a href="#" id="linkReports">Reports</a>
+  <a href="#" id="linkSettings">Settings</a>
+  <a href="#" id="logoutBtn">Logout</a>
+</div>
+
+<!-- Navbar -->
+<div class="navbar-custom" id="navbar">
+  <h5>Admin Dashboard</h5>
+  <span class="admin" id="adminName">Welcome</span>
+</div>
+
+<!-- Dashboard Page -->
+<div class="content-wrapper active" id="dashboardPage">
+  <div class="row g-4">
+    <div class="col-lg-4 col-md-6">
+      <div class="p-3 card">
+        <h5>Quick Summary</h5>
+        <div class="mt-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="small-stat">Active Sessions</div>
+              <div class="stat-value" id="statActive">0</div>
+            </div>
+            <div>
+              <div class="small-stat">Paid Sessions</div>
+              <div class="stat-value" id="statPaid">0</div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="small-stat">Today's Revenue</div>
+              <div class="stat-value" id="statRevenue">KES 0</div>
+            </div>
+            <div>
+              <div class="small-stat">Total Sessions</div>
+              <div class="stat-value" id="statTotal">0</div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="small-stat">Bonus Sessions</div>
+              <div class="stat-value" id="statBonus">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-8 col-md-6">
+      <div class="p-3 card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h5>Active Game Sessions</h5>
+          <div>
+            <button class="me-2 btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSessionModal">+ Add Session</button>
+            <button class="btn btn-sm btn-secondary" onclick="showPage(sessionsPage)">Go to Sessions</button>
+          </div>
+        </div>
+        <div class="table-responsive" style="max-height:350px; overflow:auto;">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Game</th>
+                <th>Games Played</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody id="quickSessionsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sessions Page -->
+<div class="content-wrapper" id="sessionsPage">
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="p-3 card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h5>Sessions (Live)</h5>
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSessionModal">+ Add Session</button>
+        </div>
+        <div class="table-responsive" style="max-height:400px; overflow:auto;">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Game</th>
+                <th>Games Played</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reports Page -->
+<div class="content-wrapper" id="reportsPage">
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="p-3 card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h5>Reports (All Sessions)</h5>
+          <div>
+            <button class="btn-outline-primary btn btn-sm" id="exportCSV">Export CSV</button>
+          </div>
+        </div>
+        <div class="table-responsive" style="max-height:400px; overflow:auto;">
+          <table class="table table-hover" id="reportsTable">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Games Played</th>
+                <th>Total Time (min)</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Ended</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Page -->
+<div class="content-wrapper" id="settingsPage">
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="p-3 card">
+        <h5>Admin Settings</h5>
+        <form id="settingsForm">
+          <div class="mb-3">
+            <label class="form-label">Billing Rule</label>
+            <select id="billingRule" class="form-select">
+              <option value="floor">Charge Completed Games (Floor)</option>
+              <option value="ceil">Round Up to Next Game (Ceil)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Price Per Game (KES)</label>
+            <input type="number" id="pricePerGame" class="form-control" required>
+          </div>
+          <button type="submit" class="w-100 btn btn-success">Save Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Session Modal -->
+<div class="modal fade" id="addSessionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="addSessionForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Game Session</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label>Customer Name</label>
+            <input type="text" id="modalCustomerName" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label>Game Title</label>
+            <input type="text" id="modalGameTitle" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="w-100 btn btn-success">Add Session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase + App Script -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
+  authDomain: "gamers-65b44.firebaseapp.com",
+  projectId: "gamers-65b44",
+  storageBucket: "gamers-65b44.appspot.com",
+  messagingSenderId: "97331968745",
+  appId: "1:97331968745:web:9d77ddadb4c5486ddcce78",
+  measurementId: "G-NT3BTN0Q92"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth();
+const db = getFirestore();
+
+const loginForm=document.getElementById('loginForm');
+const loginScreen=document.getElementById('loginScreen');
+const sidebar=document.getElementById('sidebar');
+const navbar=document.getElementById('navbar');
+const adminName=document.getElementById('adminName');
+const dashboardPage=document.getElementById('dashboardPage');
+const sessionsPage=document.getElementById('sessionsPage');
+const reportsPage=document.getElementById('reportsPage');
+const settingsPage=document.getElementById('settingsPage');
+const linkDashboard=document.getElementById('linkDashboard');
+const linkSessions=document.getElementById('linkSessions');
+const linkReports=document.getElementById('linkReports');
+const linkSettings=document.getElementById('linkSettings');
+const logoutBtn=document.getElementById('logoutBtn');
+
+let billingRule='floor';
+let pricePerGame=50;
+const sessionTimers = {}; // store all timers by session id
+
+// MOBILE SIDEBAR TOGGLE
+const toggleSidebarBtn=document.createElement('button');
+toggleSidebarBtn.textContent='☰';
+toggleSidebarBtn.className='btn btn-outline-secondary d-lg-none';
+toggleSidebarBtn.style.position='fixed';
+toggleSidebarBtn.style.top='1rem';
+toggleSidebarBtn.style.left='1rem';
+toggleSidebarBtn.style.zIndex='1100';
+document.body.appendChild(toggleSidebarBtn);
+toggleSidebarBtn.addEventListener('click',()=>{sidebar.classList.toggle('active');});
+
+// PAGE SWITCH
+function showPage(page){
+  [dashboardPage,sessionsPage,reportsPage,settingsPage].forEach(p=>p.classList.remove('active'));
+  page.classList.add('active');
+  [linkDashboard,linkSessions,linkReports,linkSettings].forEach(l=>l.classList.remove('active'));
+  if(page===dashboardPage) linkDashboard.classList.add('active');
+  if(page===sessionsPage) linkSessions.classList.add('active');
+  if(page===reportsPage) linkReports.classList.add('active');
+  if(page===settingsPage) linkSettings.classList.add('active');
+}
+linkDashboard.onclick=()=>showPage(dashboardPage);
+linkSessions.onclick=()=>showPage(sessionsPage);
+linkReports.onclick=()=>showPage(reportsPage);
+linkSettings.onclick=()=>showPage(settingsPage);
+
+// LOGIN
+loginForm.addEventListener('submit', async e=>{
+  e.preventDefault();
+  try{
+    const email=document.getElementById('email').value;
+    const password=document.getElementById('password').value;
+    await signInWithEmailAndPassword(auth,email,password);
+  }catch(err){ alert(err.message); }
+});
+
+onAuthStateChanged(auth,user=>{
+  if(user){
+    loginScreen.style.display='none';
+    sidebar.classList.add('active');
+    navbar.classList.add('active');
+    adminName.textContent=user.email;
+    loadSessionsLive();
+  }else{
+    loginScreen.style.display='flex';
+    sidebar.classList.remove('active');
+    navbar.classList.remove('active');
+  }
+});
+logoutBtn.onclick=()=>signOut(auth);
+
+// SETTINGS
+document.getElementById('settingsForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  billingRule=document.getElementById('billingRule').value;
+  pricePerGame=parseInt(document.getElementById('pricePerGame').value);
+  alert('Settings saved');
+});
+
+// ADD SESSION
+document.getElementById('addSessionForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const customer=document.getElementById('modalCustomerName').value;
+  const game=document.getElementById('modalGameTitle').value;
+  try{
+    await addDoc(collection(db,'sessions'),{
+      customer, game,
+      gamesPlayed:0,
+      status:'active',
+      amount:0,
+      bonus:false,
+      createdAt:serverTimestamp()
+    });
+    e.target.reset();
+    bootstrap.Modal.getInstance(document.getElementById('addSessionModal')).hide();
+  }catch(err){ alert(err.message); }
+});
+
+// LOAD SESSIONS LIVE
+function loadSessionsLive(){
+  const q=query(collection(db,'sessions'), orderBy('createdAt','desc'));
+  onSnapshot(q, snap=>{
+    const quickTable=document.getElementById('quickSessionsTable');
+    const fullTable=document.getElementById('sessionsTable');
+    const reportsBody=document.getElementById('reportsTableBody');
+    quickTable.innerHTML=''; fullTable.innerHTML=''; reportsBody.innerHTML='';
+
+    let activeCount=0, paidCount=0, totalRevenue=0, totalSessions=0, bonusCount=0;
+
+    snap.docs.forEach(docu=>{
+      const data=docu.data(); 
+      const id=docu.id;
+      const createdAt=data.createdAt?.toDate?.();
+
+      totalSessions++;
+      if(data.status==='active') activeCount++;
+      if(data.status==='paid' || data.status==='completed') paidCount++;
+      if(data.bonus) bonusCount++;
+      totalRevenue += data.amount || 0;
+
+      // QUICK TABLE
+      const trQuick=document.createElement('tr');
+      trQuick.dataset.id=id;
+      trQuick.className=data.bonus?'bonus':'';
+      trQuick.innerHTML=`<td>${data.customer}</td><td>${data.game}</td><td id="games-${id}">${data.gamesPlayed}</td><td id="timer-${id}">-</td><td id="status-${id}">${data.status}</td><td id="amount-${id}">KES ${data.amount||0}</td>`;
+      quickTable.appendChild(trQuick);
+
+      // FULL TABLE
+      const trFull=document.createElement('tr');
+      trFull.dataset.id=id;
+      trFull.className=data.bonus?'bonus':'';
+      trFull.innerHTML=`<td>${data.customer}</td><td>${data.game}</td><td id="gamesFull-${id}">${data.gamesPlayed}</td><td id="timerFull-${id}">-</td><td id="statusFull-${id}">${data.status}</td><td id="amountFull-${id}">KES ${data.amount||0}</td><td><button class="me-1 btn btn-sm btn-success completeBtn">Complete</button><button class="btn btn-sm btn-danger deleteBtn">Delete</button></td>`;
+      fullTable.appendChild(trFull);
+
+      // REPORT TABLE
+      const trReport=document.createElement('tr');
+      trReport.dataset.id=id;
+      trReport.className=data.bonus?'bonus':'';
+      trReport.innerHTML=`<td>${data.customer}</td><td>${data.gamesPlayed}</td><td id="timerReport-${id}">-</td><td>KES ${data.amount||0}</td><td>${data.status}</td><td>${createdAt?createdAt.toLocaleString():'-'}</td><td>${data.completedAt?new Date(data.completedAt.seconds*1000).toLocaleString():'-'}</td>`;
+      reportsBody.appendChild(trReport);
+
+      // TIMER LOGIC
+      if(createdAt){
+        if(sessionTimers[id]) clearInterval(sessionTimers[id]);
+
+        if(data.status==='active'){
+          sessionTimers[id] = setInterval(async ()=>{
+            const diffSec=Math.floor((new Date()-createdAt)/1000);
+            const mins=Math.floor(diffSec/60);
+            const secs=diffSec%60;
+            document.getElementById(`timer-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            document.getElementById(`timerFull-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            document.getElementById(`timerReport-${id}`).textContent=Math.floor(diffSec/60);
+
+            let gamesPlayed=Math.floor(diffSec/360);
+            if(billingRule==='ceil') gamesPlayed=Math.ceil(diffSec/360);
+
+            // BONUS SESSION LOGIC
+            if(gamesPlayed>=5){
+              gamesPlayed=5;
+              await updateDoc(doc(db,'sessions',id),{
+                gamesPlayed,
+                amount:gamesPlayed*pricePerGame,
+                bonus:true,
+                status:'paid',
+                completedAt:serverTimestamp()
+              });
+              clearInterval(sessionTimers[id]);
+            } else {
+              if(gamesPlayed!==data.gamesPlayed){
+                await updateDoc(doc(db,'sessions',id),{
+                  gamesPlayed,
+                  amount:gamesPlayed*pricePerGame
+                });
+              }
+            }
+          },1000);
+        } else {
+          // freeze timer for completed/paid
+          const diffMin=data.completedAt?(Math.floor((data.completedAt.seconds*1000-createdAt)/60000)) : 0;
+          document.getElementById(`timer-${id}`).textContent=`${diffMin} min`;
+          document.getElementById(`timerFull-${id}`).textContent=`${diffMin} min`;
+        }
+      }
+    });
+
+    // QUICK SUMMARY
+    document.getElementById('statActive').textContent = activeCount;
+    document.getElementById('statPaid').textContent = paidCount;
+    document.getElementById('statRevenue').textContent = `KES ${totalRevenue}`;
+    document.getElementById('statTotal').textContent = totalSessions;
+    document.getElementById('statBonus').textContent = bonusCount;
+
+    // BUTTONS
+    document.querySelectorAll('.completeBtn').forEach(btn=>{
+      btn.onclick=async e=>{
+        const id=btn.closest('tr').dataset.id;
+        clearInterval(sessionTimers[id]);
+        await updateDoc(doc(db,'sessions',id),{
+          status:'paid',
+          completedAt:serverTimestamp()
+        });
+      };
+    });
+    document.querySelectorAll('.deleteBtn').forEach(btn=>{
+      btn.onclick=async e=>{
+        const id=btn.closest('tr').dataset.id;
+        clearInterval(sessionTimers[id]);
+        await deleteDoc(doc(db,'sessions',id));
+      };
+    });
+  });
+}
+
+// EXPORT CSV
+document.getElementById('exportCSV').addEventListener('click',()=>{
+  let csv='Customer,Games Played,Total Time,Amount,Status,Started,Ended\n';
+  document.querySelectorAll('#reportsTableBody tr').forEach(tr=>{
+    const row=[];
+    tr.querySelectorAll('td').forEach(td=>row.push(td.textContent.replace(/,/g,' ')));
+    csv+=row.join(',')+'\n';
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='sessions_report.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
