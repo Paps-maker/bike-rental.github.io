@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiquorPro - Liquor Business System</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<style>
+  body { background: #1c1c1c; color: #f8f9fa; }
+  .navbar { background: #2b1d0e; }
+  .navbar-brand { font-weight: bold; color: #f8f9fa !important; }
+  .card { background: #2a2a2a; border: none; color: #fff; }
+  .nav-tabs .nav-link { color: #f8f9fa; }
+  .nav-tabs .nav-link.active { background: #d4a373; color: #000; }
+  .btn-custom { background: #d4a373; border: none; color: #000; }
+  .btn-custom:hover { background: #c48c59; color: #fff; }
+  .table { color: #fff; }
+  .low-stock { background:#ff6b6b;color:#000;padding:2px 6px;border-radius:6px;font-weight:600;font-size:12px; }
+  .small-muted { color:#bdbdbd; font-size:0.9rem; }
+  .modal-backdrop { background: rgba(0,0,0,0.6); }
+  #posProduct { max-height: 200px; overflow-y: auto; }
+</style>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Login Section -->
+<div id="loginSection" class="py-5 container">
+  <h3 class="mb-4">🍷FullStop Liquor inventory Dashboard</h3>
+  <div class="mb-3">
+    <input id="loginEmail" type="email" placeholder="Email" class="form-control">
+  </div>
+  <div class="mb-3">
+    <input id="loginPass" type="password" placeholder="Password" class="form-control">
+  </div>
+  <button id="loginBtn" class="w-100 btn btn-custom">Login</button>
+  <div id="loginMsg" class="mt-2 small-muted"></div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="d-none">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand">🍷FullStop Liquor inventory Dashboard</a>
+      <div class="d-flex align-items-center gap-3 ms-auto">
+        <div class="small-muted">Low stock:</div>
+        <span id="lowStockBadge" class="bg-danger px-2 py-1 rounded text-white">0</span>
+        <span id="roleBadge" class="bg-warning ms-3 text-dark badge">ADMIN</span>
+        <button id="logoutBtn" class="ms-3 btn btn-sm btn-light">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="py-4 container">
+    <!-- Dashboard Cards -->
+    <div class="mb-4 row g-3">
+      <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Today's Sales</div><h4 id="todaysSales">KSh 0</h4></div></div>
+      <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Customers</div><h4 id="customerCount">0</h4></div></div>
+      <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Products</div><h4 id="productCount">0</h4></div></div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs" id="mainTabs">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#productsTab">Products</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customersTab">Customers</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#posTab">POS</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#salesTab">Sales</button></li>
+    </ul>
+
+    <div class="pt-3 tab-content">
+      <!-- Products -->
+      <div class="tab-pane fade show active" id="productsTab">
+        <h5>Products</h5>
+        <div class="mb-3 row g-2">
+          <div class="col-md-4"><input id="prodName" type="text" placeholder="Product Name" class="form-control"></div>
+          <div class="col-md-2"><input id="prodPrice" type="number" placeholder="Price" class="form-control"></div>
+          <div class="col-md-2"><input id="prodStock" type="number" placeholder="Stock" class="form-control"></div>
+          <div class="col-md-2"><input id="prodMin" type="number" placeholder="Min alert" class="form-control"></div>
+          <div class="col-md-2"><button id="addProductBtn" class="w-100 btn btn-custom">Add Product</button></div>
+        </div>
+        <table class="table table-striped">
+          <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Min</th><th>Actions</th></tr></thead>
+          <tbody id="productsTable"></tbody>
+        </table>
+      </div>
+
+      <!-- Customers -->
+      <div class="tab-pane fade" id="customersTab">
+        <h5>Customers</h5>
+        <div class="mb-3 row g-2">
+          <div class="col-md-4"><input id="custName" type="text" placeholder="Customer Name" class="form-control"></div>
+          <div class="col-md-4"><input id="custPhone" type="text" placeholder="Phone" class="form-control"></div>
+          <div class="col-md-4"><button id="addCustomerBtn" class="w-100 btn btn-custom">Add Customer</button></div>
+        </div>
+        <table class="table table-striped">
+          <thead><tr><th>Name</th><th>Phone</th><th>Actions</th></tr></thead>
+          <tbody id="customersTable"></tbody>
+        </table>
+      </div>
+
+      <!-- POS -->
+      <div class="tab-pane fade" id="posTab">
+        <h5>POS</h5>
+        <div class="mb-3 row g-2">
+          <div class="col-md-4">
+            <label class="small-muted">Customer</label>
+            <div class="d-flex gap-2">
+              <select id="posCustomer" class="form-select"></select>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="small-muted">Product</label>
+            <select id="posProduct" class="form-select"></select>
+          </div>
+          <div class="col-md-2">
+            <label class="small-muted">Qty</label>
+            <input id="posQty" type="number" value="1" class="form-control">
+          </div>
+          <div class="d-flex align-items-end col-md-2">
+            <button id="addToCartBtn" class="w-100 btn btn-primary">Add to Cart</button>
+          </div>
+        </div>
+
+        <ul id="cartList" class="list-group mb-3"></ul>
+
+        <div class="d-flex gap-2 mb-3">
+          <button id="checkoutBtn" class="btn btn-success">Checkout</button>
+          <button id="clearCartBtn" class="btn btn-secondary">Clear Cart</button>
+        </div>
+
+        <div id="paymentSection" class="mt-3 p-3 d-none card">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="small-muted">Transaction Code</label>
+              <input id="transCode" type="text" class="form-control" placeholder="e.g. MPESA12345">
+            </div>
+            <div class="col-md-4">
+              <label class="small-muted">Payment Method</label>
+              <select id="paymentMethod" class="form-select">
+                <option value="mpesa">M-PESA</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+            </div>
+            <div class="d-flex align-items-end gap-2 col-md-4">
+              <button id="paymentCompleteBtn" class="btn btn-warning">Payment Completed</button>
+              <button id="cancelPaymentBtn" class="btn-outline-light btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sales -->
+      <div class="tab-pane fade" id="salesTab">
+        <h5>Sales</h5>
+        <table class="table table-striped">
+          <thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Transaction</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="salesTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div class="modal fade" id="editProductModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="bg-dark p-3 text-white modal-content">
+      <h5>Edit Product</h5>
+      <input id="editProdName" class="mb-2 form-control" placeholder="Name">
+      <input id="editProdPrice" type="number" class="mb-2 form-control" placeholder="Price">
+      <input id="editProdStock" type="number" class="mb-2 form-control" placeholder="Stock">
+      <input id="editProdMin" type="number" class="mb-2 form-control" placeholder="Min alert">
+      <button id="saveEditBtn" class="w-100 btn btn-success">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyDS83HjWpOSH6BCd3_0w8Lv7_3MgQzw_h0",
+  authDomain: "liquor-b1ef2.firebaseapp.com",
+  projectId: "liquor-b1ef2",
+  storageBucket: "liquor-b1ef2.appspot.com",
+  messagingSenderId: "6903039541",
+  appId: "1:6903039541:web:d552a2b11b6aca8ff8937c",
+  measurementId: "G-F1M9JJT5B4"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* Auth elements */
+const loginSection = document.getElementById("loginSection");
+const dashboard = document.getElementById("dashboard");
+const loginBtn = document.getElementById("loginBtn");
+const loginEmail = document.getElementById("loginEmail");
+const loginPass = document.getElementById("loginPass");
+const loginMsg = document.getElementById("loginMsg");
+const logoutBtn = document.getElementById("logoutBtn");
+const roleBadge = document.getElementById("roleBadge");
+let currentRole = "staff";
+const todaysSalesEl = document.getElementById("todaysSales");
+
+/* Login/Logout */
+loginBtn.onclick = async () => {
+  try {
+    const userCredential = await auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value);
+    const token = await userCredential.user.getIdTokenResult();
+    currentRole = token.claims.role || "staff";
+    loginSection.classList.add("d-none");
+    dashboard.classList.remove("d-none");
+    roleBadge.textContent = currentRole.toUpperCase();
+    initDashboard();
+  } catch(e){ loginMsg.textContent = e.message; }
+};
+
+logoutBtn.onclick = () => {
+  auth.signOut();
+  dashboard.classList.add("d-none");
+  loginSection.classList.remove("d-none");
+};
+
+auth.onAuthStateChanged(user => {
+  if(user){
+    user.getIdTokenResult().then(token=>{
+      currentRole = token.claims.role || "staff";
+      loginSection.classList.add("d-none");
+      dashboard.classList.remove("d-none");
+      roleBadge.textContent = currentRole.toUpperCase();
+      initDashboard();
+    });
+  } else {
+    dashboard.classList.add("d-none");
+    loginSection.classList.remove("d-none");
+  }
+});
+
+/* Initialize Dashboard */
+function initDashboard(){
+  /* Products */
+  let productsCache=[];
+  const prodName=document.getElementById("prodName");
+  const prodPrice=document.getElementById("prodPrice");
+  const prodStock=document.getElementById("prodStock");
+  const prodMin=document.getElementById("prodMin");
+  const addProductBtn=document.getElementById("addProductBtn");
+  const productsTable=document.getElementById("productsTable");
+  let editProductId=null;
+
+  addProductBtn.onclick = async ()=>{
+    if(currentRole!=="admin") return alert("Admins only");
+    if(!prodName.value||!prodPrice.value||!prodStock.value) return;
+    await db.collection("products").add({
+      name: prodName.value,
+      price: parseFloat(prodPrice.value),
+      stock: parseInt(prodStock.value),
+      min: parseInt(prodMin.value)||0
+    });
+    prodName.value=prodPrice.value=prodStock.value=prodMin.value="";
+  };
+
+  db.collection("products").onSnapshot(snap=>{
+    productsCache = snap.docs;
+    renderProducts(productsCache);
+    document.getElementById("productCount").textContent = snap.size;
+
+    const posProduct = document.getElementById("posProduct");
+    posProduct.innerHTML="";
+    snap.docs.forEach(doc=>{
+      const p=doc.data();
+      const option = document.createElement("option");
+      option.value = doc.id;
+      option.textContent = p.name+" - KSh "+p.price;
+      option.dataset.price = p.price;
+      posProduct.appendChild(option);
+    });
+  });
+
+  function renderProducts(docs){
+    const lowStockBadge=document.getElementById("lowStockBadge");
+    productsTable.innerHTML="";
+    let lowCount=0;
+    docs.forEach(doc=>{
+      const p=doc.data();
+      if(p.stock<=p.min) lowCount++;
+      let actions="";
+      if(currentRole==="admin"){
+        actions=`<button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
+                 <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>`;
+      }
+      productsTable.innerHTML+=`<tr>
+        <td>${p.name}</td>
+        <td>KSh ${p.price}</td>
+        <td>${p.stock}</td>
+        <td>${p.min}</td>
+        <td>${actions}</td>
+      </tr>`;
+    });
+    lowStockBadge.textContent=lowCount;
+
+    document.querySelectorAll(".delBtn").forEach(btn=>{
+      btn.onclick=async()=>{ await db.collection("products").doc(btn.dataset.id).delete(); };
+    });
+
+    document.querySelectorAll(".editBtn").forEach(btn=>{
+      btn.onclick=()=>{
+        editProductId=btn.dataset.id;
+        const p=docs.find(d=>d.id===editProductId).data();
+        document.getElementById("editProdName").value=p.name;
+        document.getElementById("editProdPrice").value=p.price;
+        document.getElementById("editProdStock").value=p.stock;
+        document.getElementById("editProdMin").value=p.min;
+        new bootstrap.Modal(document.getElementById("editProductModal")).show();
+      };
+    });
+  }
+
+  document.getElementById("saveEditBtn")?.addEventListener("click", async()=>{
+    if(!editProductId) return;
+    const editProdName=document.getElementById("editProdName").value;
+    const editProdPrice=parseFloat(document.getElementById("editProdPrice").value);
+    const editProdStock=parseInt(document.getElementById("editProdStock").value);
+    const editProdMin=parseInt(document.getElementById("editProdMin").value);
+    await db.collection("products").doc(editProductId).update({
+      name: editProdName,
+      price: editProdPrice,
+      stock: editProdStock,
+      min: editProdMin
+    });
+    bootstrap.Modal.getInstance(document.getElementById("editProductModal")).hide();
+  });
+
+  /* Customers */
+  const custName=document.getElementById("custName");
+  const custPhone=document.getElementById("custPhone");
+  const addCustomerBtn=document.getElementById("addCustomerBtn");
+  const customersTable=document.getElementById("customersTable");
+  const posCustomer=document.getElementById("posCustomer");
+
+  addCustomerBtn.onclick=async()=>{
+    if(!custName.value||!custPhone.value) return;
+    await db.collection("customers").add({name:custName.value, phone:custPhone.value});
+    custName.value=custPhone.value="";
+  };
+
+  db.collection("customers").onSnapshot(snap=>{
+    customersTable.innerHTML="";
+    posCustomer.innerHTML="";
+    snap.forEach(doc=>{
+      const c=doc.data();
+      let actions="";
+      if(currentRole==="admin") actions=`<button class="btn btn-sm btn-danger delCustBtn" data-id="${doc.id}">Delete</button>`;
+      customersTable.innerHTML+=`<tr>
+        <td>${c.name}</td><td>${c.phone}</td><td>${actions}</td>
+      </tr>`;
+
+      const option = document.createElement("option");
+      option.value=doc.id; option.textContent=c.name;
+      posCustomer.appendChild(option);
+    });
+
+    if(currentRole==="admin"){
+      document.querySelectorAll(".delCustBtn").forEach(btn=>{
+        btn.onclick=async()=>{ await db.collection("customers").doc(btn.dataset.id).delete(); };
+      });
+    }
+    document.getElementById("customerCount").textContent = snap.size;
+  });
+
+  /* POS */
+  const posProductEl = document.getElementById("posProduct");
+  const posQty=document.getElementById("posQty");
+  const addToCartBtn=document.getElementById("addToCartBtn");
+  const cartList=document.getElementById("cartList");
+  const checkoutBtn=document.getElementById("checkoutBtn");
+  const clearCartBtn=document.getElementById("clearCartBtn");
+  const paymentSection=document.getElementById("paymentSection");
+  const paymentCompleteBtn=document.getElementById("paymentCompleteBtn");
+  const cancelPaymentBtn=document.getElementById("cancelPaymentBtn");
+  const transCode=document.getElementById("transCode");
+  const paymentMethod=document.getElementById("paymentMethod");
+
+  let cart=[];
+  function renderCart(){
+    cartList.innerHTML="";
+    cart.forEach((c,i)=>{
+      const li=document.createElement("li");
+      li.className="list-group-item d-flex justify-content-between align-items-center";
+      li.textContent=`${c.name} x${c.qty} = KSh ${(c.price*c.qty).toFixed(2)}`;
+      const rmBtn=document.createElement("button");
+      rmBtn.className="btn btn-sm btn-danger"; rmBtn.textContent="x";
+      rmBtn.onclick=()=>{ cart.splice(i,1); renderCart(); };
+      li.appendChild(rmBtn);
+      cartList.appendChild(li);
+    });
+  }
+
+  addToCartBtn.onclick=()=>{
+    const prod=productsCache.find(p=>p.id===posProductEl.value)?.data();
+    if(!prod) return;
+    cart.push({id:posProductEl.value, name:prod.name, price:prod.price, qty:parseInt(posQty.value)});
+    renderCart();
+  };
+
+  clearCartBtn.onclick=()=>{ cart=[]; renderCart(); };
+
+  checkoutBtn.onclick=()=>{ if(cart.length===0) return alert("Cart empty"); paymentSection.classList.remove("d-none"); };
+  cancelPaymentBtn.onclick=()=>{ paymentSection.classList.add("d-none"); };
+
+  paymentCompleteBtn.onclick=async()=>{
+    const customerId = posCustomer.value;
+    const payment = paymentMethod.value;
+    const transaction = transCode.value;
+    const customerName = posCustomer.options[posCustomer.selectedIndex].text;
+    let total = cart.reduce((a,b)=>a+b.price*b.qty,0);
+    const items = cart.map(c=>({name:c.name, price:c.price, qty:c.qty}));
+    await db.collection("sales").add({customer:customerName, items, total, payment, transaction, date:new Date()});
+    cart=[]; renderCart(); paymentSection.classList.add("d-none"); transCode.value=""; alert("Sale completed");
+  };
+
+  /* Sales Table */
+  const salesTable = document.getElementById("salesTable");
+  db.collection("sales").onSnapshot(snap=>{
+    salesTable.innerHTML="";
+    let todayTotal=0;
+
+    snap.docs.forEach(doc=>{
+      const s=doc.data();
+      const date=s.date.toDate();
+      const dateStr=date.toLocaleString();
+      if(date.toDateString()===new Date().toDateString()) todayTotal+=s.total;
+
+      let actions="";
+      if(currentRole==="admin") actions=`<button class="btn btn-sm btn-danger delSaleBtn" data-id="${doc.id}">Delete</button> `;
+      actions += `<button class="btn btn-sm btn-success downloadBtn" data-id="${doc.id}">Download</button>`;
+
+      salesTable.innerHTML+=`<tr>
+        <td>${s.customer}</td>
+        <td>${s.items.map(i=>i.name+" x"+i.qty).join(", ")}</td>
+        <td>KSh ${s.total}</td>
+        <td>${s.payment}</td>
+        <td>${s.transaction}</td>
+        <td>${dateStr}</td>
+        <td>${actions}</td>
+      </tr>`;
+    });
+
+    todaysSalesEl.textContent="KSh "+todayTotal;
+
+    if(currentRole==="admin"){
+      document.querySelectorAll(".delSaleBtn").forEach(btn=>{
+        btn.onclick=async()=>{ if(confirm("Delete this sale?")) await db.collection("sales").doc(btn.dataset.id).delete(); };
+      });
+    }
+
+    document.querySelectorAll(".downloadBtn").forEach(btn=>{
+      btn.onclick=()=>downloadSale(btn.dataset.id);
+    });
+  });
+
+  window.downloadSale = async (id) => {
+    const docSnap = await db.collection("sales").doc(id).get();
+    if(!docSnap.exists) return;
+    const s = docSnap.data();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("🍷 FullStop Liquor", 105, 20, null, null, "center");
+    doc.setFontSize(12);
+    doc.text(`Date: ${s.date.toDate().toLocaleString()}`, 14, 30);
+    doc.text(`Customer: ${s.customer}`, 14, 36);
+    doc.text(`Payment: ${s.payment}`, 14, 42);
+    doc.text(`Transaction: ${s.transaction}`, 14, 48);
+    doc.text("Items:", 14, 56);
+    let startY = 62;
+    s.items.forEach((item,index)=>{
+      doc.text(`${index+1}. ${item.name} x${item.qty} = KSh ${(item.price*item.qty).toFixed(2)}`,16,startY);
+      startY +=6;
+    });
+    doc.text(`Total: KSh ${s.total.toFixed(2)}`, 14, startY+4);
+    doc.text("Thank you for your purchase!",105,startY+14,null,null,"center");
+    doc.save(`receipt_${id}.pdf`);
+  };
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
