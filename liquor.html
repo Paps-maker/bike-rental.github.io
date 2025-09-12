@@ -429,44 +429,52 @@ function initDashboard(){
   checkoutBtn.onclick=()=>{ if(cart.length===0) return alert("Cart empty"); paymentSection.classList.remove("d-none"); };
   cancelPaymentBtn.onclick=()=>{ paymentSection.classList.add("d-none"); };
 
-  paymentCompleteBtn.onclick=async()=>{
+ 
+  // PAYMENT COMPLETED - REDUCE STOCK
+   paymentCompleteBtn.onclick = async () => {
+    if(cart.length === 0) return alert("Cart is empty");
+
     const customerId = posCustomer.value;
     const payment = paymentMethod.value;
     const transaction = transCode.value;
-    const customerName = posCustomer.options[posCustomer.selectedIndex].text;
-    let total = cart.reduce((a,b)=>a+b.price*b.qty,0);
-    const items = cart.map(c=>({name:c.name, price:c.price, qty:c.qty}));
-    await db.collection("sales").add({customer:customerName, items, total, payment, transaction, date:new Date()});
-    cart=[]; renderCart(); paymentSection.classList.add("d-none"); transCode.value=""; alert("Sale completed");
-  };
-  // PAYMENT COMPLETED - REDUCE STOCK
-  document.getElementById("paymentCompleteBtn").onclick=async()=>{
-    const customerId=document.getElementById("posCustomer").value;
-    const payment=document.getElementById("paymentMethod").value;
-    const transaction=document.getElementById("transCode").value;
-    const customerName=document.getElementById("posCustomer").selectedOptions[0].text;
-    let total=cart.reduce((a,b)=>a+b.price*b.qty,0);
-    const items=cart.map(c=>({name:c.name, price:c.price, qty:c.qty}));
+    const customerName = posCustomer.selectedOptions[0].text;
+    let total = cart.reduce((a,b) => a + b.price * b.qty, 0);
+    const items = cart.map(c => ({ name: c.name, price: c.price, qty: c.qty }));
 
-    await db.collection("sales").add({customer:customerName, items, total, payment, transaction, date:new Date()});
+    try {
+      // Save Sale
+      await db.collection("sales").add({ 
+        customer: customerName, 
+        items, 
+        total, 
+        payment, 
+        transaction, 
+        date: new Date() 
+      });
 
-    for(const c of cart){
-      const prodRef=db.collection("products").doc(c.id);
-      const prodSnap=await prodRef.get();
-      if(prodSnap.exists){
-        const currentStock = prodSnap.data().stock||0;
-        await prodRef.update({ stock: currentStock - c.qty });
+      // Reduce stock with transaction
+      for(const c of cart){
+        const prodRef = db.collection("products").doc(c.id);
+        await db.runTransaction(async (t) => {
+          const prodSnap = await t.get(prodRef);
+          if(!prodSnap.exists) return;
+          const currentStock = prodSnap.data().stock || 0;
+          const newStock = Math.max(currentStock - c.qty, 0);
+          t.update(prodRef, { stock: newStock });
+        });
       }
+
+      // Reset
+      cart = [];
+      renderCart();
+      paymentSection.classList.add("d-none");
+      transCode.value = "";
+      alert("Sale completed and stock updated!");
+    } catch(e){
+      console.error("Error completing sale:", e);
+      alert("Error: "+e.message);
     }
-
-    cart=[]; renderCart();
-    document.getElementById("paymentSection").classList.add("d-none");
-    document.getElementById("transCode").value="";
-    alert("Sale completed and stock updated!");
   };
-  document.getElementById("cancelPaymentBtn").onclick=()=>{ document.getElementById("paymentSection").classList.add("d-none"); };
-
-
   /* Sales Table */
   const salesTable = document.getElementById("salesTable");
   db.collection("sales").onSnapshot(snap=>{
