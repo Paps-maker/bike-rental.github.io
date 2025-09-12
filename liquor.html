@@ -487,7 +487,7 @@ function initDashboard(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text("FullStop Liquor", 105, 20, null, null, "center");
+    doc.text("Becky&Babek Liquors", 105, 20, null, null, "center");
     doc.setFontSize(12);
     doc.text(`Date: ${s.date.toDate().toLocaleString()}`, 14, 30);
     doc.text(`Customer: ${s.customer}`, 14, 36);
