@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LiquorPro - Liquor Business System</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+
 <style>
   body { background: #1c1c1c; color: #f8f9fa; }
   .navbar { background: #2b1d0e; }
@@ -159,10 +160,16 @@
       <!-- Sales -->
       <div class="tab-pane fade" id="salesTab">
         <h5>Sales</h5>
+        <div class="d-flex gap-2 mb-3">
+  <button id="downloadAllPDF" class="btn btn-custom">📄 Download All Sales (PDF)</button>
+  <button id="downloadAllCSV" class="btn btn-success">📊 Download All Sales (CSV)</button>
+</div>
+
         <table class="table table-striped">
           <thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Transaction</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody id="salesTable"></tbody>
         </table>
+        
       </div>
     </div>
   </div>
@@ -473,7 +480,7 @@ function initDashboard(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text("🍷 FullStop Liquor", 105, 20, null, null, "center");
+    doc.text("FullStop Liquor", 105, 20, null, null, "center");
     doc.setFontSize(12);
     doc.text(`Date: ${s.date.toDate().toLocaleString()}`, 14, 30);
     doc.text(`Customer: ${s.customer}`, 14, 36);
@@ -489,6 +496,94 @@ function initDashboard(){
     doc.text("Thank you for your purchase!",105,startY+14,null,null,"center");
     doc.save(`receipt_${id}.pdf`);
   };
+  // Store all sales in a variable so we can export them
+let allSales = [];
+
+db.collection("sales").onSnapshot(snap => {
+  salesTable.innerHTML = "";
+  allSales = []; // reset
+  let todayTotal = 0;
+
+  snap.docs.forEach(doc => {
+    const s = doc.data();
+    allSales.push({ id: doc.id, ...s }); // store for later download
+
+    const date = s.date.toDate();
+    const dateStr = date.toLocaleString();
+    if (date.toDateString() === new Date().toDateString()) todayTotal += s.total;
+
+    let actions = "";
+    if (currentRole === "admin") 
+      actions += `<button class="btn btn-sm btn-danger delSaleBtn" data-id="${doc.id}">Delete</button> `;
+    actions += `<button class="btn btn-sm btn-success downloadBtn" data-id="${doc.id}">Download</button>`;
+
+    salesTable.innerHTML += `
+      <tr>
+        <td>${s.customer}</td>
+        <td>${s.items.map(i=>i.name+" x"+i.qty).join(", ")}</td>
+        <td>KSh ${s.total}</td>
+        <td>${s.payment}</td>
+        <td>${s.transaction}</td>
+        <td>${dateStr}</td>
+        <td>${actions}</td>
+      </tr>`;
+  });
+
+  todaysSalesEl.textContent = "KSh " + todayTotal;
+
+  // Delete buttons
+  if (currentRole === "admin") {
+    document.querySelectorAll(".delSaleBtn").forEach(btn => {
+      btn.onclick = async () => {
+        if (confirm("Delete this sale?")) await db.collection("sales").doc(btn.dataset.id).delete();
+      };
+    });
+  }
+
+  // Single sale receipt
+  document.querySelectorAll(".downloadBtn").forEach(btn => {
+    btn.onclick = () => downloadSale(btn.dataset.id);
+  });
+});
+
+/* Download all sales as PDF */
+document.getElementById("downloadAllPDF").onclick = () => {
+  if (allSales.length === 0) return alert("No sales to export");
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text(" FullStop Liquor - Sales Report", 105, 20, null, null, "center");
+  let startY = 30;
+  allSales.forEach((s, idx) => {
+    doc.setFontSize(10);
+    doc.text(`${idx+1}. ${s.customer} | ${s.items.map(i=>i.name+" x"+i.qty).join(", ")} | KSh ${s.total} | ${s.payment} | ${s.transaction} | ${s.date.toDate().toLocaleString()}`, 14, startY);
+    startY += 6;
+    if (startY > 280) { // add new page if too long
+      doc.addPage();
+      startY = 20;
+    }
+  });
+  doc.save("all_sales_report.pdf");
+};
+
+/* Download all sales as CSV */
+document.getElementById("downloadAllCSV").onclick = () => {
+  if (allSales.length === 0) return alert("No sales to export");
+  let csv = "Customer,Items,Total,Payment,Transaction,Date\n";
+  allSales.forEach(s => {
+    const items = s.items.map(i => `${i.name} x${i.qty}`).join(" | ");
+    csv += `"${s.customer}","${items}",${s.total},${s.payment},${s.transaction},${s.date.toDate().toLocaleString()}\n`;
+  });
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "all_sales_report.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
