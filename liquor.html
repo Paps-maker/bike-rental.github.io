@@ -559,7 +559,7 @@ document.getElementById("downloadAllPDF").onclick = () => {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   doc.setFontSize(16);
-  doc.text(" FullStop Liquor - Sales Report", 105, 20, null, null, "center");
+  doc.text(" Becky&Babek Liquor - Sales Report", 105, 20, null, null, "center");
   let startY = 30;
   allSales.forEach((s, idx) => {
     doc.setFontSize(10);
