@@ -419,7 +419,7 @@ function loadSessionsLive(){
             document.getElementById(`timerFull-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
             document.getElementById(`timerReport-${id}`).textContent=Math.floor(diffSec/60);
 
-            let gamesPlayed=Math.floor(diffSec/360);
+            let gamesPlayed=Math.floor(diffSec/900);
             if(billingRule==='ceil') gamesPlayed=Math.ceil(diffSec/360);
 
             // BONUS SESSION LOGIC
