@@ -205,9 +205,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let selectedBike = null;
-🔹 Per-bike rate map
-  const bikeRates = 1
+ let selectedBike = null;
+  const ratePerMinute = 1; // cost per minute
 
 function openPopup(bikeName){
   selectedBike = bikeName;
