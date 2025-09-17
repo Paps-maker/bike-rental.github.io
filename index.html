@@ -261,7 +261,7 @@ onSnapshot(query(collection(db, "reservations")), (snapshot) => {
   const reservations = [];
   snapshot.forEach(doc => reservations.push(doc.data()));
 
-  const bikes = ['Mountain Bike','Road Bike','BMX'];
+  const bikes = ['Hummer','Precision','Nitro','Carsia','Snow','Mustony','Slant','Carrera 1','Carrers 2','Valier'];
   bikes.forEach(bike=>{
     const div = document.getElementById('status-'+bike);
     const res = reservations.filter(r=>r.bike===bike && !r.returned && !r.cancelled)
