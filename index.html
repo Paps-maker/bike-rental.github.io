@@ -207,39 +207,32 @@ const db = getFirestore(app);
 
 let selectedBike = null;
 🔹 Per-bike rate map
-  const bikeRates = {
-    "Hummer": 2,   // 2 Ksh/min
-    "precision": 3,       // 3 Ksh/min
-    "Electric Bike": 5    // 5 Ksh/min
-  };
+  const bikeRates = 1
 
 function openPopup(bikeName){
-    selectedBike = bikeName;
-    document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName} (Rate: ${bikeRates[bikeName]} Ksh/min)`;
-    document.getElementById('popup').style.display = 'flex';
-    document.getElementById('customerName').value='';
-    document.getElementById('customerPhone').value='';
-    document.getElementById('pickupTime').value='';
-    document.getElementById('duration').value='';
-    document.getElementById('costDisplay').innerText = 'Estimated Cost: 0 Ksh';
-  }
+  selectedBike = bikeName;
+  document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName}`;
+  document.getElementById('popup').style.display = 'flex';
+  document.getElementById('customerName').value='';
+  document.getElementById('customerPhone').value='';
+  document.getElementById('pickupTime').value='';
+  document.getElementById('duration').value='';
+  document.getElementById('costDisplay').innerText = 'Estimated Cost: 0 Ksh';
+}
 
-  function closePopup(){
-    document.getElementById('popup').style.display='none';
-  }
+function closePopup(){
+  document.getElementById('popup').style.display='none';
+}
 
- async function reserveBike(){
-    const name=document.getElementById('customerName').value.trim();
-    const phone=document.getElementById('customerPhone').value.trim();
-    const pickup=document.getElementById('pickupTime').value;
-    const duration=parseInt(document.getElementById('duration').value);
-    if(!name||!phone||!pickup||!duration){ alert('Fill all fields'); return; }
+async function reserveBike(){
+  const name=document.getElementById('customerName').value.trim();
+  const phone=document.getElementById('customerPhone').value.trim();
+  const pickup=document.getElementById('pickupTime').value;
+  const duration=parseInt(document.getElementById('duration').value);
+  if(!name||!phone||!pickup||!duration){ alert('Fill all fields'); return; }
 
-    const start = new Date(pickup);
-    const end = new Date(start.getTime()+duration*60000);
-
-    const rate = bikeRates[selectedBike] || 0;
-    const estimatedCost = duration * rate;
+  const start = new Date(pickup);
+  const end = new Date(start.getTime()+duration*60000);
 
   try {
     await addDoc(collection(db, "reservations"), {
@@ -250,9 +243,7 @@ function openPopup(bikeName){
       end: end.toISOString(),
       picked: false,
       returned: false,
-      cancelled: false,
-      estimatedCost: estimatedCost,
-      finalCost: null
+      cancelled: false
     });
     closePopup();
   } catch (e) { console.error("Error adding reservation:", e); }
