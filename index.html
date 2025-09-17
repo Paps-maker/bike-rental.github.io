@@ -206,7 +206,12 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let selectedBike = null;
-const ratePerMinute = 1;
+🔹 Per-bike rate map
+  const bikeRates = {
+    "Hummer": 2,   // 2 Ksh/min
+    "precision": 3,       // 3 Ksh/min
+    "Electric Bike": 5    // 5 Ksh/min
+  };
 
 function openPopup(bikeName){
   selectedBike = bikeName;
