@@ -250,7 +250,7 @@ body { font-family: 'Segoe UI', sans-serif; background:#f8f9fc; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
@@ -396,104 +396,124 @@ function loadSessionsLive(){
       const trFull=document.createElement('tr');
       trFull.dataset.id=id;
       trFull.className=data.bonus?'bonus':'';
-      trFull.innerHTML=`<td>${data.customer}</td><td>${data.game}</td><td id="gamesFull-${id}">${data.gamesPlayed}</td><td id="timerFull-${id}">-</td><td id="statusFull-${id}">${data.status}</td><td id="amountFull-${id}">KES ${data.amount||0}</td><td><button class="me-1 btn btn-sm btn-success completeBtn">Complete</button><button class="btn btn-sm btn-danger deleteBtn">Delete</button></td>`;
+      trFull.innerHTML=`<td>${data.customer}</td>
+                        <td>${data.game}</td>
+                        <td id="gamesFull-${id}">${data.gamesPlayed}</td>
+                        <td id="timerFull-${id}">-</td>
+                        <td id="statusFull-${id}">${data.status}</td>
+                        <td id="amountFull-${id}">KES ${data.amount||0}</td>
+                        <td>
+                          <button class="me-1 btn btn-sm btn-warning stopBtn">Stop</button>
+                          <button class="me-1 btn btn-sm btn-secondary resumeBtn">Resume</button>
+                          <button class="me-1 btn btn-sm btn-success completeBtn">Complete</button>
+                          <button class="btn btn-sm btn-danger deleteBtn">Delete</button>
+                        </td>`;
       fullTable.appendChild(trFull);
 
       // REPORT TABLE
       const trReport=document.createElement('tr');
       trReport.dataset.id=id;
       trReport.className=data.bonus?'bonus':'';
-      trReport.innerHTML=`<td>${data.customer}</td><td>${data.gamesPlayed}</td><td id="timerReport-${id}">-</td><td>KES ${data.amount||0}</td><td>${data.status}</td><td>${createdAt?createdAt.toLocaleString():'-'}</td><td>${data.completedAt?new Date(data.completedAt.seconds*1000).toLocaleString():'-'}</td>`;
+      trReport.innerHTML=`<td>${data.customer}</td>
+                          <td>${data.gamesPlayed}</td>
+                          <td>${data.totalTime||0}</td>
+                          <td>KES ${data.amount||0}</td>
+                          <td>${data.status}</td>
+                          <td>${createdAt?createdAt.toLocaleString():'-'}</td>
+                          <td>${data.endedAt?data.endedAt.toDate().toLocaleString():'-'}</td>`;
       reportsBody.appendChild(trReport);
 
-      // TIMER LOGIC
-      if(createdAt){
-        if(sessionTimers[id]) clearInterval(sessionTimers[id]);
-
-        if(data.status==='active'){
-          sessionTimers[id] = setInterval(async ()=>{
-            const diffSec=Math.floor((new Date()-createdAt)/1000);
-            const mins=Math.floor(diffSec/60);
-            const secs=diffSec%60;
-            document.getElementById(`timer-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-            document.getElementById(`timerFull-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-            document.getElementById(`timerReport-${id}`).textContent=Math.floor(diffSec/60);
-
-            let gamesPlayed=Math.floor(diffSec/900);
-            if(billingRule==='ceil') gamesPlayed=Math.ceil(diffSec/360);
-
-            // BONUS SESSION LOGIC
-            if(gamesPlayed>=5){
-              gamesPlayed=5;
-              await updateDoc(doc(db,'sessions',id),{
-                gamesPlayed,
-                amount:gamesPlayed*pricePerGame,
-                bonus:true,
-                status:'paid',
-                completedAt:serverTimestamp()
-              });
-              clearInterval(sessionTimers[id]);
-            } else {
-              if(gamesPlayed!==data.gamesPlayed){
-                await updateDoc(doc(db,'sessions',id),{
-                  gamesPlayed,
-                  amount:gamesPlayed*pricePerGame
-                });
-              }
-            }
-          },1000);
-        } else {
-          // freeze timer for completed/paid
-          const diffMin=data.completedAt?(Math.floor((data.completedAt.seconds*1000-createdAt)/60000)) : 0;
-          document.getElementById(`timer-${id}`).textContent=`${diffMin} min`;
-          document.getElementById(`timerFull-${id}`).textContent=`${diffMin} min`;
-        }
+      // TIMER
+      if(data.status==='active' || data.status==='extra'){
+        startTimer(id, createdAt, data);
+      }else{
+        clearInterval(sessionTimers[id]);
       }
     });
 
-    // QUICK SUMMARY
-    document.getElementById('statActive').textContent = activeCount;
-    document.getElementById('statPaid').textContent = paidCount;
-    document.getElementById('statRevenue').textContent = `KES ${totalRevenue}`;
-    document.getElementById('statTotal').textContent = totalSessions;
-    document.getElementById('statBonus').textContent = bonusCount;
+    document.getElementById('statActive').textContent=activeCount;
+    document.getElementById('statPaid').textContent=paidCount;
+    document.getElementById('statRevenue').textContent='KES '+totalRevenue;
+    document.getElementById('statTotal').textContent=totalSessions;
+    document.getElementById('statBonus').textContent=bonusCount;
 
-    // BUTTONS
+    // STOP
+    document.querySelectorAll('.stopBtn').forEach(btn=>{
+      btn.onclick=async e=>{
+        const id=btn.closest('tr').dataset.id;
+        clearInterval(sessionTimers[id]);
+        await updateDoc(doc(db,'sessions',id),{status:'stopped'});
+        document.getElementById(`status-${id}`).textContent='stopped';
+        document.getElementById(`statusFull-${id}`).textContent='stopped';
+      };
+    });
+
+    // RESUME
+    document.querySelectorAll('.resumeBtn').forEach(btn=>{
+      btn.onclick=async e=>{
+        const id=btn.closest('tr').dataset.id;
+        const sessionSnap = await getDoc(doc(db,'sessions',id));
+        if(sessionSnap.exists()){
+          const data=sessionSnap.data();
+          await updateDoc(doc(db,'sessions',id),{status:'active'});
+          startTimer(id, data.createdAt?.toDate?.() || new Date(), data);
+          document.getElementById(`status-${id}`).textContent='active';
+          document.getElementById(`statusFull-${id}`).textContent='active';
+        }
+      };
+    });
+
+    // COMPLETE
     document.querySelectorAll('.completeBtn').forEach(btn=>{
       btn.onclick=async e=>{
         const id=btn.closest('tr').dataset.id;
         clearInterval(sessionTimers[id]);
         await updateDoc(doc(db,'sessions',id),{
-          status:'paid',
-          completedAt:serverTimestamp()
+          status:'completed',
+          endedAt:serverTimestamp()
         });
+        document.getElementById(`status-${id}`).textContent='completed';
+        document.getElementById(`statusFull-${id}`).textContent='completed';
       };
     });
+
+    // DELETE
     document.querySelectorAll('.deleteBtn').forEach(btn=>{
       btn.onclick=async e=>{
         const id=btn.closest('tr').dataset.id;
-        clearInterval(sessionTimers[id]);
-        await deleteDoc(doc(db,'sessions',id));
+        if(confirm('Delete this session?')){
+          clearInterval(sessionTimers[id]);
+          await deleteDoc(doc(db,'sessions',id));
+        }
       };
     });
   });
 }
 
-// EXPORT CSV
-document.getElementById('exportCSV').addEventListener('click',()=>{
-  let csv='Customer,Games Played,Total Time,Amount,Status,Started,Ended\n';
-  document.querySelectorAll('#reportsTableBody tr').forEach(tr=>{
-    const row=[];
-    tr.querySelectorAll('td').forEach(td=>row.push(td.textContent.replace(/,/g,' ')));
-    csv+=row.join(',')+'\n';
-  });
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='sessions_report.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-});
+function startTimer(id, createdAt, data){
+  clearInterval(sessionTimers[id]);
+  const startTime=createdAt||new Date();
+  sessionTimers[id]=setInterval(async ()=>{
+    const now=new Date();
+    const diffSec=Math.floor((now-startTime)/1000);
+    const mins=Math.floor(diffSec/60);
+    const secs=diffSec%60;
+    document.getElementById(`timer-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+    document.getElementById(`timerFull-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+
+    let gamesPlayed=(billingRule==='floor')?Math.floor(diffSec/900):Math.ceil(diffSec/900);
+    let amount=(gamesPlayed*(pricePerGame||50))*(data.bonus?0:1);
+
+    document.getElementById(`games-${id}`).textContent=gamesPlayed;
+    document.getElementById(`gamesFull-${id}`).textContent=gamesPlayed;
+    document.getElementById(`amount-${id}`).textContent='KES '+amount;
+    document.getElementById(`amountFull-${id}`).textContent='KES '+amount;
+
+    await updateDoc(doc(db,'sessions',id),{
+      gamesPlayed, amount, totalTime:mins
+    });
+  },1000);
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
