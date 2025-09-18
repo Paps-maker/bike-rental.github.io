@@ -488,7 +488,7 @@ function startTimer(id,data){
     document.getElementById(`timer-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
     document.getElementById(`timerFull-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
 
-    let gamesPlayed=(billingRule==='floor')?Math.floor(diffSec/900):Math.ceil(diffSec/900);
+    let gamesPlayed=(billingRule==='floor')?Math.floor(diffSec/840):Math.ceil(diffSec/840);
     let amount=gamesPlayed*(pricePerGame||50);
     document.getElementById(`games-${id}`).textContent=gamesPlayed;
     document.getElementById(`gamesFull-${id}`).textContent=gamesPlayed;
