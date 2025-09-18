@@ -283,7 +283,7 @@ const logoutBtn=document.getElementById('logoutBtn');
 
 let billingRule='floor';
 let pricePerGame=50;
-const sessionTimers = {}; // store all timers by session id
+const sessionTimers = {};
 
 // MOBILE SIDEBAR TOGGLE
 const toggleSidebarBtn=document.createElement('button');
@@ -363,72 +363,19 @@ document.getElementById('addSessionForm').addEventListener('submit', async e=>{
   }catch(err){ alert(err.message); }
 });
 
-// LOAD SESSIONS LIVE
+// LOAD SESSIONS LIVE (Optimized, no flicker)
 function loadSessionsLive(){
   const q=query(collection(db,'sessions'), orderBy('createdAt','desc'));
   onSnapshot(q, snap=>{
-    const quickTable=document.getElementById('quickSessionsTable');
-    const fullTable=document.getElementById('sessionsTable');
-    const reportsBody=document.getElementById('reportsTableBody');
-    quickTable.innerHTML=''; fullTable.innerHTML=''; reportsBody.innerHTML='';
-
     let activeCount=0, paidCount=0, totalRevenue=0, totalSessions=0, bonusCount=0;
 
-    snap.docs.forEach(docu=>{
+    snap.forEach(docu=>{
       const data=docu.data(); 
-      const id=docu.id;
-      const createdAt=data.createdAt?.toDate?.();
-
       totalSessions++;
       if(data.status==='active') activeCount++;
       if(data.status==='paid' || data.status==='completed') paidCount++;
       if(data.bonus) bonusCount++;
       totalRevenue += data.amount || 0;
-
-      // QUICK TABLE
-      const trQuick=document.createElement('tr');
-      trQuick.dataset.id=id;
-      trQuick.className=data.bonus?'bonus':'';
-      trQuick.innerHTML=`<td>${data.customer}</td><td>${data.game}</td><td id="games-${id}">${data.gamesPlayed}</td><td id="timer-${id}">-</td><td id="status-${id}">${data.status}</td><td id="amount-${id}">KES ${data.amount||0}</td>`;
-      quickTable.appendChild(trQuick);
-
-      // FULL TABLE
-      const trFull=document.createElement('tr');
-      trFull.dataset.id=id;
-      trFull.className=data.bonus?'bonus':'';
-      trFull.innerHTML=`<td>${data.customer}</td>
-                        <td>${data.game}</td>
-                        <td id="gamesFull-${id}">${data.gamesPlayed}</td>
-                        <td id="timerFull-${id}">-</td>
-                        <td id="statusFull-${id}">${data.status}</td>
-                        <td id="amountFull-${id}">KES ${data.amount||0}</td>
-                        <td>
-                          <button class="me-1 btn btn-sm btn-warning stopBtn">Stop</button>
-                          <button class="me-1 btn btn-sm btn-secondary resumeBtn">Resume</button>
-                          <button class="me-1 btn btn-sm btn-success completeBtn">Complete</button>
-                          <button class="btn btn-sm btn-danger deleteBtn">Delete</button>
-                        </td>`;
-      fullTable.appendChild(trFull);
-
-      // REPORT TABLE
-      const trReport=document.createElement('tr');
-      trReport.dataset.id=id;
-      trReport.className=data.bonus?'bonus':'';
-      trReport.innerHTML=`<td>${data.customer}</td>
-                          <td>${data.gamesPlayed}</td>
-                          <td>${data.totalTime||0}</td>
-                          <td>KES ${data.amount||0}</td>
-                          <td>${data.status}</td>
-                          <td>${createdAt?createdAt.toLocaleString():'-'}</td>
-                          <td>${data.endedAt?data.endedAt.toDate().toLocaleString():'-'}</td>`;
-      reportsBody.appendChild(trReport);
-
-      // TIMER
-      if(data.status==='active' || data.status==='extra'){
-        startTimer(id, createdAt, data);
-      }else{
-        clearInterval(sessionTimers[id]);
-      }
     });
 
     document.getElementById('statActive').textContent=activeCount;
@@ -437,85 +384,176 @@ function loadSessionsLive(){
     document.getElementById('statTotal').textContent=totalSessions;
     document.getElementById('statBonus').textContent=bonusCount;
 
-    // STOP
-    document.querySelectorAll('.stopBtn').forEach(btn=>{
-      btn.onclick=async e=>{
-        const id=btn.closest('tr').dataset.id;
-        clearInterval(sessionTimers[id]);
-        await updateDoc(doc(db,'sessions',id),{status:'stopped'});
-        document.getElementById(`status-${id}`).textContent='stopped';
-        document.getElementById(`statusFull-${id}`).textContent='stopped';
-      };
-    });
+    snap.docChanges().forEach(change=>{
+      const data=change.doc.data();
+      const id=change.doc.id;
+      const createdAt=data.createdAt?.toDate?.();
 
-    // RESUME
-    document.querySelectorAll('.resumeBtn').forEach(btn=>{
-      btn.onclick=async e=>{
-        const id=btn.closest('tr').dataset.id;
-        const sessionSnap = await getDoc(doc(db,'sessions',id));
-        if(sessionSnap.exists()){
-          const data=sessionSnap.data();
-          await updateDoc(doc(db,'sessions',id),{status:'active'});
-          startTimer(id, data.createdAt?.toDate?.() || new Date(), data);
-          document.getElementById(`status-${id}`).textContent='active';
-          document.getElementById(`statusFull-${id}`).textContent='active';
-        }
-      };
-    });
-
-    // COMPLETE
-    document.querySelectorAll('.completeBtn').forEach(btn=>{
-      btn.onclick=async e=>{
-        const id=btn.closest('tr').dataset.id;
-        clearInterval(sessionTimers[id]);
-        await updateDoc(doc(db,'sessions',id),{
-          status:'completed',
-          endedAt:serverTimestamp()
-        });
-        document.getElementById(`status-${id}`).textContent='completed';
-        document.getElementById(`statusFull-${id}`).textContent='completed';
-      };
-    });
-
-    // DELETE
-    document.querySelectorAll('.deleteBtn').forEach(btn=>{
-      btn.onclick=async e=>{
-        const id=btn.closest('tr').dataset.id;
-        if(confirm('Delete this session?')){
-          clearInterval(sessionTimers[id]);
-          await deleteDoc(doc(db,'sessions',id));
-        }
-      };
+      if(change.type==='added'){
+        addRow(data,id,createdAt);
+      }
+      if(change.type==='modified'){
+        updateRow(data,id,createdAt);
+      }
+      if(change.type==='removed'){
+        removeRow(id);
+      }
     });
   });
 }
 
-function startTimer(id, createdAt, data){
+function addRow(data,id,createdAt){
+  // Quick table
+  const trQuick=document.createElement('tr');
+  trQuick.id='rowQuick-'+id;
+  trQuick.className=data.bonus?'bonus':'';
+  trQuick.innerHTML=`<td>${data.customer}</td><td>${data.game}</td><td id="games-${id}">${data.gamesPlayed}</td><td id="timer-${id}">-</td><td id="status-${id}">${data.status}</td><td id="amount-${id}">KES ${data.amount||0}</td>`;
+  document.getElementById('quickSessionsTable').appendChild(trQuick);
+
+  // Full table
+  const trFull=document.createElement('tr');
+  trFull.id='rowFull-'+id;
+  trFull.className=data.bonus?'bonus':'';
+  trFull.innerHTML=`<td>${data.customer}</td>
+                    <td>${data.game}</td>
+                    <td id="gamesFull-${id}">${data.gamesPlayed}</td>
+                    <td id="timerFull-${id}">-</td>
+                    <td id="statusFull-${id}">${data.status}</td>
+                    <td id="amountFull-${id}">KES ${data.amount||0}</td>
+                    <td>
+                      <button class="stopBtn btn btn-sm btn-warning">Stop</button>
+                      <button class="resumeBtn btn btn-sm btn-success">Resume</button>
+                      <button class="completeBtn btn btn-sm btn-primary">Complete</button>
+                      <button class="extraBtn btn btn-sm btn-info">+ Extra 15m</button>
+                      <button class="deleteBtn btn btn-sm btn-danger">Delete</button>
+                    </td>`;
+  trFull.dataset.id=id;
+  document.getElementById('sessionsTable').appendChild(trFull);
+
+  // Reports table
+  const trReport=document.createElement('tr');
+  trReport.id='rowReport-'+id;
+  trReport.innerHTML=`<td>${data.customer}</td>
+                      <td>${data.gamesPlayed}</td>
+                      <td>${data.totalTime||0}</td>
+                      <td>KES ${data.amount||0}</td>
+                      <td>${data.status}</td>
+                      <td>${createdAt?createdAt.toLocaleString():'-'}</td>
+                      <td>${data.endedAt?.toDate?.()?.toLocaleString()||'-'}</td>`;
+  document.getElementById('reportsTableBody').appendChild(trReport);
+
+  if(data.status==='active'){ startTimer(id,data); }
+}
+
+function updateRow(data,id,createdAt){
+  document.getElementById(`games-${id}`).textContent=data.gamesPlayed;
+  document.getElementById(`amount-${id}`).textContent='KES '+(data.amount||0);
+  document.getElementById(`status-${id}`).textContent=data.status;
+  document.getElementById(`gamesFull-${id}`).textContent=data.gamesPlayed;
+  document.getElementById(`amountFull-${id}`).textContent='KES '+(data.amount||0);
+  document.getElementById(`statusFull-${id}`).textContent=data.status;
+
+  const trReport=document.getElementById('rowReport-'+id);
+  if(trReport){
+    trReport.innerHTML=`<td>${data.customer}</td>
+                        <td>${data.gamesPlayed}</td>
+                        <td>${data.totalTime||0}</td>
+                        <td>KES ${data.amount||0}</td>
+                        <td>${data.status}</td>
+                        <td>${createdAt?createdAt.toLocaleString():'-'}</td>
+                        <td>${data.endedAt?.toDate?.()?.toLocaleString()||'-'}</td>`;
+  }
+
+  if(data.status==='active'){ startTimer(id,data); }
+  else{ clearInterval(sessionTimers[id]); }
+}
+
+function removeRow(id){
+  document.getElementById('rowQuick-'+id)?.remove();
+  document.getElementById('rowFull-'+id)?.remove();
+  document.getElementById('rowReport-'+id)?.remove();
   clearInterval(sessionTimers[id]);
-  const startTime=createdAt||new Date();
+}
+
+// TIMER FIX
+function startTimer(id,data){
+  clearInterval(sessionTimers[id]);
+  const baseElapsed=data.elapsedTime||0;
+  const resumedAt=data.resumedAt?.toDate?.()||new Date();
   sessionTimers[id]=setInterval(async ()=>{
     const now=new Date();
-    const diffSec=Math.floor((now-startTime)/1000);
+    const diffSec=baseElapsed+Math.floor((now-resumedAt)/1000);
     const mins=Math.floor(diffSec/60);
     const secs=diffSec%60;
     document.getElementById(`timer-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
     document.getElementById(`timerFull-${id}`).textContent=`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
 
     let gamesPlayed=(billingRule==='floor')?Math.floor(diffSec/900):Math.ceil(diffSec/900);
-    let amount=(gamesPlayed*(pricePerGame||50))*(data.bonus?0:1);
-
+    let amount=gamesPlayed*(pricePerGame||50);
     document.getElementById(`games-${id}`).textContent=gamesPlayed;
     document.getElementById(`gamesFull-${id}`).textContent=gamesPlayed;
     document.getElementById(`amount-${id}`).textContent='KES '+amount;
     document.getElementById(`amountFull-${id}`).textContent='KES '+amount;
 
     await updateDoc(doc(db,'sessions',id),{
-      gamesPlayed, amount, totalTime:mins
+      gamesPlayed, amount, totalTime:mins, elapsedTime:diffSec
     });
   },1000);
 }
-</script>
+// ✅ ACTION BUTTON HANDLERS (Stop, Resume, Complete, Delete)
+document.addEventListener("click", async (e) => {
+  const row = e.target.closest("tr");
+  if (!row || !row.dataset.id) return;
+  const id = row.dataset.id;
 
+  // STOP
+  if (e.target.classList.contains("stopBtn")) {
+    clearInterval(sessionTimers[id]);
+    await updateDoc(doc(db, "sessions", id), {
+      status: "stopped",
+      resumedAt: null
+    });
+  }
+
+  // RESUME
+  if (e.target.classList.contains("resumeBtn")) {
+    await updateDoc(doc(db, "sessions", id), {
+      status: "active",
+      resumedAt: serverTimestamp()
+    });
+  }
+
+  // COMPLETE
+  if (e.target.classList.contains("completeBtn")) {
+    clearInterval(sessionTimers[id]);
+    await updateDoc(doc(db, "sessions", id), {
+      status: "completed",
+      endedAt: serverTimestamp()
+    });
+  }
+  // EXTRA TIME
+if (e.target.classList.contains("extraBtn")) {
+  const docRef = doc(db, "sessions", id);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    const current = snap.data();
+    const newElapsed = (current.elapsedTime || 0) + 900; // +15 min
+    await updateDoc(docRef, {
+      elapsedTime: newElapsed,
+      resumedAt: serverTimestamp()
+    });
+  }
+}
+
+
+  // DELETE
+  if (e.target.classList.contains("deleteBtn")) {
+    clearInterval(sessionTimers[id]);
+    await deleteDoc(doc(db, "sessions", id));
+  }
+});
+
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
