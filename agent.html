@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+body { background-color: #f4f6f8; font-family: Arial, sans-serif; }
+.navbar, .sidebar { background-color: #0a2e5d; color: #fff; }
+.sidebar a { color: #fff; text-decoration: none; display: block; padding: 10px 15px; }
+.sidebar a:hover { background-color: #1c3c7a; }
+.card { border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.1); margin-bottom:15px; }
+.card-header { background-color: #0a2e5d; color: #ffd700; font-weight: bold; }
+.btn-gold { background-color: #ffd700; color: #0a2e5d; }
+.btn-gold:hover { background-color: #e6c200; color: #0a2e5d; }
+.table-responsive { overflow-x:auto; }
+@media(max-width:767px){
+  .sidebar { position: fixed; z-index:1000; width: 200px; left:-200px; top:0; height:100%; transition:0.3s; }
+  .sidebar.show { left:0; }
+  .sidebar a{padding:12px 20px;}
+  .main-content { margin-left:0 !important; padding:10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal-dialog modal-sm">
+<div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Admin Login</h5></div>
+<div class="modal-body">
+<form id="loginForm">
+<div class="mb-3"><input type="email" id="loginEmail" class="form-control" placeholder="Email" required></div>
+<div class="mb-3"><input type="password" id="loginPassword" class="form-control" placeholder="Password" required></div>
+<div class="mb-3 text-danger" id="loginError"></div>
+<button type="submit" class="w-100 btn btn-gold">Login</button>
+</form>
+</div>
+</div>
+</div>
+</div>
+
+<nav class="px-4 navbar navbar-expand-lg navbar-dark">
+<a class="navbar-brand" href="#">Finance Dashboard</a>
+<button class="btn btn-gold d-md-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+<button class="ms-auto btn btn-gold" id="logoutBtn" style="display:none;">Logout</button>
+</nav>
+
+<div class="d-flex">
+<div class="pt-4 sidebar" id="sidebar">
+    <a href="#dashboard">Dashboard</a>
+    <a href="#transactions">Transactions</a>
+</div>
+
+<div class="flex-fill pt-4 main-content container-fluid" id="mainContent" style="display:none;">
+
+<!-- Dashboard Cards -->
+<div id="dashboard" class="mb-4 row">
+    <div class="col-md-4 col-12">
+        <div class="text-center card">
+            <div class="card-header">Total Deposits (KSh)</div>
+            <div class="card-body"><h3 id="totalDeposits">0</h3></div>
+        </div>
+    </div>
+    <div class="col-md-4 col-12">
+        <div class="text-center card">
+            <div class="card-header">Total Withdrawals (KSh)</div>
+            <div class="card-body"><h3 id="totalWithdrawals">0</h3></div>
+        </div>
+    </div>
+    <div class="col-md-4 col-12">
+        <div class="text-center card">
+            <div class="card-header">Total Transactions</div>
+            <div class="card-body"><h3 id="totalTransactions">0</h3></div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Section -->
+<div id="transactions">
+<div class="d-flex flex-column flex-md-row justify-content-between mb-2">
+    <h4>Transactions <button class="ms-2 mt-2 mt-md-0 btn btn-gold btn-sm" data-bs-toggle="modal" data-bs-target="#transactionModal">Add Transaction</button></h4>
+    <input type="text" id="searchInput" class="mt-2 mt-md-0 w-100 w-md-25 form-control" placeholder="Search by Name or Code">
+</div>
+<div class="table-responsive">
+<table class="table table-striped mt-2">
+<thead class="table-dark">
+<tr>
+    <th>Customer Name</th>
+    <th>ID/Passport</th>
+    <th>Phone Number</th>
+    <th>Transaction Code</th>
+    <th>Type</th>
+    <th>Method</th>
+    <th>Status</th>
+    <th>Amount</th>
+    <th>Date</th>
+    <th>Actions</th>
+</tr>
+</thead>
+<tbody id="transactionTableBody"></tbody>
+</table>
+</div>
+
+<!-- Download Section -->
+<div class="d-flex flex-wrap align-items-center mb-2">
+  <button class="me-2 btn btn-success btn-sm" id="downloadRangeBtn">Download Selected Range</button>
+  <div id="rangeContainer" style="display:none;" class="d-flex flex-wrap align-items-center mt-2">
+    <input type="date" id="startDate" class="me-2 mb-2 mb-md-0 form-control" placeholder="Start Date">
+    <input type="date" id="endDate" class="me-2 mb-2 mb-md-0 form-control" placeholder="End Date">
+    <button class="btn btn-success btn-sm" id="confirmRangeDownload">Download</button>
+  </div>
+  <button class="me-2 btn btn-primary btn-sm" id="downloadTodayBtn">Download Today</button>
+  <button class="btn btn-warning btn-sm" id="downloadAllBtn">Download All</button>
+</div>
+
+<!-- Charts -->
+<div class="d-flex flex-wrap mb-2">
+    <button class="me-2 mb-2 btn btn-sm btn-gold" onclick="updateChartView('daily')">Daily</button>
+    <button class="me-2 mb-2 btn btn-sm btn-gold" onclick="updateChartView('weekly')">Weekly</button>
+    <button class="mb-2 btn btn-sm btn-gold" onclick="updateChartView('monthly')">Monthly</button>
+</div>
+<div class="mb-4 row">
+    <div class="mb-3 col-md-6 col-12"><canvas id="depositWithdrawChart"></canvas></div>
+    <div class="mb-3 col-md-6 col-12"><canvas id="methodPieChart"></canvas></div>
+</div>
+
+</div>
+</div>
+
+<!-- Transaction Modal -->
+<div class="modal fade" id="transactionModal" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog">
+<div class="modal-content">
+<form id="transactionForm">
+<div class="modal-header"><h5 class="modal-title">Add Transaction</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+<input type="hidden" id="transactionId">
+<div class="mb-3"><label>Customer Name</label><input type="text" id="customerName" class="form-control" required></div>
+<div class="mb-3"><label>ID/Passport</label><input type="text" id="customerIdNumber" class="form-control" required></div>
+<div class="mb-3"><label>Phone Number</label><input type="text" id="customerPhone" class="form-control" required></div>
+<div class="mb-3"><label>Transaction Code</label><input type="text" id="transactionCode" class="form-control" required></div>
+<div class="mb-3"><label>Type</label><select id="transactionType" class="form-control" required><option value="Deposit">Deposit</option><option value="Withdrawal">Withdrawal</option></select></div>
+<div class="mb-3"><label>Method</label><select id="transactionMethod" class="form-control" required><option value="MPESA">MPESA</option><option value="Bank">Bank</option></select></div>
+<div class="mb-3"><label>Status</label><select id="transactionStatus" class="form-control" required><option value="Pending">Pending</option><option value="Completed">Completed</option><option value="Failed">Failed</option></select></div>
+<div class="mb-3"><label>Amount</label><input type="number" id="transactionAmount" class="form-control" required></div>
+</div>
+<div class="modal-footer"><button type="submit" class="w-100 btn btn-gold">Save</button></div>
+</form>
+</div>
+</div>
+</div>
+
+<!-- Firebase + JS -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const firebaseConfig = {
+ apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:30c5a9c47b4ab3e3b98139",
+  measurementId: "G-CBFGJ2Z0TJ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const transactionTableBody = document.getElementById('transactionTableBody');
+const mainContent = document.getElementById('mainContent');
+const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+const logoutBtn = document.getElementById('logoutBtn');
+let depositWithdrawChart, methodPieChart, chartDataCache=[];
+
+// Auth
+auth.onAuthStateChanged(user=>{
+    if(user){ mainContent.style.display='block'; logoutBtn.style.display='inline-block'; loginModal.hide(); loadTransactions(); }
+    else{ mainContent.style.display='none'; logoutBtn.style.display='none'; loginModal.show(); }
+});
+document.getElementById('loginForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value,document.getElementById('loginPassword').value)
+    .catch(err=>{ document.getElementById('loginError').innerText = err.message; });
+});
+logoutBtn.addEventListener('click',()=>{ auth.signOut(); });
+
+// Sidebar toggle
+document.getElementById('sidebarToggle').addEventListener('click',()=>{ document.getElementById('sidebar').classList.toggle('show'); });
+
+// Load Transactions
+function loadTransactions(){
+    transactionTableBody.innerHTML='';
+    db.collection('transactions').orderBy('date','desc').get().then(snapshot=>{
+        let depositTotal=0, withdrawTotal=0;
+        let dataArr=[];
+        snapshot.forEach(doc=>{
+            const data = doc.data();
+            dataArr.push({...data,id:doc.id});
+            if(data.type==='Deposit') depositTotal+=data.amount;
+            if(data.type==='Withdrawal') withdrawTotal+=data.amount;
+            const tr = document.createElement('tr');
+            tr.innerHTML=`
+            <td>${data.customerName}</td>
+            <td>${data.customerIdNumber}</td>
+            <td>${data.customerPhone}</td>
+            <td>${data.transactionCode}</td>
+            <td>${data.type}</td>
+            <td>${data.method}</td>
+            <td>${data.status}</td>
+            <td>${data.amount.toLocaleString()}</td>
+            <td>${new Date(data.date.seconds*1000).toLocaleString()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editTransaction('${doc.id}','${data.customerName}','${data.customerIdNumber}','${data.customerPhone}','${data.transactionCode}','${data.type}','${data.method}','${data.status}',${data.amount})"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${doc.id}')"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-sm btn-success" onclick="generateReceipt('${doc.id}')"><i class="fas fa-file-pdf"></i></button>
+            </td>`;
+            transactionTableBody.appendChild(tr);
+        });
+        updateDashboard(depositTotal, withdrawTotal, snapshot.size);
+        chartDataCache = dataArr;
+        renderCharts(chartDataCache);
+    });
+}
+
+// Dashboard update
+function updateDashboard(deposit, withdraw, total){
+    document.getElementById('totalDeposits').innerText = deposit.toLocaleString();
+    document.getElementById('totalWithdrawals').innerText = withdraw.toLocaleString();
+    document.getElementById('totalTransactions').innerText = total;
+}
+
+// Transaction Form Submit
+document.getElementById('transactionForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    const id = document.getElementById('transactionId').value;
+    const transactionCode = document.getElementById('transactionCode').value;
+    const data = {
+        customerName: document.getElementById('customerName').value,
+        customerIdNumber: document.getElementById('customerIdNumber').value,
+        customerPhone: document.getElementById('customerPhone').value,
+        transactionCode,
+        type: document.getElementById('transactionType').value,
+        method: document.getElementById('transactionMethod').value,
+        status: document.getElementById('transactionStatus').value,
+        amount: parseFloat(document.getElementById('transactionAmount').value),
+        date: firebase.firestore.Timestamp.now()
+    };
+    const docRef = db.collection('transactions').doc(transactionCode);
+    if(id){ // Editing
+        docRef.set(data).then(()=>{ resetForm(); loadTransactions(); bootstrap.Modal.getInstance(document.getElementById('transactionModal')).hide(); });
+    } else { // Adding
+        docRef.get().then(docSnap=>{
+            if(docSnap.exists){ alert('Transaction Code already exists'); } 
+            else { docRef.set(data).then(()=>{ resetForm(); loadTransactions(); bootstrap.Modal.getInstance(document.getElementById('transactionModal')).hide(); }); }
+        });
+    }
+});
+
+// Reset Form
+function resetForm(){
+    document.getElementById('transactionForm').reset();
+    document.getElementById('transactionId').value='';
+}
+
+// Edit Transaction
+function editTransaction(id,name,idNumber,phone,code,type,method,status,amount){
+    document.getElementById('transactionId').value=id;
+    document.getElementById('customerName').value=name;
+    document.getElementById('customerIdNumber').value=idNumber;
+    document.getElementById('customerPhone').value=phone;
+    document.getElementById('transactionCode').value=code;
+    document.getElementById('transactionType').value=type;
+    document.getElementById('transactionMethod').value=method;
+    document.getElementById('transactionStatus').value=status;
+    document.getElementById('transactionAmount').value=amount;
+    new bootstrap.Modal(document.getElementById('transactionModal')).show();
+}
+
+// Delete Transaction
+function deleteTransaction(id){
+    if(confirm('Are you sure?')){ db.collection('transactions').doc(id).delete().then(()=>{ loadTransactions(); }); }
+}
+
+// Generate Receipt
+function generateReceipt(id){
+    db.collection('transactions').doc(id).get().then(doc=>{
+        const data = doc.data();
+        const { jsPDF } = window.jspdf;
+        const docPDF = new jsPDF();
+        docPDF.text(`Transaction Receipt`,20,20);
+        docPDF.text(`Customer: ${data.customerName}`,20,30);
+        docPDF.text(`ID/Passport: ${data.customerIdNumber}`,20,40);
+        docPDF.text(`Phone: ${data.customerPhone}`,20,50);
+        docPDF.text(`Transaction Code: ${data.transactionCode}`,20,60);
+        docPDF.text(`Type: ${data.type}`,20,70);
+        docPDF.text(`Method: ${data.method}`,20,80);
+        docPDF.text(`Status: ${data.status}`,20,90);
+        docPDF.text(`Amount: ${data.amount.toLocaleString()}`,20,100);
+        docPDF.text(`Date: ${new Date(data.date.seconds*1000).toLocaleString()}`,20,110);
+        docPDF.save(`${data.transactionCode}_receipt.pdf`);
+    });
+}
+
+// Search
+document.getElementById('searchInput').addEventListener('input', e=>{
+    const val = e.target.value.toLowerCase();
+    transactionTableBody.querySelectorAll('tr').forEach(tr=>{
+        const name = tr.children[0].innerText.toLowerCase();
+        const code = tr.children[3].innerText.toLowerCase();
+        tr.style.display = (name.includes(val) || code.includes(val)) ? '' : 'none';
+    });
+});
+
+// Charts
+function renderCharts(dataArr){
+    const deposits = {}, withdrawals={}, methods={MPESA:0,Bank:0};
+    dataArr.forEach(d=>{
+        const date = new Date(d.date.seconds*1000).toLocaleDateString();
+        if(d.type==='Deposit'){ deposits[date]=(deposits[date]||0)+d.amount; }
+        else if(d.type==='Withdrawal'){ withdrawals[date]=(withdrawals[date]||0)+d.amount; }
+        methods[d.method] = (methods[d.method]||0)+1;
+    });
+    const labels = Object.keys(deposits);
+    const depositData = Object.values(deposits);
+    const withdrawData = Object.values(withdrawals);
+
+    if(depositWithdrawChart) depositWithdrawChart.destroy();
+    depositWithdrawChart = new Chart(document.getElementById('depositWithdrawChart'),{
+        type:'bar', data:{ labels, datasets:[
+            {label:'Deposits',data:depositData,backgroundColor:'green'},
+            {label:'Withdrawals',data:withdrawData,backgroundColor:'red'}
+        ]}
+    });
+
+    if(methodPieChart) methodPieChart.destroy();
+    methodPieChart = new Chart(document.getElementById('methodPieChart'),{
+        type:'pie', data:{ labels:Object.keys(methods), datasets:[{data:Object.values(methods), backgroundColor:['#007bff','#ffc107']}] }
+    });
+}
+
+// Download Range Toggle
+document.getElementById('downloadRangeBtn').addEventListener('click', ()=>{
+    const container = document.getElementById('rangeContainer');
+    container.style.display = container.style.display==='none'?'flex':'none';
+});
+
+// Download Selected Range
+document.getElementById('confirmRangeDownload').addEventListener('click', ()=>{
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    if(!start||!end){ alert('Select start and end dates'); return; }
+    const startDate = new Date(start); startDate.setHours(0,0,0,0);
+    const endDate = new Date(end); endDate.setHours(23,59,59,999);
+    const filtered = chartDataCache.filter(t=>{
+        const tDate = new Date(t.date.seconds*1000);
+        return tDate>=startDate && tDate<=endDate;
+    });
+    if(filtered.length===0){ alert('No transactions'); return; }
+    downloadExcel(filtered,`Transactions_${start}_to_${end}.xlsx`);
+    document.getElementById('rangeContainer').style.display='none';
+    document.getElementById('startDate').value=''; document.getElementById('endDate').value='';
+});
+
+// Download Today
+document.getElementById('downloadTodayBtn').addEventListener('click', ()=>{
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+    const filtered = chartDataCache.filter(t=>{
+        const tDate = new Date(t.date.seconds*1000);
+        return tDate>=today && tDate<tomorrow;
+    });
+    if(filtered.length===0){ alert('No transactions today'); return; }
+    downloadExcel(filtered,`Transactions_Today.xlsx`);
+});
+
+// Download All
+document.getElementById('downloadAllBtn').addEventListener('click', ()=>{
+    if(chartDataCache.length===0){ alert('No transactions'); return; }
+    downloadExcel(chartDataCache,'Transactions_All.xlsx');
+});
+
+// Excel Download Helper
+function downloadExcel(arr,filename){
+    const wsData=[["Customer Name","ID/Passport","Phone Number","Transaction Code","Type","Method","Status","Amount","Date"]];
+    arr.forEach(t=>{ wsData.push([t.customerName,t.customerIdNumber,t.customerPhone,t.transactionCode,t.type,t.method,t.status,t.amount,new Date(t.date.seconds*1000).toLocaleString()]); });
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wsData),"Transactions");
+    XLSX.writeFile(wb,filename);
+}
+</script>
+</body>
+</html>
