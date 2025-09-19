@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -129,7 +130,6 @@
                 <thead>
                   <tr>
                     <th>Store</th>
-            
                     <th>Agent No</th>
                     <th>Contact</th>
                     <th>Documents</th>
@@ -156,13 +156,13 @@
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
-      authDomain: "transc-eec4c.firebaseapp.com",
-      projectId: "transc-eec4c",
-      storageBucket: "gs://transc-eec4c-storage",
-      messagingSenderId: "3676403115",
-      appId: "1:3676403115:web:8f176dc82e526ac8614eee",
-      measurementId: "G-K5JKH3NGR1"
+    apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
+  authDomain: "transc-eec4c.firebaseapp.com",
+  projectId: "transc-eec4c",
+  storageBucket: "transc-eec4c-storage.appspot.com", // <--- FIXED
+  messagingSenderId: "3676403115",
+  appId: "1:3676403115:web:8f176dc82e526ac8614eee",
+  measurementId: "G-K5JKH3NGR1"
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -178,7 +178,6 @@
 
     let editMode = false;
 
-    // 🔐 Auth State
     auth.onAuthStateChanged(user => {
       if (user) {
         loginPage.style.display = "none";
@@ -190,7 +189,6 @@
       }
     });
 
-    // Login
     loginForm.addEventListener("submit", e => {
       e.preventDefault();
       const email = document.getElementById("loginEmail").value;
@@ -201,15 +199,15 @@
 
     function logout() { auth.signOut(); }
 
-    // Show chosen file name
     function showFileName(input, targetId) {
       const fileName = input.files.length > 0 ? input.files[0].name : "No file selected";
       document.getElementById(targetId).textContent = fileName;
     }
 
-    // Save or update client with upload progress
+    // ----- Save client with per-file progress -----
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
       const data = {};
       [...form.elements].forEach(el => {
         if (el.name && el.type !== 'file') data[el.name] = el.value;
@@ -226,34 +224,47 @@
         const tempId = "temp_" + Date.now();
         clientRow = document.createElement("tr");
         clientRow.setAttribute("data-id", tempId);
-        clientRow.innerHTML = `<td colspan="5" class="text-center fw-bold">Uploading...</td>`;
+        let progressHtml = docs.map(doc => `<div id="${tempId}_${doc}">${doc}: waiting...</div>`).join('');
+        clientRow.innerHTML = `<td colspan="5" class="text-center fw-bold">${progressHtml}</td>`;
         table.prepend(clientRow);
       }
 
-      for (const doc of docs) {
+      // Upload all documents concurrently
+      const uploadPromises = docs.map(async doc => {
         const file = form[doc].files[0];
-        if (file) {
-          try {
-            const storageRef = storage.ref('documents/' + Date.now() + '_' + file.name);
-            const uploadTask = storageRef.put(file);
+        if (!file) return;
 
-            uploadTask.on('state_changed', 
+        const storageRef = storage.ref('documents/' + Date.now() + '_' + file.name);
+
+        try {
+          const downloadURL = await new Promise((resolve, reject) => {
+            const uploadTask = storageRef.put(file);
+            uploadTask.on('state_changed',
               snapshot => {
                 const percent = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                if (clientRow) clientRow.querySelector("td").textContent = `${doc} uploading: ${percent.toFixed(0)}%`;
+                const progressDiv = document.getElementById(`${clientRow.dataset.id}_${doc}`);
+                if (progressDiv) progressDiv.textContent = `${doc} uploading: ${percent.toFixed(0)}%`;
               },
-              error => console.error('Upload failed:', error),
+              error => reject(error),
               async () => {
-                data[doc] = await storageRef.getDownloadURL();
+                const url = await storageRef.getDownloadURL();
+                resolve(url);
               }
             );
+          });
 
-            await uploadTask;
-          } catch (err) {
-            console.warn(`Skipping ${doc} due to upload error:`, err);
-          }
+          data[doc] = downloadURL;
+          const progressDiv = document.getElementById(`${clientRow.dataset.id}_${doc}`);
+          if (progressDiv) progressDiv.textContent = `${doc} uploaded ✅`;
+
+        } catch (err) {
+          console.warn(`Error uploading ${doc}:`, err);
+          const progressDiv = document.getElementById(`${clientRow.dataset.id}_${doc}`);
+          if (progressDiv) progressDiv.textContent = `${doc} failed ❌`;
         }
-      }
+      });
+
+      await Promise.all(uploadPromises);
 
       try {
         if (editId) {
@@ -262,7 +273,7 @@
         } else {
           await db.collection('clients').add(data);
         }
-        
+
         form.reset();
         document.getElementById("editId").value = "";
         document.querySelectorAll('.file-chosen').forEach(el => el.textContent = "No file selected");
@@ -275,7 +286,7 @@
       }
     });
 
-    // Load clients
+    // ----- Load Clients -----
     async function loadClients() {
       table.innerHTML = '';
       const snap = await db.collection('clients').get();
@@ -303,7 +314,6 @@
       });
     }
 
-    // Edit client
     async function editClient(id) {
       const docRef = await db.collection('clients').doc(id).get();
       const d = docRef.data();
@@ -313,17 +323,14 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Delete client
     async function deleteClient(id) {
       await db.collection('clients').doc(id).delete();
       loadClients();
     }
 
-    // Download all documents for one client
     async function downloadAllDocs(clientId) {
       const docRef = await db.collection('clients').doc(clientId).get();
       const d = docRef.data();
-
       const files = {
         "ID_Copy": d.idCopy,
         "KRA_Certificate": d.kraCert,
@@ -342,9 +349,7 @@
             const blob = await response.blob();
             zip.file(name + getFileExtension(url), blob);
             hasFiles = true;
-          } catch (err) {
-            console.error("Error fetching file:", err);
-          }
+          } catch (err) { console.error("Error fetching file:", err); }
         }
       }
 
@@ -361,7 +366,6 @@
       return match ? "." + match[1] : ".pdf";
     }
 
-    // CSV Export
     function downloadCSV() {
       let csv = "Store Name,Agent No,Contact\n";
       const rows = document.querySelectorAll("#clientsTable tr");
@@ -381,7 +385,6 @@
       link.click();
     }
 
-    // PDF Export
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -391,22 +394,23 @@
       rows.forEach(row => {
         const cols = row.querySelectorAll("td");
         if (cols.length >= 3) {
-          doc.text(`Store: ${cols[0].innerText} | Agent: ${cols[1].innerText} | Contact: ${cols[2].innerText}`, 10, y);
+          doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText}`, 10, y);
           y += 10;
         }
       });
       doc.save("clients_list.pdf");
     }
 
-    // Search Filter
     searchInput.addEventListener("input", () => {
-      const q = searchInput.value.toLowerCase();
+      const filter = searchInput.value.toLowerCase();
       document.querySelectorAll("#clientsTable tr").forEach(row => {
-        const store = row.children[0].innerText.toLowerCase();
-        const agent = row.children[1].innerText.toLowerCase();
-        row.style.display = store.includes(q) || agent.includes(q) ? "" : "none";
+        const store = row.children[0]?.innerText.toLowerCase();
+        const agent = row.children[1]?.innerText.toLowerCase();
+        row.style.display = (store.includes(filter) || agent.includes(filter)) ? "" : "none";
       });
     });
+
   </script>
+
 </body>
 </html>
