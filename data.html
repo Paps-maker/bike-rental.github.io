@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>M-Pesa Agents Admin Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <link rel="icon" type="image/png" href="img/data.jpg">
+<link rel="icon" type="image/png" href="img/data.jpg">
 <style>
   body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
   .navbar { background: #0A7C2F; }
@@ -152,11 +152,14 @@
 </div>
 
 <!-- Firebase SDK -->
+
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
@@ -246,7 +249,17 @@ function loadClientsRealtime(){
         : `<button class="me-1 mb-1 btn-outline-secondary btn btn-sm" disabled>No ${label}</button>`;
 
       table.innerHTML += `
-      <tr data-id="${doc.id}">
+      <tr data-id="${doc.id}" 
+          data-store-no="${d.storeNo||''}" 
+          data-till-number="${d.tillNumber||''}" 
+          data-location="${d.location||''}" 
+          data-sub-agent="${d.subAgent||''}" 
+          data-full-name="${d.fullName||''}"
+          data-id-copy="${d.idCopy||''}"
+          data-kra-cert="${d.kraCert||''}"
+          data-good-conduct="${d.goodConduct||''}"
+          data-business-permit="${d.businessPermit||''}"
+          data-shop-picture="${d.shopPicture||''}">
         <td>${d.storeName||''}</td>
         <td>${d.storeNo||''}</td>
         <td>${d.agentNo||''}</td>
@@ -283,29 +296,70 @@ async function editClient(id){
 async function deleteClient(id){ await db.collection('clients').doc(id).delete(); }
 
 function downloadCSV(){
-  let csv="Store Name,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact\n";
+  let csv="Store Name,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact,Documents\n";
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
-    const cols=row.querySelectorAll("td");
-    if(cols.length>=8){
-      csv+=`"${cols[0].innerText}","${cols[1].innerText}","${cols[2].innerText}","${cols[3].innerText}","${cols[4].innerText}","${cols[5].innerText}","${cols[6].innerText}","${cols[7].innerText}"\n`;
-    }
+    const docs=[];
+    if(row.dataset.idCopy) docs.push("ID Copy");
+    if(row.dataset.kraCert) docs.push("KRA");
+    if(row.dataset.goodConduct) docs.push("Good Conduct");
+    if(row.dataset.businessPermit) docs.push("Permit");
+    if(row.dataset.shopPicture) docs.push("Shop Picture");
+    csv+=`"${row.children[0].innerText}","${row.children[1].innerText}","${row.children[2].innerText}","${row.children[3].innerText}","${row.children[4].innerText}","${row.children[5].innerText}","${row.children[6].innerText}","${row.children[7].innerText}","${docs.join(", ")}"\n`;
   });
   const blob = new Blob([csv],{type:"text/csv"});
   saveAs(blob,"clients_list.csv");
 }
 
-function downloadPDF(){
-  const { jsPDF }=window.jspdf;
-  const doc = new jsPDF();
-  doc.text("Clients List",10,10);
-  let y=20;
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p','pt','a4');
+  doc.setFontSize(14);
+  doc.text("Clients List", 40, 40);
+
+  const headers = ["Store Name","Store No","Agent No","Till Number","Location","Sub Agent","Full Name","Contact","Documents"];
+  const rows = [];
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
-    const cols=row.querySelectorAll("td");
-    if(cols.length>=8){
-      doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText} | ${cols[3].innerText} | ${cols[4].innerText} | ${cols[5].innerText} | ${cols[6].innerText} | ${cols[7].innerText}`,10,y);
-      y+=10;
-    }
+    const docs=[];
+    if(row.dataset.idCopy) docs.push("ID Copy");
+    if(row.dataset.kraCert) docs.push("KRA");
+    if(row.dataset.goodConduct) docs.push("Good Conduct");
+    if(row.dataset.businessPermit) docs.push("Permit");
+    if(row.dataset.shopPicture) docs.push("Shop Picture");
+
+    rows.push([
+      row.children[0].innerText,
+      row.children[1].innerText,
+      row.children[2].innerText,
+      row.children[3].innerText,
+      row.children[4].innerText,
+      row.children[5].innerText,
+      row.children[6].innerText,
+      row.children[7].innerText,
+      docs.join(", ") || "No Docs"
+    ]);
   });
+
+  doc.autoTable({
+    head:[headers],
+    body:rows,
+    startY:60,
+    styles:{fontSize:9,cellPadding:3},
+    headStyles:{fillColor:[10,124,47],textColor:255,halign:'center'},
+    bodyStyles:{halign:'left'},
+    columnStyles:{
+      0:{cellWidth:70},
+      1:{cellWidth:50},
+      2:{cellWidth:50},
+      3:{cellWidth:50},
+      4:{cellWidth:60},
+      5:{cellWidth:60},
+      6:{cellWidth:80},
+      7:{cellWidth:60},
+      8:{cellWidth:100}
+    },
+    margin:{left:10,right:40}
+  });
+
   doc.save("clients_list.pdf");
 }
 
