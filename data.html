@@ -1,416 +1,354 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>M-Pesa Agents Admin Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <style>
-    body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
-    .navbar { background: #0A7C2F; }
-    .navbar-brand, .nav-link, .navbar-text { color: #fff !important; }
-    .card { border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .btn-mpesa { background: #0A7C2F; color: #fff; }
-    .btn-mpesa:hover { background: #06591F; color: #fff; }
-    .table th { background: #0A7C2F; color: #fff; }
-    .file-upload { position: relative; overflow: hidden; display: inline-block; width: 100%; }
-    .file-upload input[type="file"] { position: absolute; opacity: 0; right: 0; top: 0; cursor: pointer; height: 100%; width: 100%; }
-    .upload-label { background: #0A7C2F; color: white; padding: 8px 15px; border-radius: 8px; width: 100%; display: block; text-align: center; cursor: pointer; }
-    .upload-label:hover { background: #06591F; }
-    .file-chosen { margin-top: 4px; font-size: 0.85rem; color: #555; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M-Pesa Agents Admin Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<style>
+  body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+  .navbar { background: #0A7C2F; }
+  .navbar-brand, .nav-link, .navbar-text { color: #fff !important; }
+  .card { border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+  .btn-mpesa { background: #0A7C2F; color: #fff; }
+  .btn-mpesa:hover { background: #06591F; color: #fff; }
+  .table th { background: #0A7C2F; color: #fff; font-size: 0.9rem; }
+  .table td { font-size: 0.85rem; }
+  .file-upload { position: relative; overflow: hidden; display: inline-block; width: 100%; }
+  .file-upload input[type="file"] { position: absolute; opacity: 0; right: 0; top: 0; cursor: pointer; height: 100%; width: 100%; }
+  .upload-label { background: #0A7C2F; color: white; padding: 8px 15px; border-radius: 8px; width: 100%; display: block; text-align: center; cursor: pointer; }
+  .upload-label:hover { background: #06591F; }
+  .file-chosen { margin-top: 4px; font-size: 0.75rem; color: #555; }
+</style>
 </head>
 <body>
 
-  <!-- 🔐 Login Page -->
-  <div id="loginPage" class="py-5 container" style="max-width:400px; display:none;">
-    <div class="p-4 card">
-      <h4 class="mb-3 text-center fw-bold">Admin Login</h4>
-      <form id="loginForm">
-        <input type="email" id="loginEmail" class="mb-3 form-control" placeholder="Email" required>
-        <input type="password" id="loginPassword" class="mb-3 form-control" placeholder="Password" required>
-        <button type="submit" class="w-100 btn btn-mpesa">Login</button>
-      </form>
-    </div>
+<!-- 🔐 Login Page -->
+<div id="loginPage" class="py-5 container" style="max-width:400px; display:none;">
+  <div class="p-4 card">
+    <h4 class="mb-3 text-center fw-bold">Admin Login</h4>
+    <form id="loginForm">
+      <input type="email" id="loginEmail" class="mb-3 form-control" placeholder="Email" required>
+      <input type="password" id="loginPassword" class="mb-3 form-control" placeholder="Password" required>
+      <button type="submit" class="w-100 btn btn-mpesa">Login</button>
+    </form>
   </div>
+</div>
 
-  <!-- 🖥️ Dashboard -->
-  <div id="dashboardPage" style="display:none;">
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg">
-      <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">Admin Dashboard</a>
-        <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-light" onclick="downloadCSV()">⬇ Export CSV</button>
-          <button class="btn btn-sm btn-light" onclick="downloadPDF()">⬇ Export PDF</button>
-          <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
-        </div>
-      </div>
-    </nav>
-
-    <div class="mt-4 container-fluid">
-      <div class="row">
-        <!-- Client Form -->
-        <div class="mb-3 col-lg-4">
-          <div class="p-3 card">
-            <h5 class="mb-3 fw-bold">Add / Edit Client</h5>
-            <form id="clientForm">
-              <input type="hidden" id="editId">
-              <input class="mb-2 form-control" placeholder="Store Name" name="storeName" required>
-              <input class="mb-2 form-control" placeholder="Store No" name="storeNo" required>
-              <input class="mb-2 form-control" placeholder="Agent No" name="agentNo" required>
-              <input class="mb-2 form-control" placeholder="Till Number" name="tillNumber">
-              <input class="mb-2 form-control" placeholder="Physical Location" name="location">
-              <input class="mb-2 form-control" placeholder="Sub Agent Section" name="subAgent">
-              <input class="mb-2 form-control" placeholder="Full Name" name="fullName" required>
-              <input class="mb-2 form-control" placeholder="Contact" name="contact" required>
-
-              <!-- Upload Documents -->
-              <label class="form-label fw-bold">Upload Documents</label>
-              <div class="mb-3">
-                <label class="form-label">ID Copy</label>
-                <div class="file-upload">
-                  <span class="upload-label">Choose File</span>
-                  <input type="file" name="idCopy" accept="image/*,.pdf" onchange="showFileName(this,'idCopyName')">
-                </div>
-                <div id="idCopyName" class="file-chosen">No file selected</div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">KRA Certificate</label>
-                <div class="file-upload">
-                  <span class="upload-label">Choose File</span>
-                  <input type="file" name="kraCert" accept="image/*,.pdf" onchange="showFileName(this,'kraCertName')">
-                </div>
-                <div id="kraCertName" class="file-chosen">No file selected</div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Certificate of Good Conduct</label>
-                <div class="file-upload">
-                  <span class="upload-label">Choose File</span>
-                  <input type="file" name="goodConduct" accept="image/*,.pdf" onchange="showFileName(this,'goodConductName')">
-                </div>
-                <div id="goodConductName" class="file-chosen">No file selected</div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Business Permit</label>
-                <div class="file-upload">
-                  <span class="upload-label">Choose File</span>
-                  <input type="file" name="businessPermit" accept="image/*,.pdf" onchange="showFileName(this,'businessPermitName')">
-                </div>
-                <div id="businessPermitName" class="file-chosen">No file selected</div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Shop Picture</label>
-                <div class="file-upload">
-                  <span class="upload-label">Choose File</span>
-                  <input type="file" name="shopPicture" accept="image/*" onchange="showFileName(this,'shopPictureName')">
-                </div>
-                <div id="shopPictureName" class="file-chosen">No file selected</div>
-              </div>
-
-              <button class="mt-2 w-100 btn btn-mpesa">Save Client</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- Clients Table -->
-        <div class="col-lg-8">
-          <div class="p-3 card">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <h5 class="fw-bold">Clients List</h5>
-              <input id="searchInput" class="w-50 form-control" placeholder="Search by Store Name or Agent No">
-            </div>
-            <div class="table-responsive">
-              <table class="table table-bordered align-middle">
-                <thead>
-                  <tr>
-                    <th>Store</th>
-                    <th>Agent No</th>
-                    <th>Contact</th>
-                    <th>Documents</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="clientsTable"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+<!-- 🖥️ Dashboard -->
+<div id="dashboardPage" style="display:none;">
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="#">Admin Dashboard</a>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-light" onclick="downloadCSV()">⬇ Export CSV</button>
+        <button class="btn btn-sm btn-light" onclick="downloadPDF()">⬇ Export PDF</button>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
+  </nav>
+
+  <div class="mt-4 container-fluid">
+    <div class="row">
+      <!-- Client Form -->
+      <div class="mb-3 col-lg-4">
+        <div class="p-3 card">
+          <h5 class="mb-3 fw-bold">Add / Edit Client</h5>
+          <form id="clientForm">
+            <input type="hidden" id="editId">
+            <input class="mb-2 form-control" placeholder="Store Name" name="storeName" required>
+            <input class="mb-2 form-control" placeholder="Store No" name="storeNo" required>
+            <input class="mb-2 form-control" placeholder="Agent No" name="agentNo" required>
+            <input class="mb-2 form-control" placeholder="Till Number" name="tillNumber">
+            <input class="mb-2 form-control" placeholder="Physical Location" name="location">
+            <input class="mb-2 form-control" placeholder="Sub Agent Section" name="subAgent">
+            <input class="mb-2 form-control" placeholder="Full Name" name="fullName" required>
+            <input class="mb-2 form-control" placeholder="Contact" name="contact" required>
+
+            <!-- Upload Documents -->
+            <label class="form-label fw-bold">Upload Documents</label>
+
+            <div class="mb-3">
+              <label class="form-label">ID Copy</label>
+              <div class="file-upload">
+                <span class="upload-label">Choose File</span>
+                <input type="file" name="idCopy" accept="image/*,.pdf" onchange="showFileName(this,'idCopyName')">
+              </div>
+              <div id="idCopyName" class="file-chosen">No file selected</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">KRA Certificate</label>
+              <div class="file-upload">
+                <span class="upload-label">Choose File</span>
+                <input type="file" name="kraCert" accept="image/*,.pdf" onchange="showFileName(this,'kraCertName')">
+              </div>
+              <div id="kraCertName" class="file-chosen">No file selected</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Certificate of Good Conduct</label>
+              <div class="file-upload">
+                <span class="upload-label">Choose File</span>
+                <input type="file" name="goodConduct" accept="image/*,.pdf" onchange="showFileName(this,'goodConductName')">
+              </div>
+              <div id="goodConductName" class="file-chosen">No file selected</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Business Permit</label>
+              <div class="file-upload">
+                <span class="upload-label">Choose File</span>
+                <input type="file" name="businessPermit" accept="image/*,.pdf" onchange="showFileName(this,'businessPermitName')">
+              </div>
+              <div id="businessPermitName" class="file-chosen">No file selected</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Shop Picture</label>
+              <div class="file-upload">
+                <span class="upload-label">Choose File</span>
+                <input type="file" name="shopPicture" accept="image/*" onchange="showFileName(this,'shopPictureName')">
+              </div>
+              <div id="shopPictureName" class="file-chosen">No file selected</div>
+            </div>
+
+            <button class="mt-2 w-100 btn btn-mpesa">Save Client</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Clients Table -->
+      <div class="col-lg-8">
+        <div class="p-3 card">
+          <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold">Clients List</h5>
+            <input id="searchInput" class="mt-2 mt-md-0 w-100 w-md-50 form-control" placeholder="Search clients...">
+          </div>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm text-nowrap align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th>Store Name</th>
+                  <th>Store No</th>
+                  <th>Agent No</th>
+                  <th>Till Number</th>
+                  <th>Location</th>
+                  <th>Sub Agent</th>
+                  <th>Full Name</th>
+                  <th>Contact</th>
+                  <th>Documents</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="clientsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-  <script>
-    const firebaseConfig = {
-    apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
-  authDomain: "transc-eec4c.firebaseapp.com",
-  projectId: "transc-eec4c",
-  storageBucket: "transc-eec4c-storage.appspot.com", // <--- FIXED
-  messagingSenderId: "3676403115",
-  appId: "1:3676403115:web:8f176dc82e526ac8614eee",
-  measurementId: "G-K5JKH3NGR1"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const storage = firebase.storage();
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBMCKZXRDoAgvyRQw0mCu7KGSAsZsx7lyI",
+  authDomain: "lawfirmnotify.firebaseapp.com",
+  projectId: "lawfirmnotify",
+  storageBucket: "lawfirmnotify.firebasestorage.app",
+  messagingSenderId: "649855356603",
+  appId: "1:649855356603:web:1272f668781c969c70239e",
+  measurementId: "G-V7SG94S9N4"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
 
-    const loginPage = document.getElementById("loginPage");
-    const dashboardPage = document.getElementById("dashboardPage");
-    const loginForm = document.getElementById("loginForm");
-    const form = document.getElementById("clientForm");
-    const table = document.getElementById("clientsTable");
-    const searchInput = document.getElementById("searchInput");
+const loginPage = document.getElementById("loginPage");
+const dashboardPage = document.getElementById("dashboardPage");
+const loginForm = document.getElementById("loginForm");
+const form = document.getElementById("clientForm");
+const table = document.getElementById("clientsTable");
+const searchInput = document.getElementById("searchInput");
 
-    let editMode = false;
+auth.onAuthStateChanged(user => {
+  if(user){
+    loginPage.style.display="none";
+    dashboardPage.style.display="block";
+    loadClientsRealtime();
+  } else {
+    loginPage.style.display="block";
+    dashboardPage.style.display="none";
+  }
+});
 
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        loginPage.style.display = "none";
-        dashboardPage.style.display = "block";
-        loadClients();
-      } else {
-        loginPage.style.display = "block";
-        dashboardPage.style.display = "none";
-      }
+loginForm.addEventListener("submit", e=>{
+  e.preventDefault();
+  const email=document.getElementById("loginEmail").value;
+  const pass=document.getElementById("loginPassword").value;
+  auth.signInWithEmailAndPassword(email,pass).catch(err=>alert("Login failed: "+err.message));
+});
+
+function logout(){ auth.signOut(); }
+function showFileName(input,targetId){ document.getElementById(targetId).textContent = input.files.length>0 ? input.files[0].name : "No file selected"; }
+
+form.addEventListener("submit", async e=>{
+  e.preventDefault();
+  const data = {};
+  [...form.elements].forEach(el=>{ if(el.name && el.type!=='file') data[el.name] = el.value; });
+
+  const files = ['idCopy','kraCert','goodConduct','businessPermit','shopPicture'];
+  const editId = document.getElementById("editId").value;
+
+  for(const key of files){
+    const fileInput = form[key];
+    if(fileInput.files.length>0){
+      const file = fileInput.files[0];
+      const path = `clients/${key}/${Date.now()}_${file.name}`;
+      const snapshot = await storage.ref(path).put(file);
+      data[key] = await snapshot.ref.getDownloadURL();
+    }
+  }
+
+  try {
+    if(editId){
+      await db.collection('clients').doc(editId).update(data);
+    } else {
+      await db.collection('clients').add(data);
+    }
+    form.reset();
+    document.getElementById("editId").value="";
+    document.querySelectorAll('.file-chosen').forEach(el=>el.textContent="No file selected");
+  } catch(err){
+    console.error(err); alert("Error saving client: "+err.message);
+  }
+});
+
+function loadClientsRealtime(){
+  table.innerHTML='';
+  db.collection('clients').onSnapshot(snapshot=>{
+    table.innerHTML='';
+    snapshot.forEach(doc=>{
+      const d = doc.data();
+      const docButton = (url,label)=> url 
+        ? `<a href="${url}" download target="_blank" class="me-1 mb-1 btn-outline-success btn btn-sm">Download ${label}</a>`
+        : `<button class="me-1 mb-1 btn-outline-secondary btn btn-sm" disabled>No ${label}</button>`;
+
+      table.innerHTML += `
+      <tr data-id="${doc.id}">
+        <td>${d.storeName||''}</td>
+        <td>${d.storeNo||''}</td>
+        <td>${d.agentNo||''}</td>
+        <td>${d.tillNumber||''}</td>
+        <td>${d.location||''}</td>
+        <td>${d.subAgent||''}</td>
+        <td>${d.fullName||''}</td>
+        <td>${d.contact||''}</td>
+        <td>
+          ${docButton(d.idCopy,'ID Copy')}
+          ${docButton(d.kraCert,'KRA')}
+          ${docButton(d.goodConduct,'Good Conduct')}
+          ${docButton(d.businessPermit,'Permit')}
+          ${docButton(d.shopPicture,'Shop')}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-success" onclick="downloadAllDocs('${doc.id}')">⬇ All</button>
+          <button class="btn btn-sm btn-primary" onclick="editClient('${doc.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteClient('${doc.id}')">Delete</button>
+        </td>
+      </tr>`;
     });
+  });
+}
 
-    loginForm.addEventListener("submit", e => {
-      e.preventDefault();
-      const email = document.getElementById("loginEmail").value;
-      const pass = document.getElementById("loginPassword").value;
-      auth.signInWithEmailAndPassword(email, pass)
-        .catch(err => alert("Login failed: " + err.message));
-    });
+async function editClient(id){
+  const docRef = await db.collection('clients').doc(id).get();
+  const d = docRef.data();
+  document.getElementById("editId").value=id;
+  [...form.elements].forEach(el=>{ if(el.name && d[el.name]) el.value=d[el.name]; });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 
-    function logout() { auth.signOut(); }
+async function deleteClient(id){ await db.collection('clients').doc(id).delete(); }
 
-    function showFileName(input, targetId) {
-      const fileName = input.files.length > 0 ? input.files[0].name : "No file selected";
-      document.getElementById(targetId).textContent = fileName;
+function downloadCSV(){
+  let csv="Store Name,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact\n";
+  document.querySelectorAll("#clientsTable tr").forEach(row=>{
+    const cols=row.querySelectorAll("td");
+    if(cols.length>=8){
+      csv+=`"${cols[0].innerText}","${cols[1].innerText}","${cols[2].innerText}","${cols[3].innerText}","${cols[4].innerText}","${cols[5].innerText}","${cols[6].innerText}","${cols[7].innerText}"\n`;
     }
+  });
+  const blob = new Blob([csv],{type:"text/csv"});
+  saveAs(blob,"clients_list.csv");
+}
 
-    // ----- Save client with per-file progress -----
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const data = {};
-      [...form.elements].forEach(el => {
-        if (el.name && el.type !== 'file') data[el.name] = el.value;
-      });
-
-      const docs = ['idCopy','kraCert','goodConduct','businessPermit','shopPicture'];
-      const editId = document.getElementById("editId").value;
-      let clientRow;
-
-      if (editId) {
-        clientRow = document.querySelector(`#clientsTable tr[data-id="${editId}"]`);
-        if (clientRow) clientRow.querySelector("td").textContent = "Updating...";
-      } else {
-        const tempId = "temp_" + Date.now();
-        clientRow = document.createElement("tr");
-        clientRow.setAttribute("data-id", tempId);
-        let progressHtml = docs.map(doc => `<div id="${tempId}_${doc}">${doc}: waiting...</div>`).join('');
-        clientRow.innerHTML = `<td colspan="5" class="text-center fw-bold">${progressHtml}</td>`;
-        table.prepend(clientRow);
-      }
-
-      // Upload all documents concurrently
-      const uploadPromises = docs.map(async doc => {
-        const file = form[doc].files[0];
-        if (!file) return;
-
-        const storageRef = storage.ref('documents/' + Date.now() + '_' + file.name);
-
-        try {
-          const downloadURL = await new Promise((resolve, reject) => {
-            const uploadTask = storageRef.put(file);
-            uploadTask.on('state_changed',
-              snapshot => {
-                const percent = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                const progressDiv = document.getElementById(`${clientRow.dataset.id}_${doc}`);
-                if (progressDiv) progressDiv.textContent = `${doc} uploading: ${percent.toFixed(0)}%`;
-              },
-              error => reject(error),
-              async () => {
-                const url = await storageRef.getDownloadURL();
-                resolve(url);
-              }
-            );
-          });
-
-          data[doc] = downloadURL;
-          const progressDiv = document.getElementById(`${clientRow.dataset.id}_${doc}`);
-          if (progressDiv) progressDiv.textContent = `${doc} uploaded ✅`;
-
-        } catch (err) {
-          console.warn(`Error uploading ${doc}:`, err);
-          const progressDiv = document.getElementById(`${clientRow.dataset.id}_${doc}`);
-          if (progressDiv) progressDiv.textContent = `${doc} failed ❌`;
-        }
-      });
-
-      await Promise.all(uploadPromises);
-
-      try {
-        if (editId) {
-          await db.collection('clients').doc(editId).update(data);
-          editMode = false;
-        } else {
-          await db.collection('clients').add(data);
-        }
-
-        form.reset();
-        document.getElementById("editId").value = "";
-        document.querySelectorAll('.file-chosen').forEach(el => el.textContent = "No file selected");
-
-        loadClients();
-        alert("Client saved successfully!");
-      } catch (err) {
-        console.error("Error saving client:", err);
-        alert("Failed to save client: " + err.message);
-      }
-    });
-
-    // ----- Load Clients -----
-    async function loadClients() {
-      table.innerHTML = '';
-      const snap = await db.collection('clients').get();
-      snap.forEach(doc => {
-        const d = doc.data();
-        table.innerHTML += `
-          <tr data-id="${doc.id}">
-            <td>${d.storeName || ''}</td>
-            <td>${d.agentNo || ''}</td>
-            <td>${d.contact || ''}</td>
-            <td>
-              ${d.idCopy ? `<a href="${d.idCopy}" download target="_blank">ID</a> |` : ''}
-              ${d.kraCert ? `<a href="${d.kraCert}" download target="_blank">KRA</a> |` : ''}
-              ${d.goodConduct ? `<a href="${d.goodConduct}" download target="_blank">Good Conduct</a> |` : ''}
-              ${d.businessPermit ? `<a href="${d.businessPermit}" download target="_blank">Permit</a> |` : ''}
-              ${d.shopPicture ? `<a href="${d.shopPicture}" download target="_blank">Shop</a>` : ''}
-            </td>
-            <td>
-              <button class="btn btn-sm btn-success" onclick="downloadAllDocs('${doc.id}')">⬇ All</button>
-              <button class="btn btn-sm btn-primary" onclick="editClient('${doc.id}')">Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteClient('${doc.id}')">Delete</button>
-            </td>
-          </tr>
-        `;
-      });
+function downloadPDF(){
+  const { jsPDF }=window.jspdf;
+  const doc = new jsPDF();
+  doc.text("Clients List",10,10);
+  let y=20;
+  document.querySelectorAll("#clientsTable tr").forEach(row=>{
+    const cols=row.querySelectorAll("td");
+    if(cols.length>=8){
+      doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText} | ${cols[3].innerText} | ${cols[4].innerText} | ${cols[5].innerText} | ${cols[6].innerText} | ${cols[7].innerText}`,10,y);
+      y+=10;
     }
+  });
+  doc.save("clients_list.pdf");
+}
 
-    async function editClient(id) {
-      const docRef = await db.collection('clients').doc(id).get();
-      const d = docRef.data();
-      document.getElementById("editId").value = id;
-      [...form.elements].forEach(el => { if (el.name && d[el.name]) el.value = d[el.name]; });
-      editMode = true;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+searchInput.addEventListener("input",()=>{
+  const filter = searchInput.value.toLowerCase();
+  document.querySelectorAll("#clientsTable tr").forEach(row=>{
+    const store=row.children[0]?.innerText.toLowerCase();
+    const agent=row.children[2]?.innerText.toLowerCase();
+    row.style.display=(store.includes(filter)||agent.includes(filter))?"":"none";
+  });
+});
+
+async function downloadAllDocs(clientId){
+  const docRef = await db.collection('clients').doc(clientId).get();
+  const d = docRef.data();
+  const zip = new JSZip();
+  const docEntries = [
+    { key:'idCopy', label:'ID Copy' },
+    { key:'kraCert', label:'KRA' },
+    { key:'goodConduct', label:'Good Conduct' },
+    { key:'businessPermit', label:'Business Permit' },
+    { key:'shopPicture', label:'Shop Picture' }
+  ];
+
+  let hasFiles=false;
+  for(const entry of docEntries){
+    if(d[entry.key]){
+      hasFiles=true;
+      try{
+        const response = await fetch(d[entry.key]);
+        const blob = await response.blob();
+        zip.file(`${entry.label}${getFileExtension(d[entry.key])}`, blob);
+      }catch(err){ console.error(err); }
     }
+  }
 
-    async function deleteClient(id) {
-      await db.collection('clients').doc(id).delete();
-      loadClients();
-    }
+  if(!hasFiles){ alert('No documents available to download for this client.'); return; }
+  zip.generateAsync({type:'blob'}).then(content=>{ saveAs(content, `${d.storeName||'client_docs'}.zip`); });
+}
 
-    async function downloadAllDocs(clientId) {
-      const docRef = await db.collection('clients').doc(clientId).get();
-      const d = docRef.data();
-      const files = {
-        "ID_Copy": d.idCopy,
-        "KRA_Certificate": d.kraCert,
-        "Good_Conduct": d.goodConduct,
-        "Business_Permit": d.businessPermit,
-        "Shop_Picture": d.shopPicture
-      };
-
-      const zip = new JSZip();
-      let hasFiles = false;
-
-      for (const [name, url] of Object.entries(files)) {
-        if (url) {
-          try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            zip.file(name + getFileExtension(url), blob);
-            hasFiles = true;
-          } catch (err) { console.error("Error fetching file:", err); }
-        }
-      }
-
-      if (hasFiles) {
-        const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, `${d.storeName || "client"}_documents.zip`);
-      } else {
-        alert("No documents available for this client.");
-      }
-    }
-
-    function getFileExtension(url) {
-      const match = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
-      return match ? "." + match[1] : ".pdf";
-    }
-
-    function downloadCSV() {
-      let csv = "Store Name,Agent No,Contact\n";
-      const rows = document.querySelectorAll("#clientsTable tr");
-      rows.forEach(row => {
-        const cols = row.querySelectorAll("td");
-        if (cols.length >= 3) {
-          const store = cols[0].innerText;
-          const agent = cols[1].innerText;
-          const contact = cols[2].innerText;
-          csv += `"${store}","${agent}","${contact}"\n`;
-        }
-      });
-      const blob = new Blob([csv], { type: "text/csv" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "clients_list.csv";
-      link.click();
-    }
-
-    function downloadPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.text("Clients List", 10, 10);
-      let y = 20;
-      const rows = document.querySelectorAll("#clientsTable tr");
-      rows.forEach(row => {
-        const cols = row.querySelectorAll("td");
-        if (cols.length >= 3) {
-          doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText}`, 10, y);
-          y += 10;
-        }
-      });
-      doc.save("clients_list.pdf");
-    }
-
-    searchInput.addEventListener("input", () => {
-      const filter = searchInput.value.toLowerCase();
-      document.querySelectorAll("#clientsTable tr").forEach(row => {
-        const store = row.children[0]?.innerText.toLowerCase();
-        const agent = row.children[1]?.innerText.toLowerCase();
-        row.style.display = (store.includes(filter) || agent.includes(filter)) ? "" : "none";
-      });
-    });
-
-  </script>
-
+function getFileExtension(url){
+  const parts=url.split('.');
+  return parts.length?`.${parts.pop().split(/\#|\?/)[0]}`:'';
+}
+</script>
 </body>
 </html>
