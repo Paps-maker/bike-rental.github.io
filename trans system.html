@@ -203,14 +203,26 @@ document.getElementById('sidebarToggle').addEventListener('click',()=>{ document
 // Load Transactions
 function loadTransactions(){
     transactionTableBody.innerHTML='';
+    const today = new Date();
+    today.setHours(0,0,0,0); // Start of today
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1); // Start of tomorrow
+
     db.collection('transactions').orderBy('date','desc').get().then(snapshot=>{
         let depositTotal=0, withdrawTotal=0;
         let dataArr=[];
+
         snapshot.forEach(doc=>{
             const data = doc.data();
             dataArr.push({...data,id:doc.id});
-            if(data.type==='Deposit') depositTotal+=data.amount;
-            if(data.type==='Withdrawal') withdrawTotal+=data.amount;
+
+            const transactionDate = new Date(data.date.seconds * 1000);
+            // Only count transactions for today
+            if(transactionDate >= today && transactionDate < tomorrow){
+                if(data.type==='Deposit') depositTotal+=data.amount;
+                if(data.type==='Withdrawal') withdrawTotal+=data.amount;
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML=`
             <td>${data.customerName}</td>
@@ -221,7 +233,7 @@ function loadTransactions(){
             <td>${data.method}</td>
             <td>${data.status}</td>
             <td>${data.amount.toLocaleString()}</td>
-            <td>${new Date(data.date.seconds*1000).toLocaleString()}</td>
+            <td>${transactionDate.toLocaleString()}</td>
             <td>
                 <button class="btn btn-sm btn-primary" onclick="editTransaction('${doc.id}','${data.customerName}','${data.customerIdNumber}','${data.customerPhone}','${data.transactionCode}','${data.type}','${data.method}','${data.status}',${data.amount})"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${doc.id}')"><i class="fas fa-trash"></i></button>
@@ -229,11 +241,19 @@ function loadTransactions(){
             </td>`;
             transactionTableBody.appendChild(tr);
         });
-        updateDashboard(depositTotal, withdrawTotal, snapshot.size);
+
+        // Only display totals for today
+        const todayTransactions = dataArr.filter(d=>{
+            const tDate = new Date(d.date.seconds * 1000);
+            return tDate >= today && tDate < tomorrow;
+        });
+
+        updateDashboard(depositTotal, withdrawTotal, todayTransactions.length);
         chartDataCache = dataArr;
         renderCharts(chartDataCache);
     });
 }
+
 
 // Dashboard update
 function updateDashboard(deposit, withdraw, total){
