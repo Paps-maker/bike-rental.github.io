@@ -206,22 +206,83 @@ loginForm.addEventListener("submit", e=>{
 function logout(){ auth.signOut(); }
 function showFileName(input,targetId){ document.getElementById(targetId).textContent = input.files.length>0 ? input.files[0].name : "No file selected"; }
 
-form.addEventListener("submit", async e=>{
+form.addEventListener("submit", async e => {
   e.preventDefault();
+
   const data = {};
-  [...form.elements].forEach(el=>{ if(el.name && el.type!=='file') data[el.name] = el.value; });
+  [...form.elements].forEach(el => { 
+    if (el.name && el.type !== 'file') data[el.name] = el.value; 
+  });
 
   const files = ['idCopy','kraCert','goodConduct','businessPermit','shopPicture'];
   const editId = document.getElementById("editId").value;
 
-  for(const key of files){
-    const fileInput = form[key];
-    if(fileInput.files.length>0){
-      const file = fileInput.files[0];
-      const path = `clients/${key}/${Date.now()}_${file.name}`;
-      const snapshot = await storage.ref(path).put(file);
-      data[key] = await snapshot.ref.getDownloadURL();
+  try {
+    for (const key of files) {
+      const fileInput = form[key];
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const path = `clients/${key}/${Date.now()}_${file.name}`;
+        const storageRef = storage.ref(path);
+        const uploadTask = storageRef.put(file);
+
+        // Show SweetAlert with progress bar
+        Swal.fire({
+          title: `Uploading ${key}...`,
+          html: `
+            <div id="progress-text">0%</div>
+            <div style="width:100%;background:#eee;height:10px;border-radius:5px;overflow:hidden">
+              <div id="progress-bar" style="height:10px;width:0;background:#28a745"></div>
+            </div>
+          `,
+          allowOutsideClick: false,
+          showConfirmButton: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+
+        await new Promise((resolve, reject) => {
+          uploadTask.on(
+            "state_changed",
+            snapshot => {
+              let progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              document.getElementById("progress-text").innerText = progress + "%";
+              document.getElementById("progress-bar").style.width = progress + "%";
+            },
+            error => reject(error),
+            async () => {
+              data[key] = await storageRef.getDownloadURL();
+              resolve();
+            }
+          );
+        });
+      }
     }
+
+    // Save to Firestore
+    if (editId) {
+      await db.collection("clients").doc(editId).update(data);
+    } else {
+      await db.collection("clients").add(data);
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Client Saved',
+      text: 'The client and their documents have been saved successfully!',
+      timer: 3000,
+      showConfirmButton: false
+    });
+
+    form.reset();
+  } catch (err) {
+    console.error("Upload error:", err);
+    Swal.fire({
+      icon: 'error',
+      title: 'Upload Failed',
+      text: 'Something went wrong while saving the client. Please try again.'
+    });
   }
 
   try {
@@ -489,13 +550,18 @@ async function downloadAllDocs(clientId) {
 // ✅ Helper to extract file extension
 function getFileExtension(url) {
   try {
-    const pathname = new URL(url).pathname;
-    const ext = pathname.split('.').pop();
-    return ext ? '.' + ext.split('?')[0] : '';
+    // Remove query params if present
+    const cleanUrl = url.split('?')[0];
+
+    // Extract last segment after the last "."
+    const ext = cleanUrl.substring(cleanUrl.lastIndexOf('.') + 1);
+
+    return ext ? '.' + ext : '';
   } catch {
     return '';
   }
 }
+
 
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
