@@ -57,7 +57,7 @@
           <h5 class="mb-3 fw-bold">Add / Edit Client</h5>
           <form id="clientForm">
             <input type="hidden" id="editId">
-            <input class="mb-2 form-control" placeholder="Store Name" name="storeName" required>
+            <input class="mb-2 form-control" placeholder="Agent Name,Store Name,Phone" name="storeName" required>
             <input class="mb-2 form-control" placeholder="Store No" name="storeNo" required>
             <input class="mb-2 form-control" placeholder="Agent No" name="agentNo" required>
             <input class="mb-2 form-control" placeholder="Till Number" name="tillNumber">
@@ -130,7 +130,7 @@
             <table class="table table-bordered table-sm text-nowrap align-middle">
               <thead class="table-dark">
                 <tr>
-                  <th>Store Name</th>
+                  <th>Agent Details</th>
                   <th>Store No</th>
                   <th>Agent No</th>
                   <th>Till Number</th>
@@ -296,7 +296,7 @@ async function editClient(id){
 async function deleteClient(id){ await db.collection('clients').doc(id).delete(); }
 
 function downloadCSV(){
-  let csv="Store Name,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact,Documents\n";
+  let csv="Agent Details,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact,Documents\n";
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const docs=[];
     if(row.dataset.idCopy) docs.push("ID Copy");
@@ -316,7 +316,7 @@ function downloadPDF() {
   doc.setFontSize(14);
   doc.text("Clients List", 40, 40);
 
-  const headers = ["Store Name","Store No","Agent No","Till Number","Location","Sub Agent","Full Name","Contact","Documents"];
+  const headers = ["Agent Details","Store No","Agent No","Till Number","Location","Sub Agent","Full Name","Contact","Documents"];
   const rows = [];
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const docs=[];
