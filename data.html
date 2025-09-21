@@ -261,11 +261,7 @@ form.addEventListener("submit", async e => {
     }
 
     // Save to Firestore
-    if (editId) {
-      await db.collection("clients").doc(editId).update(data);
-    } else {
-      await db.collection("clients").add(data);
-    }
+   
 
     Swal.fire({
       icon: 'success',
