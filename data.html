@@ -293,7 +293,29 @@ async function editClient(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-async function deleteClient(id){ await db.collection('clients').doc(id).delete(); }
+async function deleteClient(id) {
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: "This action will permanently delete the client.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, delete it!',
+    cancelButtonText: 'Cancel'
+  });
+
+  if (result.isConfirmed) {
+    try {
+      await db.collection('clients').doc(id).delete();
+      Swal.fire('Deleted!', 'The client has been deleted.', 'success');
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      Swal.fire('Error', 'Failed to delete client. Please try again.', 'error');
+    }
+  }
+}
+
 
 function downloadCSV(){
   let csv="Agent Details,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact,Documents\n";
@@ -405,5 +427,7 @@ function getFileExtension(url){
   return parts.length?`.${parts.pop().split(/\#|\?/)[0]}`:'';
 }
 </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 </body>
 </html>
