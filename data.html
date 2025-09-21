@@ -446,7 +446,7 @@ searchInput.addEventListener("input",()=>{
   const filter = searchInput.value.toLowerCase();
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const store=row.children[0]?.innerText.toLowerCase();
-    const agent=row.children[2]?.innerText.toLowerCase();
+    const agent=row.children[1]?.innerText.toLowerCase();
     row.style.display=(store.includes(filter)||agent.includes(filter))?"":"none";
   });
 });
