@@ -394,40 +394,114 @@ searchInput.addEventListener("input",()=>{
   });
 });
 
-async function downloadAllDocs(clientId){
+async function downloadAllDocs(clientId) {
   const docRef = await db.collection('clients').doc(clientId).get();
+  if (!docRef.exists) {
+    Swal.fire('Error', 'Client not found.', 'error');
+    return;
+  }
+
   const d = docRef.data();
   const zip = new JSZip();
+
+  // Use storeName or fallback to ID
+  const clientFolderName = d.storeName?.trim() || `client_${clientId}`;
+  const clientFolder = zip.folder(clientFolderName);
+
   const docEntries = [
-    { key:'idCopy', label:'ID Copy' },
-    { key:'kraCert', label:'KRA' },
-    { key:'goodConduct', label:'Good Conduct' },
-    { key:'businessPermit', label:'Business Permit' },
-    { key:'shopPicture', label:'Shop Picture' }
+    { key: 'idCopy', label: 'ID Copy' },
+    { key: 'kraCert', label: 'KRA Certificate' },
+    { key: 'goodConduct', label: 'Good Conduct' },
+    { key: 'businessPermit', label: 'Business Permit' },
+    { key: 'shopPicture', label: 'Shop Picture' }
   ];
 
-  let hasFiles=false;
-  for(const entry of docEntries){
-    if(d[entry.key]){
-      hasFiles=true;
-      try{
+  let hasFiles = false;
+
+  // SweetAlert with progress bar
+  Swal.fire({
+    title: 'Preparing Download',
+    html: `
+      <p id="progressText">Collecting documents...</p>
+      <div style="width:100%; background:#eee; border-radius:5px; overflow:hidden; margin-top:10px;">
+        <div id="progressBar" style="width:0%; background:#3085d6; color:#fff; text-align:center; height:20px; font-size:12px;">
+          0%
+        </div>
+      </div>
+    `,
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
+    }
+  });
+
+  // Ensure all fetches complete before generating ZIP
+  for (const entry of docEntries) {
+    if (d[entry.key]) {
+      hasFiles = true;
+      try {
         const response = await fetch(d[entry.key]);
+        if (!response.ok) throw new Error(`Failed to fetch ${entry.label}`);
         const blob = await response.blob();
-        zip.file(`${entry.label}${getFileExtension(d[entry.key])}`, blob);
-      }catch(err){ console.error(err); }
+
+        // ✅ Add file into the client folder
+        clientFolder.file(
+          `${entry.label}${getFileExtension(d[entry.key])}`,
+          blob
+        );
+      } catch (err) {
+        console.error(`Error downloading ${entry.label}:`, err);
+      }
     }
   }
 
-  if(!hasFiles){ alert('No documents available to download for this client.'); return; }
-  zip.generateAsync({type:'blob'}).then(content=>{ saveAs(content, `${d.storeName||'client_docs'}.zip`); });
+  if (!hasFiles) {
+    Swal.fire('No Files', 'No documents available to download for this client.', 'info');
+    return;
+  }
+
+  try {
+    // Generate ZIP with progress callback
+    const content = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+      const percent = Math.round(metadata.percent);
+      const progressBar = document.getElementById("progressBar");
+      const progressText = document.getElementById("progressText");
+      if (progressBar) {
+        progressBar.style.width = percent + "%";
+        progressBar.innerText = percent + "%";
+      }
+      if (progressText) {
+        progressText.innerText = "Zipping files: " + percent + "%";
+      }
+    });
+
+    Swal.close();
+    saveAs(content, `${clientFolderName}.zip`);
+
+    Swal.fire('Success', 'All documents downloaded successfully!', 'success');
+  } catch (err) {
+    Swal.close();
+    console.error('Error generating ZIP:', err);
+    Swal.fire('Error', 'Failed to generate ZIP file. Please try again.', 'error');
+  }
 }
 
-function getFileExtension(url){
-  const parts=url.split('.');
-  return parts.length?`.${parts.pop().split(/\#|\?/)[0]}`:'';
+// ✅ Helper to extract file extension
+function getFileExtension(url) {
+  try {
+    const pathname = new URL(url).pathname;
+    const ext = pathname.split('.').pop();
+    return ext ? '.' + ext.split('?')[0] : '';
+  } catch {
+    return '';
+  }
 }
+
 </script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
 
 </body>
 </html>
