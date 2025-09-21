@@ -57,14 +57,14 @@
           <h5 class="mb-3 fw-bold">Add / Edit Client</h5>
           <form id="clientForm">
             <input type="hidden" id="editId">
-            <input class="mb-2 form-control" placeholder="Agent Name,Store Name,Phone" name="storeName" required>
+            <input class="mb-2 form-control" placeholder="Store Name" name="storeName" required>
             <input class="mb-2 form-control" placeholder="Store No" name="storeNo" required>
             <input class="mb-2 form-control" placeholder="Agent No" name="agentNo" required>
             <input class="mb-2 form-control" placeholder="Till Number" name="tillNumber">
             <input class="mb-2 form-control" placeholder="Physical Location" name="location">
-            <input class="mb-2 form-control" placeholder="Sub Agent Section" name="subAgent">
-            <input class="mb-2 form-control" placeholder="Full Name" name="fullName" required>
-            <input class="mb-2 form-control" placeholder="Contact" name="contact" required>
+            
+            <input class="mb-2 form-control" placeholder="Sub Agent Full Name" name="fullName" required>
+            <input class="mb-2 form-control" placeholder="Sub Agent Contact" name="contact" required>
 
             <!-- Upload Documents -->
             <label class="form-label fw-bold">Upload Documents</label>
@@ -88,12 +88,12 @@
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Certificate of Good Conduct</label>
+              <label class="form-label">PCC</label>
               <div class="file-upload">
                 <span class="upload-label">Choose File</span>
-                <input type="file" name="goodConduct" accept="image/*,.pdf" onchange="showFileName(this,'goodConductName')">
+                <input type="file" name="PCC" accept="image/*,.pdf" onchange="showFileName(this,'PCCName')">
               </div>
-              <div id="goodConductName" class="file-chosen">No file selected</div>
+              <div id="PCCName" class="file-chosen">No file selected</div>
             </div>
 
             <div class="mb-3">
@@ -103,6 +103,14 @@
                 <input type="file" name="businessPermit" accept="image/*,.pdf" onchange="showFileName(this,'businessPermitName')">
               </div>
               <div id="businessPermitName" class="file-chosen">No file selected</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Sub-Agent contract</label>
+              <div class="file-upload">
+                <span class="upload-label">Choose File</span>
+                <input type="file" name="subagentcontract" accept="image/*,.pdf" onchange="showFileName(this,'subagentcontractName')">
+              </div>
+              <div id="subagentcontractName" class="file-chosen">No file selected</div>
             </div>
 
             <div class="mb-3">
@@ -114,7 +122,8 @@
               <div id="shopPictureName" class="file-chosen">No file selected</div>
             </div>
 
-            <button class="mt-2 w-100 btn btn-mpesa">Save Client</button>
+            <button type="submit" class="mt-2 w-100 btn btn-mpesa">Save Client</button>
+
           </form>
         </div>
       </div>
@@ -130,14 +139,14 @@
             <table class="table table-bordered table-sm text-nowrap align-middle">
               <thead class="table-dark">
                 <tr>
-                  <th>Agent Details</th>
+                  <th>Store Name</th>
                   <th>Store No</th>
                   <th>Agent No</th>
                   <th>Till Number</th>
                   <th>Location</th>
-                  <th>Sub Agent</th>
-                  <th>Full Name</th>
-                  <th>Contact</th>
+                  <th></th>
+                  <th>Sub Agent Full Name</th>
+                  <th>Sub Agent Contact</th>
                   <th>Documents</th>
                   <th>Actions</th>
                 </tr>
@@ -214,7 +223,7 @@ form.addEventListener("submit", async e => {
     if (el.name && el.type !== 'file') data[el.name] = el.value; 
   });
 
-  const files = ['idCopy','kraCert','goodConduct','businessPermit','shopPicture'];
+  const files = ['idCopy','kraCert','PCC','businessPermit','subagentcontract','shopPicture'];
   const editId = document.getElementById("editId").value;
 
   try {
@@ -314,8 +323,9 @@ function loadClientsRealtime(){
           data-full-name="${d.fullName||''}"
           data-id-copy="${d.idCopy||''}"
           data-kra-cert="${d.kraCert||''}"
-          data-good-conduct="${d.goodConduct||''}"
+          data-pcc="${d.PCC||''}"
           data-business-permit="${d.businessPermit||''}"
+          data-subagent-contract="${d.subagentcontract||''}"
           data-shop-picture="${d.shopPicture||''}">
         <td>${d.storeName||''}</td>
         <td>${d.storeNo||''}</td>
@@ -328,8 +338,9 @@ function loadClientsRealtime(){
         <td>
           ${docButton(d.idCopy,'ID Copy')}
           ${docButton(d.kraCert,'KRA')}
-          ${docButton(d.goodConduct,'Good Conduct')}
+          ${docButton(d.goodConduct,'PCC')}
           ${docButton(d.businessPermit,'Permit')}
+          ${docButton(d.subagentcontract,'sub-agent contract')}
           ${docButton(d.shopPicture,'Shop')}
         </td>
         <td>
@@ -375,13 +386,14 @@ async function deleteClient(id) {
 
 
 function downloadCSV(){
-  let csv="Agent Details,Store No,Agent No,Till Number,Location,Sub Agent,Full Name,Contact,Documents\n";
+  let csv="Store Name,Store No,Agent No,Till Number,Location,,Sub Agent Full Name,Sub Agent Contact,Documents\n";
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const docs=[];
     if(row.dataset.idCopy) docs.push("ID Copy");
     if(row.dataset.kraCert) docs.push("KRA");
-    if(row.dataset.goodConduct) docs.push("Good Conduct");
+    if(row.dataset.pcc) docs.push("PCC");
     if(row.dataset.businessPermit) docs.push("Permit");
+    if(row.dataset.subagentcontract) docs.push("Sub-agent contract");
     if(row.dataset.shopPicture) docs.push("Shop Picture");
     csv+=`"${row.children[0].innerText}","${row.children[1].innerText}","${row.children[2].innerText}","${row.children[3].innerText}","${row.children[4].innerText}","${row.children[5].innerText}","${row.children[6].innerText}","${row.children[7].innerText}","${docs.join(", ")}"\n`;
   });
@@ -395,7 +407,7 @@ function downloadPDF() {
   doc.setFontSize(14);
   doc.text("Clients List", 40, 40);
 
-  const headers = ["Agent Details","Store No","Agent No","Till Number","Location","Sub Agent","Full Name","Contact","Documents"];
+  const headers = ["Store Name","Store No","Agent No","Till Number","Location","","Sub Agent Full Name","Sub Agent Contact","Documents"];
   const rows = [];
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const docs=[];
@@ -403,6 +415,7 @@ function downloadPDF() {
     if(row.dataset.kraCert) docs.push("KRA");
     if(row.dataset.goodConduct) docs.push("Good Conduct");
     if(row.dataset.businessPermit) docs.push("Permit");
+    if(row.dataset.pcc) docs.push("PCC");
     if(row.dataset.shopPicture) docs.push("Shop Picture");
 
     rows.push([
