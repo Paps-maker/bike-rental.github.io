@@ -23,6 +23,7 @@
 </style>
 </head>
 <body>
+  
 
 <!-- 🔐 Login Page -->
 <div id="loginPage" class="py-5 container" style="max-width:400px; display:none;">
@@ -259,6 +260,70 @@ loginForm.addEventListener("submit", async e => {
     });
   }
 });
+// Inactivity time (e.g., 10 minutes)
+let inactivityTime = 10 * 60 * 1000; 
+let warningTime = 30 * 1000; // Warn 30 seconds before logout
+let inactivityTimer, warningTimer;
+
+function resetTimer() {
+  clearTimeout(inactivityTimer);
+  clearTimeout(warningTimer);
+
+  // Start warning timer
+  warningTimer = setTimeout(showWarning, inactivityTime - warningTime);
+
+  // Start actual logout timer
+  inactivityTimer = setTimeout(logoutUser, inactivityTime);
+}
+
+function showWarning() {
+  let timerInterval;
+  Swal.fire({
+    title: 'Inactive!',
+    html: `You will be logged out in <b></b> seconds due to inactivity.`,
+    timer: warningTime,
+    timerProgressBar: true,
+    showCancelButton: true,
+    cancelButtonText: 'Stay Logged In',
+    didOpen: () => {
+      const b = Swal.getHtmlContainer().querySelector('b');
+      timerInterval = setInterval(() => {
+        const remaining = Math.ceil(Swal.getTimerLeft() / 1000);
+        b.textContent = remaining;
+      }, 1000);
+    },
+    willClose: () => {
+      clearInterval(timerInterval);
+    }
+  }).then((result) => {
+    if (result.isDismissed) {
+      // User clicked 'Stay Logged In', reset timers
+      resetTimer();
+    }
+  });
+}
+
+function logoutUser() {
+  Swal.fire({
+    icon: 'warning',
+    title: 'Logged Out',
+    text: 'You have been logged out due to inactivity.',
+    timer: 3000,
+    showConfirmButton: false
+  }).then(() => {
+    auth.signOut(); // Firebase logout
+  });
+}
+
+// Listen to user interactions
+window.onload = () => {
+  document.addEventListener('mousemove', resetTimer);
+  document.addEventListener('keydown', resetTimer);
+  document.addEventListener('click', resetTimer);
+  document.addEventListener('scroll', resetTimer);
+
+  resetTimer(); // Start timer initially
+};
 
 
 function logout(){ auth.signOut(); }
