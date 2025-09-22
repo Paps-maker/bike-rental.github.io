@@ -23,8 +23,6 @@
 </style>
 </head>
 <body>
-  
-
 
 <!-- 🔐 Login Page -->
 <div id="loginPage" class="py-5 container" style="max-width:400px; display:none;">
@@ -35,10 +33,6 @@
       <input type="password" id="loginPassword" class="mb-3 form-control" placeholder="Password" required>
       <button type="submit" class="w-100 btn btn-mpesa">Login</button>
     </form>
-    <!-- Add somewhere in your dashboard -->
-<div id="recaptcha-enroll"></div>
-
-
   </div>
 </div>
 
@@ -179,7 +173,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <script>
-  
 const firebaseConfig = {
   apiKey: "AIzaSyBMCKZXRDoAgvyRQw0mCu7KGSAsZsx7lyI",
   authDomain: "lawfirmnotify.firebaseapp.com",
@@ -212,82 +205,12 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-loginForm.addEventListener("submit", async e => {
+loginForm.addEventListener("submit", e=>{
   e.preventDefault();
-  const email = document.getElementById("loginEmail").value;
-  const pass = document.getElementById("loginPassword").value;
-
-  try {
-    const cred = await auth.signInWithEmailAndPassword(email, pass);
-    // ✅ If MFA not required
-    await Swal.fire("Success", "Login successful!", "success");
-    
-  } catch (error) {
-    if (error.code === "auth/multi-factor-auth-required") {
-      // ✅ MFA required → handle OTP flow
-      const resolver = error.resolver;
-      handleMFA(resolver);
-    } else {
-      Swal.fire("Login failed", error.message, "error");
-    }
-  }
+  const email=document.getElementById("loginEmail").value;
+  const pass=document.getElementById("loginPassword").value;
+  auth.signInWithEmailAndPassword(email,pass).catch(err=>alert("Login failed: "+err.message));
 });
-
-
-// ✅ Function to handle MFA with SweetAlert2
-async function handleMFA(resolver) {
-  const recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
-    size: "invisible"
-  });
-
-  const phoneAuthProvider = new firebase.auth.PhoneAuthProvider(auth);
-  const phoneNumber = resolver.hints[0]
-    ? resolver.hints[0].phoneNumber
-    : (await Swal.fire({
-        title: "Enter Phone Number",
-        input: "text",
-        inputPlaceholder: "+2547XXXXXXXX",
-        showCancelButton: true
-      })).value;
-
-  if (!phoneNumber) {
-    Swal.fire("Cancelled", "Phone number required for MFA.", "warning");
-    return;
-  }
-
-  try {
-    // Send SMS
-    const verificationId = await phoneAuthProvider.verifyPhoneNumber(
-      { phoneNumber, session: resolver.session },
-      recaptchaVerifier
-    );
-
-    const otp = await Swal.fire({
-      title: "Enter OTP",
-      input: "text",
-      inputLabel: "Check your phone for the SMS code",
-      inputPlaceholder: "123456",
-      showCancelButton: true
-    });
-
-    if (!otp.value) {
-      Swal.fire("Cancelled", "OTP is required to complete login.", "warning");
-      return;
-    }
-
-    const cred = firebase.auth.PhoneAuthProvider.credential(verificationId, otp.value);
-    const multiFactorAssertion = firebase.auth.PhoneMultiFactorGenerator.assertion(cred);
-
-    // Finish sign-in
-    await resolver.resolveSignIn(multiFactorAssertion);
-
-    await Swal.fire("Success", "MFA verification successful!", "success");
-    showDashboard();
-  } catch (err) {
-    Swal.fire("MFA failed", err.message, "error");
-  }
-}
-
 
 function logout(){ auth.signOut(); }
 function showFileName(input,targetId){ document.getElementById(targetId).textContent = input.files.length>0 ? input.files[0].name : "No file selected"; }
@@ -416,7 +339,7 @@ function loadClientsRealtime(){
           ${docButton(d.idCopy,'ID Copy')}
           ${docButton(d.kraCert,'KRA')}
           ${docButton(d.PCC,'PCC')}
-          ${docButton(d.businessPermit,' Business Permit')}
+          ${docButton(d.businessPermit,'Business Permit')}
           ${docButton(d.subagentcontract,'sub-agent contract')}
           ${docButton(d.shopPicture,'Shop')}
         </td>
