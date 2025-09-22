@@ -61,6 +61,8 @@
             <input class="mb-2 form-control" placeholder="Store No" name="storeNo" required>
             <input class="mb-2 form-control" placeholder="Agent No" name="agentNo" required>
             <input class="mb-2 form-control" placeholder="Till Number" name="tillNumber">
+           <input type="date" class="mb-2 form-control" name="datetillissued" placeholder="Date Till Issued">
+
             <input class="mb-2 form-control" placeholder="Physical Location" name="location">
             
             <input class="mb-2 form-control" placeholder="Sub Agent Full Name" name="fullName" required>
@@ -145,8 +147,8 @@
                   <th>Store No</th>
                   <th>Agent No</th>
                   <th>Till Number</th>
+                  <th>Date of till issued</th>
                   <th>Location</th>
-                  <th></th>
                   <th>Sub Agent Full Name</th>
                   <th>Sub Agent Contact</th>
                   <th>Documents</th>
@@ -419,8 +421,8 @@ function loadClientsRealtime(){
       <tr data-id="${doc.id}" 
           data-store-no="${d.storeNo||''}" 
           data-till-number="${d.tillNumber||''}" 
+          data-date-till-issued="${d.datetillissued||''}" 
           data-location="${d.location||''}" 
-          data-sub-agent="${d.subAgent||''}" 
           data-full-name="${d.fullName||''}"
           data-id-copy="${d.idCopy||''}"
           data-kra-cert="${d.kraCert||''}"
@@ -432,8 +434,8 @@ function loadClientsRealtime(){
         <td>${d.storeNo||''}</td>
         <td>${d.agentNo||''}</td>
         <td>${d.tillNumber||''}</td>
+        <td>${d.datetillissued||''}</td>
         <td>${d.location||''}</td>
-        <td>${d.subAgent||''}</td>
         <td>${d.fullName||''}</td>
         <td>${d.contact||''}</td>
         <td>
@@ -489,7 +491,7 @@ async function deleteClient(id) {
 
 
 function downloadCSV(){
-  let csv="Store Name,Store No,Agent No,Till Number,Location,,Sub Agent Full Name,Sub Agent Contact,Documents\n";
+  let csv="Store Name,Store No,Agent No,Till Number,Date till issued,Location,Sub Agent Full Name,Sub Agent Contact,Documents\n";
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const docs=[];
     if(row.dataset.idCopy) docs.push("ID Copy");
@@ -510,7 +512,7 @@ function downloadPDF() {
   doc.setFontSize(14);
   doc.text("Clients List", 40, 40);
 
-  const headers = ["Store Name","Store No","Agent No","Till Number","Location","","Sub Agent Full Name","Sub Agent Contact","Documents"];
+  const headers = ["Store Name","Store No","Agent No","Till Number","Date Till Issued","Location","Sub Agent Full Name","Sub Agent Contact","Documents"];
   const rows = [];
   document.querySelectorAll("#clientsTable tr").forEach(row=>{
     const docs=[];
