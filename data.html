@@ -205,12 +205,57 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-loginForm.addEventListener("submit", e=>{
+loginForm.addEventListener("submit", async e => {
   e.preventDefault();
-  const email=document.getElementById("loginEmail").value;
-  const pass=document.getElementById("loginPassword").value;
-  auth.signInWithEmailAndPassword(email,pass).catch(err=>alert("Login failed: "+err.message));
+  const email = document.getElementById("loginEmail").value;
+  const pass = document.getElementById("loginPassword").value;
+
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+
+    // 🎉 Professional Success Alert
+    Swal.fire({
+      icon: "success",
+      title: "Welcome Back!",
+      text: "You have logged in successfully.",
+      timer: 2000,
+      timerProgressBar: true,
+      showConfirmButton: false,
+      background: "#f0f9ff",
+      color: "#065f46",
+      iconColor: "#10b981",
+      showClass: {
+        popup: "animate__animated animate__fadeInUp animate__faster"
+      },
+      hideClass: {
+        popup: "animate__animated animate__fadeOutDown animate__faster"
+      }
+    }).then(() => {
+      // ✅ Redirect or show dashboard after success
+      // window.location.href = "dashboard.html";
+    });
+
+  } catch (err) {
+    // ❌ Professional Error Alert
+    Swal.fire({
+      icon: "error",
+      title: "Login Failed",
+      html: `<b>Reason:</b> ${err.message}`,
+      confirmButtonText: "Try Again",
+      confirmButtonColor: "#ef4444",
+      background: "#fff5f5",
+      color: "#991b1b",
+      iconColor: "#dc2626",
+      showClass: {
+        popup: "animate__animated animate__shakeX animate__faster"
+      },
+      hideClass: {
+        popup: "animate__animated animate__fadeOutUp animate__faster"
+      }
+    });
+  }
 });
+
 
 function logout(){ auth.signOut(); }
 function showFileName(input,targetId){ document.getElementById(targetId).textContent = input.files.length>0 ? input.files[0].name : "No file selected"; }
