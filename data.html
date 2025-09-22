@@ -121,6 +121,8 @@
               </div>
               <div id="shopPictureName" class="file-chosen">No file selected</div>
             </div>
+            <input class="mb-2 form-control" placeholder="Performance Page URL" name="performancePage">
+
 
             <button type="submit" class="mt-2 w-100 btn btn-mpesa">Save Client</button>
 
@@ -258,6 +260,60 @@ loginForm.addEventListener("submit", async e => {
 
 
 function logout(){ auth.signOut(); }
+let countdownInterval;
+
+function showIdleWarning(minutesLeft = 1) {
+  let secondsLeft = minutesLeft * 60;
+
+  Swal.fire({
+    title: "Inactivity Detected",
+    html: `
+      <p style="margin-bottom:15px;">You will be logged out in <span id="countdown" style="font-size:2rem;font-weight:bold;">${secondsLeft}</span> seconds.</p>
+      <div style="width:100%;background:#444;height:20px;border-radius:10px;overflow:hidden;">
+        <div id="progressBar" style="width:100%;height:100%;background:#0A7C2F;"></div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: "Stay Logged In",
+    cancelButtonText: "Logout Now",
+    allowOutsideClick: false,
+    background: "#1e1e1e",
+    color: "#fff",
+    didOpen: () => {
+      const countdownEl = Swal.getHtmlContainer().querySelector("#countdown");
+      const progressBar = Swal.getHtmlContainer().querySelector("#progressBar");
+
+      countdownInterval = setInterval(() => {
+        secondsLeft--;
+        countdownEl.textContent = secondsLeft;
+
+        // Animate countdown number
+        countdownEl.style.transition = "transform 0.3s";
+        countdownEl.style.transform = "scale(1.5)";
+        setTimeout(() => { countdownEl.style.transform = "scale(1)"; }, 300);
+
+        // Animate progress bar
+        const progressPercent = (secondsLeft / (minutesLeft * 60)) * 100;
+        progressBar.style.transition = "width 0.5s linear";
+        progressBar.style.width = progressPercent + "%";
+
+        if (secondsLeft <= 0) {
+          clearInterval(countdownInterval);
+          Swal.close();
+          logout();
+        }
+      }, 1000);
+    }
+  }).then(result => {
+    clearInterval(countdownInterval);
+    if (result.isConfirmed) {
+      resetIdleTimer(); // user wants to stay logged in
+    } else {
+      logout(); // user clicked logout
+    }
+  });
+}
+
 function showFileName(input,targetId){ document.getElementById(targetId).textContent = input.files.length>0 ? input.files[0].name : "No file selected"; }
 
 form.addEventListener("submit", async e => {
@@ -391,7 +447,9 @@ function loadClientsRealtime(){
         <td>
           <button class="btn btn-sm btn-success" onclick="downloadAllDocs('${doc.id}')">⬇ All</button>
           <button class="btn btn-sm btn-primary" onclick="editClient('${doc.id}')">Edit</button>
+           <a href="${d.performancePage || '#'}" class="btn btn-sm btn-info" target="_blank" ${d.performancePage ? '' : 'disabled'}>Performance</a>
           <button class="btn btn-sm btn-danger" onclick="deleteClient('${doc.id}')">Delete</button>
+          
         </td>
       </tr>`;
     });
