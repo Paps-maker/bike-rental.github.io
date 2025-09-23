@@ -1,0 +1,3723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgriERP — Full Agricultural ERP (Firebase)</title>
+
+  <!-- Bootstrap & FontAwesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+  <link rel="icon" type="image/png" href="img/farm.jpg">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+  <style>
+    :root {
+    --green: #2e7d32;
+    --accent: #6b8e23;
+    --soft: #f3f9f3;
+}
+
+body {
+    font-family: Inter, system-ui, Arial, sans-serif;
+    background: linear-gradient(180deg,#f8fdf8, #eef8ee);
+    margin: 0;
+}
+
+/* Navbar */
+nav {
+    background: var(--green);
+    position: sticky;   /* stick to top */
+    top: 0;
+    z-index: 1030;      /* above cards */
+}
+
+nav .navbar-brand {
+    color: #fff;
+    font-weight: 700;
+}
+
+/* Sidebar */
+.sidebar {
+    background: linear-gradient(180deg,var(--green),#1b5e20);
+    color: #fff;
+    min-height: 100vh;
+    padding: 18px;
+    width: 260px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1040;  /* above navbar when mobile slides */
+    overflow-y: auto;
+    transition: .25s;
+}
+
+.sidebar a {
+    color: #e7f5e7;
+    text-decoration: none;
+    display: block;
+    padding: 8px 6px;
+    border-radius: 6px;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+}
+
+/* Cards */
+.card {
+    border-radius: 10px;
+}
+
+/* KPI */
+.kpi {
+    font-weight: 700;
+    font-size: 1.6rem;
+    color: var(--green);
+}
+
+.small-muted {
+    color: #6c757d;
+    font-size: .9rem;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    color: #666;
+    padding: 14px 0;
+    margin-top: 18px;
+}
+
+/* Pages */
+.page { display: none; }
+.page.active { display: block; }
+
+/* Tables */
+.table-sm td, .table-sm th { padding: .35rem; }
+
+/* Mobile sidebar */
+@media(max-width:767px){
+    .sidebar {
+        left: -280px;
+        width: 220px;
+    }
+    .sidebar.show {
+        left: 0;
+    }
+}
+
+/* Main content padding to avoid navbar overlap */
+main {
+    margin-left: 260px; /* space for sidebar */
+    padding: 20px;
+}
+
+@media(max-width:767px){
+    main {
+        margin-left: 0;
+        padding-top: 70px; /* height of navbar */
+    }
+}
+  </style>
+</head>
+<body>
+<!-- Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      
+      <div class="modal-header">
+        <h5 class="modal-title">Login</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="loginForm">
+          <div class="mb-3">
+            <label for="loginEmail" class="form-label">Email</label>
+            <input type="email" id="loginEmail" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="loginPassword" class="form-label">Password</label>
+            <input type="password" id="loginPassword" class="form-control" required>
+          </div>
+          <div id="loginError" class="mb-2 text-danger small"></div>
+          <button type="submit" class="w-100 btn btn-primary">Login</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- NAV BAR -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">AgriERP🌾</a>
+    <div class="d-flex align-items-center ms-auto">
+      <span class="me-3 text-white" id="userEmail">Not signed in</span>
+      <button class="me-2 btn-outline-light btn btn-sm" id="signInBtn" data-bs-toggle="modal" data-bs-target="#loginModal">Sign In</button>
+      <button class="btn btn-warning btn-sm" id="signOutBtn" style="display:none">Sign Out</button>
+      <button class="ms-2 btn btn-light d-md-none" id="menuToggle"><i class="fas fa-bars"></i></button>
+    </div>
+  </div>
+</nav>
+
+<!-- Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Login</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="loginForm">
+          <div class="mb-3">
+            <label for="loginEmail" class="form-label">Email</label>
+            <input type="email" id="loginEmail" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="loginPassword" class="form-label">Password</label>
+            <input type="password" id="loginPassword" class="form-control" required>
+          </div>
+          <div id="loginError" class="mb-2 text-danger small"></div>
+          <button type="submit" class="w-100 btn btn-primary">Login</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<div class="d-flex">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <h5>Farm Dashboard</h5>
+    <hr style="border-color: rgba(255,255,255,0.06)">
+    <a href="#" data-page="dashboard" class="active"><i class="me-2 fa fa-tachometer-alt"></i>Dashboard</a>
+    <a href="#" data-page="poultry"><i class="me-2 fa fa-dove"></i>Poultry</a>
+    <a href="#" data-page="livestock"><i class="me-2 fa fa-cow"></i>Livestock</a>
+    <a href="#" data-page="crops"><i class="me-2 fa fa-seedling"></i>Crops</a>
+    <a href="#" data-page="finance"><i class="me-2 fa fa-coins"></i>Finance</a>
+    <a href="#" data-page="inventory"><i class="me-2 fa fa-boxes-stacked"></i>Inventory</a>
+    <a href="#" data-page="staff"><i class="me-2 fa fa-user-far"></i>Staff</a>
+    <a href="#" data-page="quickSale"><i class="me-2 fa fa-bolt"></i>Quick Sale</a>
+    <a href="#" data-page="orders"><i class="me-2 fa fa-truck"></i>Orders</a>
+    <a href="#" data-page="customers"><i class="me-2 fa fa-users"></i>Customers</a>
+    <a href="#" data-page="tasks"><i class="me-2 fa-list-check fa"></i>Tasks</a>
+    <a href="#" data-page="reports"><i class="me-2 fa fa-chart-line"></i>Reports</a>
+    <hr style="border-color: rgba(255,255,255,0.06)">
+    
+  </aside>
+<!-- Quick Sale Modal (paste into body near other modals) -->
+<div class="modal fade" id="quickSaleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-success text-white modal-header">
+        <h5 class="modal-title">Quick Sale</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickSaleForm">
+          <div class="mb-3">
+            <label class="form-label">Customer</label>
+            <input type="text" id="qsCustomer" class="form-control" placeholder="Walk-in / Name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Item</label>
+            <input type="text" id="qsItem" class="form-control" placeholder="e.g., Eggs, Milk, Layer Feed" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" id="qsQuantity" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount (KSh)</label>
+            <input type="number" id="qsAmount" class="form-control" min="0" step="0.01" required>
+          </div>
+          <div id="qsError" class="mb-2 text-danger small" style="display:none;"></div>
+          <button type="submit" class="w-100 btn btn-success" id="qsSaveBtn">Save Sale</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+  <!-- MAIN -->
+  <main class="flex-fill p-4" id="mainContent">
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="page active">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <h3>Overview</h3>
+          <div class="small-muted">Live KPIs & quick actions</div>
+        </div>
+        <div>
+          <button class="me-2 btn btn-success btn-sm" id="quickSaleBtn">Quick Sale</button>
+          <button class="btn-outline-secondary btn btn-sm" id="exportSnapshotBtn">Export Snapshot</button>
+        </div>
+      </div>
+
+      <div class="mt-3 row g-3">
+        <div class="col-md-3 col-6"><div class="p-3 card"><div class="card-header">Total Poultry</div><div class="card-body"><div class="kpi" id="kpiPoultry">0</div><div class="small-muted">Total birds</div></div></div></div>
+        <div class="col-md-3 col-6"><div class="p-3 card"><div class="card-header">Total Livestock</div><div class="card-body"><div class="kpi" id="kpiLivestock">0</div><div class="small-muted">Total animals</div></div></div></div>
+        <div class="col-md-3 col-6"><div class="p-3 card"><div class="card-header">Inventory Items</div><div class="card-body"><div class="kpi" id="kpiInventory">0</div><div class="small-muted">unique items</div></div></div></div>
+        <div class="col-md-3 col-6"><div class="p-3 card"><div class="card-header">Cash Balance (KSh)</div><div class="card-body"><div class="kpi" id="kpiCash">0</div><div class="small-muted">Sales - Expenses</div></div></div></div>
+      </div>
+
+      <div class="mt-4 row g-3">
+        <div class="col-md-8"><div class="p-3 card"><div class="card-header">Production Overview</div><div class="card-body"><canvas id="productionChart" height="120"></canvas></div></div></div>
+        <div class="mt-4 row g-3">
+  <div class="col-md-8">
+    <div class="p-3 card">
+      <div class="card-header">Production Overview</div>
+      <div class="card-body">
+        <canvas id="productionChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="mb-3 p-3 card">
+      <div class="card-header">Recent Sales</div>
+      <div class="card-body">
+        <ul id="recentSales" class="list-group list-group-flush"></ul>
+      </div>
+    </div>
+    <div class="p-3 card">
+      <div class="card-header">Upcoming Tasks</div>
+      <div class="card-body">
+        <ul id="taskList" class="list-group"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+      </div>
+    </section>
+
+    <!-- POULTRY -->
+<section id="poultry" class="page">
+  <div class="d-flex align-items-center justify-content-between">
+    <h3>Poultry</h3>
+    <button class="btn btn-primary btn-sm" id="addFlockBtn">Add Flock</button>
+  </div>
+<!-- Button to download Eggs PDF -->
+<button id="downloadEggsPdfBtn" class="mb-3 btn btn-primary">
+  Download Egg Production Report
+</button>
+
+  <!-- Add Flock Form -->
+  <div class="mt-3 p-3 card">
+    <form id="flockForm" class="align-items-end row g-2">
+      <div class="col-md-4">
+        <label>Flock Name</label>
+        <input id="flockName" class="form-control" required/>
+      </div>
+      <div class="col-md-3">
+        <label>Birds Count</label>
+        <input id="flockCount" class="form-control" type="number" required/>
+      </div>
+      <div class="col-md-3">
+        <label>Start Date</label>
+        <input id="flockStart" class="form-control" type="date" />
+      </div>
+      <div class="col-md-2">
+        <button class="w-100 btn btn-success">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Flocks List -->
+  <div class="mt-3 card">
+    <div class="card-header">Flocks</div>
+    <div class="card-body">
+      <table class="table table-sm" id="flockTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Birds</th>
+            <th>Start</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Eggs Section -->
+  <div class="mt-4 card">
+    <div class="d-flex align-items-center justify-content-between card-header">
+      <h5>Egg Production</h5>
+      <button class="btn btn-primary btn-sm" id="addEggsBtn">Add Record</button>
+    </div>
+    <div class="card-body">
+      <form id="eggsForm" class="align-items-end row g-2">
+        <div class="col-md-3">
+          <label>Date</label>
+          <input id="eggDate" type="date" class="form-control" required />
+        </div>
+        <div class="col-md-3">
+          <label>Eggs Collected</label>
+          <input id="eggCount" type="number" class="form-control" required />
+        </div>
+        <div class="col-md-3">
+          <label>Broken Eggs</label>
+          <input id="eggBroken" type="number" class="form-control" value="0" />
+        </div>
+        <div class="col-md-3">
+          <button class="w-100 btn btn-success">Save</button>
+        </div>
+      </form>
+    </div>
+    <div class="card-body">
+      <table class="table table-sm" id="eggsTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Collected</th>
+            <th>Broken</th>
+            <th>Net</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+
+    <!-- LIVESTOCK -->
+<!-- LIVESTOCK -->
+<section id="livestock" class="page">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3>Livestock</h3>
+    <button class="btn btn-primary btn-sm" id="addAnimalBtn">Register Animal</button>
+  </div>
+
+  <!-- Animal Registration Form -->
+  <div class="shadow-sm mt-3 p-3 card">
+    <form id="animalForm" class="align-items-end row g-2">
+      <div class="col-md-3">
+        <label for="earTag" class="form-label">Ear Tag</label>
+        <input id="earTag" class="form-control" required/>
+      </div>
+      <div class="col-md-3">
+        <label for="breed" class="form-label">Breed / Species</label>
+        <input id="breed" class="form-control" required/>
+      </div>
+      <div class="col-md-3">
+        <label for="dob" class="form-label">Date of Birth</label>
+        <input id="dob" type="date" class="form-control"/>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="w-100 btn btn-success">Save Animal</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Animal List Table -->
+  <div class="shadow-sm mt-3 card">
+    <div class="card-header">Registered Animals</div>
+    <div class="card-body">
+      <table class="table table-sm" id="animalTable">
+        <thead>
+          <tr>
+            <th>Ear Tag</th>
+            <th>Breed</th>
+            <th>Date of Birth</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="4" class="text-muted text-center">No animals registered yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Milk Production Section -->
+  <div class="shadow-sm mt-4 card">
+    <div class="d-flex align-items-center justify-content-between card-header">
+      <h5>Milk Production</h5>
+      <button class="btn btn-primary btn-sm" id="addMilkBtn">Add Record</button>
+    </div>
+
+    <!-- Milk Form -->
+    <div class="card-body">
+      <form id="milkForm" class="align-items-end row g-2">
+        <input type="hidden" id="milkAnimalId" />
+        <div class="col-md-3">
+          <label for="milkDate" class="form-label">Date</label>
+          <input id="milkDate" type="date" class="form-control" required/>
+        </div>
+        <div class="col-md-3">
+          <label for="milkTime" class="form-label">Time of Collection</label>
+          <select id="milkTime" class="form-select" required>
+            <option value="">Select</option>
+            <option value="Morning">Morning</option>
+            <option value="Afternoon">Afternoon</option>
+            <option value="Evening">Evening</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="milkCowSelect" class="form-label">Select Cow</label>
+          <select id="milkCowSelect" class="form-select">
+            <option value="">-- Select a cow --</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="milkLitres" class="form-label">Liters Collected</label>
+          <input id="milkLitres" type="number" step="0.1" class="form-control" required/>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="w-100 btn btn-success">Save Milk</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Milk Table -->
+    <div class="card-body">
+      <table class="table table-sm" id="milkTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Liters</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="4" class="text-muted text-center">No milk records yet</td></tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="text-end"><strong>Total:</strong></td>
+            <td id="milkTotal">0.0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+  </div>
+
+</section>
+<script>
+
+
+// ------------------- ADD ANIMAL -------------------
+animalForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const earTag = document.getElementById('earTag').value.trim();
+  const breed = document.getElementById('breed').value.trim();
+  const dob = document.getElementById('dob').value;
+
+  if (!earTag || !breed) return;
+
+  try {
+    await db.collection('livestock').add({ earTag, breed, dob });
+    animalForm.reset();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+// ------------------- LISTEN TO ANIMALS -------------------
+db.collection('livestock').onSnapshot(snapshot => {
+  animalTableBody.innerHTML = '';
+  milkCowSelect.innerHTML = '<option value="">-- Select a cow --</option>';
+  
+  if(snapshot.empty){
+    animalTableBody.innerHTML = `<tr><td colspan="4" class="text-muted text-center">No animals registered yet</td></tr>`;
+  }
+
+  snapshot.forEach(doc => {
+    const a = doc.data();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${a.earTag}</td>
+      <td>${a.breed}</td>
+      <td>${a.dob || ''}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="editAnimal('${doc.id}','${a.earTag}','${a.breed}','${a.dob || ''}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('livestock','${doc.id}')">Delete</button>
+      </td>
+    `;
+    animalTableBody.appendChild(tr);
+
+    const option = document.createElement('option');
+    option.value = doc.id;
+    option.textContent = `${a.earTag} (${a.breed})`;
+    milkCowSelect.appendChild(option);
+  });
+});
+
+// ------------------- EDIT ANIMAL -------------------
+function editAnimal(id, earTag, breed, dob){
+  document.getElementById('earTag').value = earTag;
+  document.getElementById('breed').value = breed;
+  document.getElementById('dob').value = dob;
+
+  animalForm.removeEventListener('submit', addAnimalListener);
+  animalForm.addEventListener('submit', async function updateAnimal(e){
+    e.preventDefault();
+    await db.collection('livestock').doc(id).update({
+      earTag: document.getElementById('earTag').value.trim(),
+      breed: document.getElementById('breed').value.trim(),
+      dob: document.getElementById('dob').value
+    });
+    animalForm.reset();
+    animalForm.removeEventListener('submit', updateAnimal);
+    animalForm.addEventListener('submit', addAnimalListener);
+  });
+}
+
+// Keep original add listener
+function addAnimalListener(e){
+  e.preventDefault();
+  const earTag = document.getElementById('earTag').value.trim();
+  const breed = document.getElementById('breed').value.trim();
+  const dob = document.getElementById('dob').value;
+  if(!earTag || !breed) return;
+  db.collection('livestock').add({ earTag, breed, dob });
+  animalForm.reset();
+}
+animalForm.addEventListener('submit', addAnimalListener);
+
+// ------------------- ADD MILK RECORD -------------------
+// ------------------- ADD MILK RECORD -------------------
+milkForm.addEventListener('submit', async (e) => {
+  e.preventDefault(); // Prevent page reload
+
+  const animalId = milkCowSelect.value;
+  const date = document.getElementById('milkDate').value;
+  const time = document.getElementById('milkTime').value;
+  const litres = parseFloat(document.getElementById('milkLitres').value);
+
+  if (!animalId || !date || !time || !litres) return;
+
+  try {
+    await db.collection('milk').add({ animalId, date, time, litres });
+    milkForm.reset();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+// ------------------- LISTEN TO MILK RECORDS -------------------
+db.collection('milk').onSnapshot(snapshot => {
+  milkTableBody.innerHTML = '';
+  let total = 0;
+
+  if (snapshot.empty) {
+    milkTableBody.innerHTML = `<tr><td colspan="4" class="text-muted text-center">No milk records yet</td></tr>`;
+    milkTotalEl.textContent = '0.0';
+  }
+
+  snapshot.forEach(doc => {
+    const m = doc.data();
+    total += m.litres;
+
+    // Get animal info
+    db.collection('livestock').doc(m.animalId).get().then(animalDoc => {
+      const animal = animalDoc.data();
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${m.date}</td>
+        <td>${m.time}</td>
+        <td>${m.litres}</td>
+        <td>
+          <button class="btn btn-sm btn-warning" onclick="editMilk('${doc.id}','${m.animalId}','${m.date}','${m.time}','${m.litres}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDoc('milk','${doc.id}')">Delete</button>
+        </td>
+      `;
+      milkTableBody.appendChild(tr);
+    });
+  });
+
+  milkTotalEl.textContent = total.toFixed(1);
+});
+
+// ------------------- EDIT MILK -------------------
+function editMilk(id, animalId, date, time, litres) {
+  milkCowSelect.value = animalId;
+  document.getElementById('milkDate').value = date;
+  document.getElementById('milkTime').value = time;
+  document.getElementById('milkLitres').value = litres;
+
+  milkForm.addEventListener('submit', async function updateMilk(e) {
+    e.preventDefault(); // Prevent reload
+
+    await db.collection('milk').doc(id).update({
+      animalId: milkCowSelect.value,
+      date: document.getElementById('milkDate').value,
+      time: document.getElementById('milkTime').value,
+      litres: parseFloat(document.getElementById('milkLitres').value)
+    });
+
+    milkForm.reset();
+    milkForm.removeEventListener('submit', updateMilk);
+  });
+}
+
+// ------------------- DELETE MILK -------------------
+function deleteDoc(collection, id) {
+  if (confirm('Are you sure you want to delete this record?')) {
+    db.collection(collection).doc(id).delete();
+  }
+}
+// ------------------- PDF DOWNLOAD -------------------
+function downloadLivestockPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 20;
+
+  doc.setFontSize(16);
+  doc.text("Livestock Report", 14, y);
+  y += 10;
+
+  // Animals
+  doc.autoTable({
+    head: [['Ear Tag','Breed','DOB']],
+    body: Array.from(animalTableBody.querySelectorAll('tr')).map(tr =>
+      Array.from(tr.querySelectorAll('td')).slice(0,3).map(td => td.textContent)
+    ),
+    startY: y,
+    styles:{ fontSize:10 }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Milk
+  doc.setFontSize(14);
+  doc.text("Milk Production", 14, y);
+  y += 6;
+  doc.autoTable({
+    head: [['Date','Time','Liters']],
+    body: Array.from(milkTableBody.querySelectorAll('tr')).map(tr =>
+      Array.from(tr.querySelectorAll('td')).slice(0,3).map(td => td.textContent)
+    ),
+    startY: y,
+    styles:{ fontSize:10 }
+  });
+
+  doc.save(`Livestock_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+</script>
+
+
+
+
+
+<!-- Milk Section -->
+
+
+
+
+    <!-- CROPS & HARVEST -->
+<section id="crops" class="page">
+  <!-- Crops Section -->
+  <div class="d-flex align-items-center justify-content-between">
+    <h3>Crops & Fields</h3>
+    <button class="btn btn-primary btn-sm" id="addFieldBtn">Add Field</button>
+  </div>
+<!-- PDF Download Button -->
+<div class="mb-3">
+  <button id="downloadCropsPdfBtn" class="btn btn-primary">
+    Download Crops Report PDF
+  </button>
+</div>
+
+  <div class="mt-3 p-3 card">
+    <form id="fieldForm" class="align-items-end row g-2">
+      <div class="col-md-3">
+        <label>Crop Type</label>
+        <input id="cropType" class="form-control" required/>
+      </div>
+      <div class="col-md-3">
+        <label>Area (ha)</label>
+        <input id="cropArea" class="form-control" required/>
+      </div>
+      <div class="col-md-3">
+        <label>Planted On</label>
+        <input id="cropPlanted" class="form-control" type="date" />
+      </div>
+      <div class="w-100">
+        <button class="w-100 btn btn-success">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="mt-3 p-3 card">
+    <div class="card-header">Fields</div>
+    <div class="card-body">
+      <table class="table table-sm" id="fieldTable">
+        <thead>
+          <tr>
+            <th>Crop</th>
+            <th>Area</th>
+            <th>Planted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Harvest Section -->
+  <div class="mt-5">
+    <div class="d-flex align-items-center justify-content-between">
+      <h3>Harvest</h3>
+      <button class="btn btn-primary btn-sm" id="addHarvestBtn">Add Harvest</button>
+    </div>
+
+    <div class="mt-3 p-3 card">
+      <form id="harvestForm" class="align-items-end row g-2">
+        <div class="col-md-3">
+          <label>Crop</label>
+          <input id="harvestCrop" class="form-control" required />
+        </div>
+        <div class="col-md-3">
+          <label>Quantity (kg)</label>
+          <input id="harvestQuantity" type="number" class="form-control" required />
+        </div>
+        <div class="col-md-3">
+          <label>Harvested On</label>
+          <input id="harvestDate" type="date" class="form-control" required />
+        </div>
+        <div class="w-100">
+          <button class="w-100 btn btn-success">Save</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="mt-3 p-3 card">
+      <div class="card-header">Harvest Records</div>
+      <div class="card-body">
+        <table class="table table-sm" id="harvestTable">
+          <thead>
+            <tr>
+              <th>Crop</th>
+              <th>Quantity (kg)</th>
+              <th>Harvested On</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+    
+
+    <!-- FINANCE -->
+<!-- FINANCE SECTION -->
+<section id="finance" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3>Finance</h3>
+    <div class="btn-group">
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#expenseModal">
+        <i class="bi bi-cash-stack"></i> Add Expense
+      </button>
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#saleModal">
+        <i class="bi bi-cart-check"></i> Add Sale
+      </button>
+      <button class="btn-outline-success btn btn-sm" id="downloadExpensePdf">Download Expenses PDF</button>
+      <button class="btn-outline-primary btn btn-sm" id="downloadSalePdf">Download Sales PDF</button>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="h-100 card">
+        <div class="bg-danger text-white card-header">Expenses</div>
+        <div class="p-0 card-body">
+          <table class="table table-hover table-striped mb-0" id="expenseTable">
+            <thead class="table-dark">
+              <tr><th>Date</th><th>Category</th><th>Amount (KSh)</th><th>Actions</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="h-100 card">
+        <div class="bg-primary text-white card-header">Sales</div>
+        <div class="p-0 card-body">
+          <table class="table table-hover table-striped mb-0" id="saleTable">
+            <thead class="table-dark">
+              <tr><th>Date</th><th>Product</th><th>Amount (KSh)</th><th>Actions</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script>
+  // Function to generate PDF
+  async function generatePdf(collectionName, headers, title, fileName) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const data = [];
+    const snapshot = await db.collection(collectionName).get();
+    snapshot.forEach(docSnap => {
+      const item = docSnap.data();
+      if(collectionName === 'expenses') {
+        data.push([item.date, item.category, item.amount]);
+      } else if(collectionName === 'sales') {
+        data.push([item.date, item.product, item.amount]);
+      }
+    });
+    doc.text(title, 14, 15);
+    doc.autoTable({
+      head: [headers],
+      body: data,
+      startY: 20,
+      theme: 'striped'
+    });
+    doc.save(fileName);
+  }
+
+  // Button events
+  document.getElementById('downloadExpensePdf').addEventListener('click', () => {
+    generatePdf('expenses', ['Date', 'Category', 'Amount (KSh)'], 'Expenses Report', 'expenses.pdf');
+  });
+
+  document.getElementById('downloadSalePdf').addEventListener('click', () => {
+    generatePdf('sales', ['Date', 'Product', 'Amount (KSh)'], 'Sales Report', 'sales.pdf');
+  });
+</script>
+
+
+<!-- MODALS -->
+<!-- Expense Modal -->
+<div class="modal fade" id="expenseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="expenseForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Expense</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3"><label>Date</label><input type="date" class="form-control" id="expenseDate" required></div>
+          <div class="mb-3"><label>Category</label><input type="text" class="form-control" id="expenseCategory" required></div>
+          <div class="mb-3"><label>Amount (KSh)</label><input type="number" class="form-control" id="expenseAmount" required></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Sale Modal -->
+<div class="modal fade" id="saleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="saleForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Sale</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3"><label>Date</label><input type="date" class="form-control" id="saleDate" required></div>
+          <div class="mb-3"><label>Product</label><input type="text" class="form-control" id="saleProduct" required></div>
+          <div class="mb-3"><label>Amount (KSh)</label><input type="number" class="form-control" id="saleAmount" required></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save Sale</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+    <!-- INVENTORY -->
+<section id="inventory" class="page">
+  <div class="d-flex align-items-center justify-content-between">
+    <h3>Inventory</h3>
+    <div>
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#inventoryModal">Add Item</button>
+      <button class="btn btn-success btn-sm" id="downloadPdfBtn">Download PDF</button>
+    </div>
+  </div>
+
+  <!-- Inventory Table -->
+  <div class="mt-3 p-3 card">
+    <div class="card-header">Items</div>
+    <div class="card-body">
+      <table class="table table-sm table-striped" id="inventoryTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Category</th>
+            <th>Qty</th>
+            <th>Unit</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Add jsPDF CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  document.getElementById('downloadPdfBtn').addEventListener('click', () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Table headers
+    const headers = [["Item", "Category", "Qty", "Unit"]];
+    const data = [];
+
+    const rows = document.querySelectorAll('#inventoryTable tbody tr');
+    rows.forEach(row => {
+      const rowData = [];
+      row.querySelectorAll('td').forEach((cell, index) => {
+        if (index < 4) rowData.push(cell.innerText); // exclude actions column
+      });
+      data.push(rowData);
+    });
+
+    doc.text("Inventory Report", 14, 15);
+    doc.autoTable({
+      head: headers,
+      body: data,
+      startY: 20,
+      theme: 'striped'
+    });
+
+    doc.save("inventory.pdf");
+  });
+</script>
+
+<!-- Add jsPDF AutoTable plugin CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Inventory Modal -->
+<div class="modal fade" id="inventoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="inventoryForm">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Inventory Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label for="itemName" class="form-label">Item Name</label>
+          <input type="text" class="form-control" id="itemName" required>
+        </div>
+        <div class="mb-2">
+          <label for="itemCategory" class="form-label">Category</label>
+          <input type="text" class="form-control" id="itemCategory" required>
+        </div>
+        <div class="mb-2">
+          <label for="itemQty" class="form-label">Quantity</label>
+          <input type="number" class="form-control" id="itemQty" required>
+        </div>
+        <div class="mb-2">
+          <label for="itemUnit" class="form-label">Unit</label>
+          <input type="text" class="form-control" id="itemUnit" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Save Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+    <!-- STAFF -->
+<section id="staff" class="my-4 page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Staff</h3>
+    <button class="btn btn-primary btn-sm" id="addStaffBtn" data-bs-toggle="modal" data-bs-target="#staffModal">
+      <i class="bi bi-plus-circle"></i> Add Staff
+    </button>
+     <button class="btn btn-success btn-sm" id="downloadStaffPdfBtn">
+      <i class="bi bi-download"></i> Download PDF
+    </button>
+  </div>
+
+  <div class="shadow-sm card">
+    <div class="card-header">Team</div>
+    <div class="p-3 card-body">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm table-striped" id="staffTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Phone</th>
+              <th>Salary (KSh)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Staff rows populated from Firebase -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Staff Modal -->
+<div class="modal fade" id="staffModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-primary text-white modal-header">
+        <h5 class="modal-title">Add Staff Member</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="staffForm">
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" id="staffName" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <input type="text" id="staffRole" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Phone</label>
+            <input type="text" id="staffPhone" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Salary (KSh)</label>
+            <input type="number" id="staffSalary" class="form-control" min="0" step="0.01" required>
+          </div>
+          <div id="staffError" class="mb-2 text-danger small" style="display:none;"></div>
+          <button type="submit" class="w-100 btn btn-primary">Save Staff</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  const staffTableBody = document.querySelector('#staffTable tbody');
+  const staffForm = document.getElementById('staffForm');
+  const staffError = document.getElementById('staffError');
+  const staffModalEl = document.getElementById('staffModal');
+  const staffModal = new bootstrap.Modal(staffModalEl);
+
+  // Load staff from Firebase
+  db.collection('staff').orderBy('name').onSnapshot(snapshot => {
+    staffTableBody.innerHTML = '';
+    snapshot.forEach(doc => {
+      const s = doc.data();
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', doc.id);
+      tr.innerHTML = `
+        <td>${s.name}</td>
+        <td>${s.role}</td>
+        <td>${s.phone}</td>
+        <td>${s.salary}</td>
+        <td>
+          <button class="btn btn-sm btn-primary edit-btn">Edit</button>
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      `;
+      staffTableBody.appendChild(tr);
+
+      // Edit staff
+      tr.querySelector('.edit-btn').addEventListener('click', () => {
+        staffForm.staffName.value = s.name;
+        staffForm.staffRole.value = s.role;
+        staffForm.staffPhone.value = s.phone;
+        staffForm.staffSalary.value = s.salary;
+        staffForm.setAttribute('data-edit-id', doc.id);
+        staffModal.show();
+      });
+
+      // Delete staff
+      tr.querySelector('.delete-btn').addEventListener('click', async () => {
+        if(confirm(`Delete ${s.name}?`)){
+          await db.collection('staff').doc(doc.id).delete();
+        }
+      });
+    });
+  });
+
+  // Handle add/edit staff form submission
+  staffForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = staffForm.staffName.value.trim();
+    const role = staffForm.staffRole.value.trim();
+    const phone = staffForm.staffPhone.value.trim();
+    const salary = parseFloat(staffForm.staffSalary.value);
+
+    if(!name || !role || !phone || isNaN(salary)){
+      staffError.style.display = 'block';
+      staffError.textContent = 'Please fill all fields correctly.';
+      return;
+    }
+
+    try {
+      const editId = staffForm.getAttribute('data-edit-id');
+      if(editId){
+        // Update existing staff
+        await db.collection('staff').doc(editId).update({ name, role, phone, salary });
+        staffForm.removeAttribute('data-edit-id');
+      } else {
+        // Add new staff
+        await db.collection('staff').add({ name, role, phone, salary });
+      }
+
+      staffForm.reset();
+      staffError.style.display = 'none';
+      staffModal.hide();
+    } catch(err){
+      staffError.style.display = 'block';
+      staffError.textContent = err.message;
+    }
+  });
+
+});
+document.getElementById('downloadStaffPdfBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text('Staff List', 14, 22);
+  doc.setFontSize(12);
+
+  // Fetch staff from Firebase
+  const snapshot = await db.collection('staff').orderBy('name').get();
+  const staffData = [];
+  snapshot.forEach(doc => {
+    const s = doc.data();
+    staffData.push([s.name, s.role, s.phone, s.salary]);
+  });
+
+  if(staffData.length === 0){
+    alert('No staff data available.');
+    return;
+  }
+
+  // Add table header
+  const headers = [['Name', 'Role', 'Phone', 'Salary (KSh)']];
+  doc.autoTable({
+    head: headers,
+    body: staffData,
+    startY: 30,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [33, 150, 243] },
+  });
+
+  doc.save('Staff_List.pdf');
+});
+</script>
+
+
+    <!-- QUICK SALE SECTION -->
+<section id="quickSale" class="my-4 page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+  <h3 class="mb-0">Quick Sale</h3>
+  <div class="btn-group">
+    <button class="btn btn-success btn-sm" id="quickSaleNewBtn" data-bs-toggle="modal" data-bs-target="#quickSaleModal">
+      <i class="bi bi-plus-circle"></i> New Quick Sale
+    </button>
+    <button class="btn btn-primary btn-sm" id="downloadQuickSalePdfBtn">
+      <i class="bi bi-download"></i> Download PDF
+    </button>
+  </div>
+</div>
+
+
+  <div class="shadow-sm card">
+    <div class="p-3 card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover table-striped mb-0" id="quickSaleTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Amount (KSh)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Quick Sale rows populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Sale Modal -->
+<div class="modal fade" id="quickSaleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-success text-white modal-header">
+        <h5 class="modal-title">Quick Sale</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickSaleForm">
+          <div class="mb-3">
+            <label class="form-label">Customer</label>
+            <input type="text" id="qsCustomer" class="form-control" placeholder="Walk-in / Name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Product</label>
+            <input type="text" id="qsItem" class="form-control" placeholder="e.g., Eggs, Milk, Feed" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" id="qsQuantity" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount (KSh)</label>
+            <input type="number" id="qsAmount" class="form-control" min="0" step="0.01" required>
+          </div>
+          <div id="qsError" class="mb-2 text-danger small" style="display:none;"></div>
+          <button type="submit" class="w-100 btn btn-success" id="qsSaveBtn">Save Sale</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div class="bottom-0 position-fixed p-3 end-0" style="z-index: 1055;">
+  <div id="qsToast" class="align-items-center bg-success border-0 text-white toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body">Sale saved successfully!</div>
+      <button type="button" class="m-auto me-2 btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  const quickSaleTableBody = document.querySelector('#quickSaleTable tbody');
+  const toastEl = document.getElementById('qsToast');
+  const toast = new bootstrap.Toast(toastEl);
+
+  // Load sales from Firebase and listen for changes
+  db.collection('sales').orderBy('date', 'desc').onSnapshot(snapshot => {
+    quickSaleTableBody.innerHTML = '';
+    snapshot.forEach(doc => {
+      const sale = doc.data();
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', doc.id); // store doc ID for edit/delete
+      tr.innerHTML = `
+        <td>${sale.date}</td>
+        <td>${sale.customer}</td>
+        <td>${sale.item || sale.product}</td>
+        <td>${sale.qty}</td>
+        <td>${sale.amount}</td>
+        <td>
+          <button class="btn btn-sm btn-primary edit-btn">Edit</button>
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      `;
+      quickSaleTableBody.appendChild(tr);
+
+      // Delete button
+      tr.querySelector('.delete-btn').addEventListener('click', async () => {
+        if(confirm('Are you sure you want to delete this sale?')){
+          await db.collection('sales').doc(doc.id).delete();
+        }
+      });
+
+      // Edit button
+      tr.querySelector('.edit-btn').addEventListener('click', () => {
+        document.getElementById('qsCustomer').value = sale.customer;
+        document.getElementById('qsItem').value = sale.item || sale.product;
+        document.getElementById('qsQuantity').value = sale.qty;
+        document.getElementById('qsAmount').value = sale.amount;
+
+        // Store doc id on the form for updating
+        document.getElementById('quickSaleForm').setAttribute('data-edit-id', doc.id);
+        const modalEl = document.getElementById('quickSaleModal');
+        const modalInstance = new bootstrap.Modal(modalEl);
+        modalInstance.show();
+      });
+
+    });
+  });
+
+  // Quick Sale Form Submission
+  document.getElementById('quickSaleForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); // prevent reload
+
+    const customer = document.getElementById('qsCustomer').value.trim();
+    const item = document.getElementById('qsItem').value.trim();
+    const qty = parseFloat(document.getElementById('qsQuantity').value);
+    const amount = parseFloat(document.getElementById('qsAmount').value);
+    const editId = e.target.getAttribute('data-edit-id');
+
+    if(!customer || !item || qty <= 0 || amount < 0){
+      document.getElementById('qsError').style.display = 'block';
+      document.getElementById('qsError').innerText = 'Please fill all fields correctly.';
+      return;
+    }
+
+    try {
+      if(editId){
+        // Update existing sale
+        await db.collection('sales').doc(editId).update({ customer, item, qty, amount });
+        e.target.removeAttribute('data-edit-id');
+      } else {
+        // Add new sale
+        await db.collection('sales').add({
+          customer, item, qty, amount, date: new Date().toLocaleDateString()
+        });
+      }
+
+      // Reset form and hide error
+      e.target.reset();
+      document.getElementById('qsError').style.display = 'none';
+
+      // Close modal
+      const modalEl = document.getElementById('quickSaleModal');
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      modalInstance.hide();
+
+      // Show toast
+      toast.show();
+
+    } catch(err){
+      document.getElementById('qsError').style.display = 'block';
+      document.getElementById('qsError').innerText = err.message;
+    }
+  });
+
+});
+document.getElementById('downloadQuickSalePdfBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text('Quick Sales Report', 14, 22);
+  doc.setFontSize(12);
+
+  // Fetch Quick Sales from Firebase
+  const snapshot = await db.collection('sales').orderBy('date', 'desc').get();
+  const quickSaleData = [];
+  snapshot.forEach(doc => {
+    const s = doc.data();
+    quickSaleData.push([
+      s.date || '',
+      s.customer || 'Walk-in',
+      s.item || s.product || 'Sale',
+      s.qty || '',
+      s.amount || 0
+    ]);
+  });
+
+  if(quickSaleData.length === 0){
+    alert('No quick sale data available.');
+    return;
+  }
+
+  // Add table header
+  const headers = [['Date', 'Customer', 'Product', 'Qty', 'Amount (KSh)']];
+
+  doc.autoTable({
+    head: headers,
+    body: quickSaleData,
+    startY: 30,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [40, 167, 69] }, // green header
+  });
+
+  doc.save('Quick_Sales_Report.pdf');
+});
+</script>
+
+
+   <!-- ORDERS -->
+<section id="orders" class="my-4 page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Orders & Deliveries</h3>
+    <div class="btn-group">
+      <button class="btn btn-primary btn-sm" id="addOrderBtn" data-bs-toggle="modal" data-bs-target="#orderModal">
+        <i class="bi bi-plus-circle"></i> New Order
+      </button>
+      <button class="btn btn-success btn-sm" id="downloadOrdersPdfBtn">
+        <i class="bi bi-download"></i> Download PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="shadow-sm card">
+    <div class="card-header">Orders</div>
+    <div class="p-3 card-body">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm table-striped" id="orderTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Customer</th>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Orders populated from Firebase -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Order Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-primary text-white modal-header">
+        <h5 class="modal-title">New Order</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="orderForm">
+          <div class="mb-3">
+            <label class="form-label">Customer</label>
+            <input type="text" id="orderCustomer" class="form-control" placeholder="Customer Name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Product</label>
+            <input type="text" id="orderProduct" class="form-control" placeholder="Product Name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" id="orderQty" class="form-control" min="1" value="1" required>
+          </div>
+          <div id="orderError" class="mb-2 text-danger small" style="display:none;"></div>
+          <button type="submit" class="w-100 btn btn-primary">Save Order</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const orderTableBody = document.querySelector('#orderTable tbody');
+  const orderForm = document.getElementById('orderForm');
+  const orderModalEl = document.getElementById('orderModal');
+  const orderModal = new bootstrap.Modal(orderModalEl);
+  const orderError = document.getElementById('orderError');
+
+  // Load orders from Firebase
+  db.collection('orders').orderBy('date', 'desc').onSnapshot(snapshot => {
+    orderTableBody.innerHTML = '';
+    snapshot.forEach(doc => {
+      const o = doc.data();
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', doc.id);
+      tr.innerHTML = `
+        <td>${o.customer || 'Walk-in'}</td>
+        <td>${o.product || ''}</td>
+        <td>${o.qty || ''}</td>
+        <td>${o.status || 'Pending'}</td>
+        <td>
+          <button class="btn btn-sm btn-success complete-btn"${o.status === 'Completed' ? ' disabled' : ''}>Complete</button>
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      `;
+      orderTableBody.appendChild(tr);
+
+      // Complete order button
+      tr.querySelector('.complete-btn').addEventListener('click', async () => {
+        try {
+          await db.collection('orders').doc(doc.id).update({ status: 'Completed' });
+        } catch(err) {
+          alert('Error completing order: ' + err.message);
+        }
+      });
+
+      // Delete order button
+      tr.querySelector('.delete-btn').addEventListener('click', async () => {
+        if(confirm(`Delete order for ${o.customer || 'Walk-in'}?`)){
+          await db.collection('orders').doc(doc.id).delete();
+        }
+      });
+    });
+  });
+
+  // Add new order
+  orderForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const customer = orderForm.orderCustomer.value.trim();
+    const product = orderForm.orderProduct.value.trim();
+    const qty = parseInt(orderForm.orderQty.value);
+
+    if(!customer || !product || qty < 1){
+      orderError.style.display = 'block';
+      orderError.textContent = 'Please fill all fields correctly.';
+      return;
+    }
+
+    try {
+      await db.collection('orders').add({
+        customer,
+        product,
+        qty,
+        status: 'Pending',
+        date: new Date().toLocaleDateString()
+      });
+      orderForm.reset();
+      orderError.style.display = 'none';
+      orderModal.hide();
+    } catch(err){
+      orderError.style.display = 'block';
+      orderError.textContent = err.message;
+    }
+  });
+});
+document.getElementById('downloadOrdersPdfBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text('Orders & Deliveries Report', 14, 22);
+  doc.setFontSize(12);
+
+  // Fetch orders from Firebase
+  const snapshot = await db.collection('orders').orderBy('date', 'desc').get();
+  const orderData = [];
+  snapshot.forEach(doc => {
+    const o = doc.data();
+    orderData.push([
+      o.customer || 'Walk-in',
+      o.product || '',
+      o.qty || '',
+      o.status || 'Pending'
+    ]);
+  });
+
+  if(orderData.length === 0){
+    alert('No order data available.');
+    return;
+  }
+
+  // Add table header
+  const headers = [['Customer', 'Product', 'Qty', 'Status']];
+
+  // Generate PDF table
+  doc.autoTable({
+    head: headers,
+    body: orderData,
+    startY: 30,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [0, 123, 255] }, // Bootstrap primary color
+  });
+
+  // Save PDF
+  doc.save('Orders_Report.pdf');
+});
+</script>
+
+
+   <!-- CUSTOMERS -->
+<section id="customers" class="my-4 page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Customers</h3>
+    <div class="btn-group">
+      <button class="btn btn-primary btn-sm" id="addCustomerBtn" data-bs-toggle="modal" data-bs-target="#customerModal">
+        <i class="bi bi-plus-circle"></i> Add Customer
+      </button>
+      <button class="btn btn-success btn-sm" id="downloadCustomersPdfBtn">
+        <i class="bi bi-download"></i> Download PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="shadow-sm card">
+    <div class="card-header">Customers</div>
+    <div class="p-3 card-body">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm table-striped" id="customerTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Address</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Customers populated from Firebase -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-primary text-white modal-header">
+        <h5 class="modal-title">Add Customer</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="customerForm">
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" id="customerName" class="form-control" placeholder="Customer Name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Phone</label>
+            <input type="text" id="customerPhone" class="form-control" placeholder="Phone Number" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Address</label>
+            <input type="text" id="customerAddress" class="form-control" placeholder="Customer Address" required>
+          </div>
+          <div id="customerError" class="mb-2 text-danger small" style="display:none;"></div>
+          <button type="submit" class="w-100 btn btn-primary">Save Customer</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const customerTableBody = document.querySelector('#customerTable tbody');
+  const customerForm = document.getElementById('customerForm');
+  const customerModalEl = document.getElementById('customerModal');
+  const customerModal = new bootstrap.Modal(customerModalEl);
+  const customerError = document.getElementById('customerError');
+
+  // Load customers from Firebase
+  db.collection('customers').orderBy('name').onSnapshot(snapshot => {
+    customerTableBody.innerHTML = '';
+    snapshot.forEach(doc => {
+      const c = doc.data();
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', doc.id);
+      tr.innerHTML = `
+        <td>${c.name}</td>
+        <td>${c.phone}</td>
+        <td>${c.address}</td>
+        <td>
+          <button class="btn btn-sm btn-primary edit-btn">Edit</button>
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      `;
+      customerTableBody.appendChild(tr);
+
+      // Edit customer
+      tr.querySelector('.edit-btn').addEventListener('click', () => {
+        customerForm.customerName.value = c.name;
+        customerForm.customerPhone.value = c.phone;
+        customerForm.customerAddress.value = c.address;
+        customerForm.setAttribute('data-edit-id', doc.id);
+        customerModal.show();
+      });
+
+      // Delete customer
+      tr.querySelector('.delete-btn').addEventListener('click', async () => {
+        if(confirm(`Delete ${c.name}?`)){
+          await db.collection('customers').doc(doc.id).delete();
+        }
+      });
+    });
+  });
+
+  // Add / Update customer
+  customerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = customerForm.customerName.value.trim();
+    const phone = customerForm.customerPhone.value.trim();
+    const address = customerForm.customerAddress.value.trim();
+
+    if(!name || !phone || !address){
+      customerError.style.display = 'block';
+      customerError.textContent = 'Please fill all fields correctly.';
+      return;
+    }
+
+    try {
+      const editId = customerForm.getAttribute('data-edit-id');
+      if(editId){
+        await db.collection('customers').doc(editId).update({ name, phone, address });
+        customerForm.removeAttribute('data-edit-id');
+      } else {
+        await db.collection('customers').add({ name, phone, address });
+      }
+      customerForm.reset();
+      customerError.style.display = 'none';
+      customerModal.hide();
+    } catch(err){
+      customerError.style.display = 'block';
+      customerError.textContent = err.message;
+    }
+  });
+});
+document.getElementById('downloadCustomersPdfBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text('Customers Report', 14, 22);
+  doc.setFontSize(12);
+
+  // Fetch customers from Firebase
+  const snapshot = await db.collection('customers').orderBy('name').get();
+  const customerData = [];
+  snapshot.forEach(doc => {
+    const c = doc.data();
+    customerData.push([c.name, c.phone, c.address]);
+  });
+
+  if(customerData.length === 0){
+    alert('No customer data available.');
+    return;
+  }
+
+  const headers = [['Name', 'Phone', 'Address']];
+
+  doc.autoTable({
+    head: headers,
+    body: customerData,
+    startY: 30,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [0, 123, 255] },
+  });
+
+  doc.save('Customers_Report.pdf');
+});
+</script>
+
+
+
+    <!-- TASKS -->
+<section id="tasks" class="my-4 page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Tasks / Work Logs</h3>
+    <div class="btn-group">
+      <button class="btn btn-primary btn-sm" id="addTaskBtn" data-bs-toggle="modal" data-bs-target="#taskModal">
+        <i class="bi bi-plus-circle"></i> Add Task
+      </button>
+      <button class="btn btn-success btn-sm" id="downloadTasksPdfBtn">
+        <i class="bi bi-download"></i> Download PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="shadow-sm card">
+    <div class="card-header">Task Board</div>
+    <div class="p-3 card-body">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm table-striped" id="taskTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Task</th>
+              <th>Assigned To</th>
+              <th>Due</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Tasks populated from Firebase -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Task Modal -->
+<div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-primary text-white modal-header">
+        <h5 class="modal-title">Add Task</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="taskForm">
+          <div class="mb-3">
+            <label class="form-label">Task</label>
+            <input type="text" id="taskTitle" class="form-control" placeholder="Task description" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Assigned To</label>
+            <input type="text" id="taskAssignedTo" class="form-control" placeholder="Employee name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Due Date</label>
+            <input type="date" id="taskDueDate" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select id="taskStatus" class="form-select" required>
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div id="taskError" class="mb-2 text-danger small" style="display:none;"></div>
+          <button type="submit" class="w-100 btn btn-primary">Save Task</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const taskTableBody = document.querySelector('#taskTable tbody');
+  const taskForm = document.getElementById('taskForm');
+  const taskModalEl = document.getElementById('taskModal');
+  const taskModal = new bootstrap.Modal(taskModalEl);
+  const taskError = document.getElementById('taskError');
+
+  // Load tasks from Firebase
+  db.collection('tasks').orderBy('due').onSnapshot(snapshot => {
+    taskTableBody.innerHTML = '';
+    snapshot.forEach(doc => {
+      const t = doc.data();
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', doc.id);
+      tr.innerHTML = `
+        <td>${t.title}</td>
+        <td>${t.assignedTo}</td>
+        <td>${t.due}</td>
+        <td>${t.status}</td>
+        <td>
+          <button class="btn btn-sm btn-success complete-btn"${t.status === 'Completed' ? ' disabled' : ''}>Complete</button>
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      `;
+      taskTableBody.appendChild(tr);
+
+      // Complete task button
+      tr.querySelector('.complete-btn').addEventListener('click', async () => {
+        await db.collection('tasks').doc(doc.id).update({ status: 'Completed' });
+      });
+
+      // Delete task button
+      tr.querySelector('.delete-btn').addEventListener('click', async () => {
+        if(confirm(`Delete task "${t.title}"?`)){
+          await db.collection('tasks').doc(doc.id).delete();
+        }
+      });
+    });
+  });
+
+  // Add / Update task
+  taskForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = taskForm.taskTitle.value.trim();
+    const assignedTo = taskForm.taskAssignedTo.value.trim();
+    const due = taskForm.taskDueDate.value;
+    const status = taskForm.taskStatus.value;
+
+    if(!title || !assignedTo || !due || !status){
+      taskError.style.display = 'block';
+      taskError.textContent = 'Please fill all fields correctly.';
+      return;
+    }
+
+    try {
+      await db.collection('tasks').add({ title, assignedTo, due, status });
+      taskForm.reset();
+      taskError.style.display = 'none';
+      taskModal.hide();
+    } catch(err){
+      taskError.style.display = 'block';
+      taskError.textContent = err.message;
+    }
+  });
+});
+document.getElementById('downloadTasksPdfBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text('Tasks / Work Logs Report', 14, 22);
+  doc.setFontSize(12);
+
+  // Fetch tasks from Firebase
+  const snapshot = await db.collection('tasks').orderBy('due').get();
+  const taskData = [];
+  snapshot.forEach(doc => {
+    const t = doc.data();
+    taskData.push([t.title, t.assignedTo, t.due, t.status]);
+  });
+
+  if(taskData.length === 0){
+    alert('No task data available.');
+    return;
+  }
+
+  const headers = [['Task', 'Assigned To', 'Due Date', 'Status']];
+
+  doc.autoTable({
+    head: headers,
+    body: taskData,
+    startY: 30,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [0, 123, 255] },
+  });
+
+  doc.save('Tasks_Report.pdf');
+});
+
+</script>
+
+    <!-- REPORTS -->
+    <!-- REPORTS -->
+<section id="reports" class="my-4 page">
+  <h3>Reports</h3>
+  <div class="mt-2 col-md-3">
+  <button class="w-100 btn btn-warning" id="downloadAllReportsBtn">
+    <i class="bi bi-download"></i> Download All Reports
+  </button>
+</div>
+
+  <div class="shadow-sm mt-3 p-3 card">
+    <div class="card-body">
+      <div class="align-items-end row g-2">
+        <div class="col-md-3">
+          <label>From</label>
+          <input id="reportFrom" class="form-control" type="date" />
+        </div>
+        
+        <div class="col-md-3">
+          <label>To</label>
+          <input id="reportTo" class="form-control" type="date" />
+        </div>
+        <div class="col-md-3">
+          <label>Type</label>
+          <select id="reportType" class="form-select">
+            <option value="finance">Finance</option>
+            <option value="inventory">Inventory</option>
+            <option value="livestock">Livestock</option>
+            <option value="poultry">Poultry</option>
+            <option value="crops">Crops</option>
+            <option value="orders">Orders</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button class="w-100 btn btn-success" id="generateReportBtn">Generate & Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+document.getElementById('generateReportBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const fromDate = document.getElementById('reportFrom').value;
+  const toDate = document.getElementById('reportTo').value;
+  const reportType = document.getElementById('reportType').value;
+
+  if (!fromDate || !toDate) {
+    alert('Please select both From and To dates.');
+    return;
+  }
+
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+  to.setHours(23,59,59,999); // include full day
+
+  let data = [];
+  let headers = [];
+
+  try {
+    switch(reportType) {
+      case 'finance':
+        headers = [['Date', 'Category/Note', 'Amount (KSh)']];
+        const financeSnapshot = await db.collection('finance')
+          .where('dateObj', '>=', from)
+          .where('dateObj', '<=', to)
+          .get();
+        financeSnapshot.forEach(doc => {
+          const f = doc.data();
+          data.push([f.date, f.category || f.note || '', f.amount || '']);
+        });
+        break;
+
+      case 'inventory':
+        headers = [['Item', 'Category', 'Qty', 'Unit']];
+        const invSnapshot = await db.collection('inventory').get();
+        invSnapshot.forEach(doc => {
+          const i = doc.data();
+          data.push([i.name, i.category, i.qty, i.unit]);
+        });
+        break;
+
+      case 'livestock':
+        headers = [['Type', 'Breed', 'Qty', 'Age', 'Notes']];
+        const livestockSnapshot = await db.collection('livestock').get();
+        livestockSnapshot.forEach(doc => {
+          const l = doc.data();
+          data.push([l.type, l.breed, l.qty, l.age || '', l.notes || '']);
+        });
+        break;
+
+      case 'poultry':
+        headers = [['Type', 'Breed', 'Qty', 'Age', 'Notes']];
+        const poultrySnapshot = await db.collection('poultry').get();
+        poultrySnapshot.forEach(doc => {
+          const p = doc.data();
+          data.push([p.type, p.breed, p.qty, p.age || '', p.notes || '']);
+        });
+        break;
+
+      case 'crops':
+        headers = [['Crop', 'Area (Acres)', 'Planted On', 'Notes']];
+        const cropsSnapshot = await db.collection('crops').get();
+        cropsSnapshot.forEach(doc => {
+          const c = doc.data();
+          data.push([c.cropType, c.area, c.plantedOn || '', c.notes || '']);
+        });
+        break;
+
+      case 'orders':
+        headers = [['Customer', 'Product', 'Qty', 'Status']];
+        const ordersSnapshot = await db.collection('orders')
+          .where('dateObj', '>=', from)
+          .where('dateObj', '<=', to)
+          .get();
+        ordersSnapshot.forEach(doc => {
+          const o = doc.data();
+          data.push([o.customer || 'Walk-in', o.product, o.qty, o.status]);
+        });
+        break;
+
+      default:
+        alert('Report type not implemented.');
+        return;
+    }
+
+    if(data.length === 0){
+      alert('No data available for this period.');
+      return;
+    }
+
+    // PDF Header
+    doc.setFontSize(18);
+    doc.text(`${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`, 14, 22);
+    doc.setFontSize(12);
+    doc.text(`From: ${fromDate} To: ${toDate}`, 14, 30);
+
+    // Add table
+    doc.autoTable({
+      head: headers,
+      body: data,
+      startY: 35,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [0, 123, 255] },
+    });
+
+    doc.save(`${reportType}_report_${fromDate}_to_${toDate}.pdf`);
+
+  } catch(err){
+    console.error(err);
+    alert('Error generating report: ' + err.message);
+  }
+});
+document.getElementById('downloadAllReportsBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const today = new Date().toISOString().split('T')[0];
+  doc.setFontSize(20);
+  doc.text('Full ERP Report', 14, 20);
+  doc.setFontSize(12);
+  doc.text(`Generated on: ${today}`, 14, 28);
+
+  let startY = 35;
+
+  const addSection = async (title, headers, snapshotPromise) => {
+    const data = [];
+    const snapshot = await snapshotPromise;
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      data.push(d.row || d); // use `row` if you store formatted data, otherwise entire doc
+    });
+
+    if(data.length === 0) return; // skip empty sections
+
+    doc.setFontSize(16);
+    doc.text(title, 14, startY);
+    startY += 6;
+
+    doc.autoTable({
+      head: [headers],
+      body: data.map(r => headers.map(h => r[h.toLowerCase()] || r[h] || '')),
+      startY: startY,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [0, 123, 255] },
+      theme: 'grid'
+    });
+
+    startY = doc.lastAutoTable.finalY + 10;
+  };
+
+  try {
+    // Finance
+    await addSection(
+      'Finance',
+      ['Date', 'Category/Note', 'Amount'],
+      db.collection('finance').get()
+    );
+
+    // Inventory
+    await addSection(
+      'Inventory',
+      ['Name', 'Category', 'Qty', 'Unit'],
+      db.collection('inventory').get()
+    );
+
+    // Livestock
+    await addSection(
+      'Livestock',
+      ['Type', 'Breed', 'Qty', 'Age', 'Notes'],
+      db.collection('livestock').get()
+    );
+
+    // Poultry
+    await addSection(
+      'Poultry',
+      ['Type', 'Breed', 'Qty', 'Age', 'Notes'],
+      db.collection('poultry').get()
+    );
+
+    // Crops
+    await addSection(
+      'Crops',
+      ['Crop', 'Area', 'Planted On', 'Notes'],
+      db.collection('crops').get()
+    );
+
+    // Orders
+    await addSection(
+      'Orders',
+      ['Customer', 'Product', 'Qty', 'Status'],
+      db.collection('orders').get()
+    );
+
+    doc.save(`Full_ERP_Report_${today}.pdf`);
+
+  } catch(err) {
+    console.error(err);
+    alert('Error generating full report: ' + err.message);
+  }
+});
+</script>
+
+
+
+    
+  </main>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* --------------------------
+  Put your Firebase config here
+---------------------------*/
+const firebaseConfig = {
+  apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:58ed375a4f9b0fc3b98139",
+  measurementId: "G-EEN2P206WB"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// --------------------------
+// Show/hide pages based on auth
+// --------------------------
+function showDashboardForUser(user){
+  if(user){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('dashboard').classList.add('active');
+    document.getElementById('userEmail').innerText = user.email;
+    document.getElementById('signInBtn').style.display = 'none';
+    document.getElementById('signOutBtn').style.display = 'inline-block';
+    startRealtimeListeners(); // existing function to populate tables & KPIs
+  } else {
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    alert("You must sign in to access the dashboard.");
+  }
+}
+
+
+// --------------------------
+// Sidebar navigation
+// --------------------------
+const pages = {
+  dashboard: document.getElementById('dashboard'),
+  poultry: document.getElementById('poultry'),
+  livestock: document.getElementById('livestock'),
+  crops: document.getElementById('crops'),
+  finance: document.getElementById('finance'),
+  inventory: document.getElementById('inventory'),
+  staff: document.getElementById('staff'),
+  quickSale: document.getElementById('quickSale'),
+  orders: document.getElementById('orders'),
+  customers: document.getElementById('customers'),
+  tasks: document.getElementById('tasks'),
+  reports: document.getElementById('reports')
+};
+
+document.querySelectorAll('.sidebar a').forEach(a=>{
+  a.addEventListener('click', e=>{
+    e.preventDefault();
+    if(!auth.currentUser) return alert('Please sign in first!');
+    document.querySelectorAll('.sidebar a').forEach(x=>x.classList.remove('active'));
+    a.classList.add('active');
+    const page = a.dataset.page;
+    Object.values(pages).forEach(p=>p.classList.remove('active'));
+    if(pages[page]) pages[page].classList.add('active');
+    document.getElementById('sidebar').classList.remove('show'); // mobile hide
+  });
+});
+
+document.getElementById('menuToggle').addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('show'));
+
+// --------------------------
+//* --------------------------
+  
+auth.onAuthStateChanged(user=>{
+  if(user){
+    showDashboardForUser(user);
+
+    // Close modal if it's open
+    const loginModalEl = document.getElementById('loginModal');
+    const loginModal = bootstrap.Modal.getInstance(loginModalEl);
+    if(loginModal) loginModal.hide();
+
+  } else {
+    document.getElementById('userEmail').innerText = 'Not signed in';
+    document.getElementById('signInBtn').style.display = 'inline-block';
+    document.getElementById('signOutBtn').style.display = 'none';
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+
+    // Open login modal when logged out
+    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+    loginModal.show();
+  }
+});
+
+/* --------------------------
+  Login form submission
+---------------------------*/
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPassword').value.trim();
+
+  if(!email || !pass) return;
+
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch(err) {
+    alert(err.message);
+  }
+});
+
+/* --------------------------
+  Sign out button
+---------------------------*/
+document.getElementById('signOutBtn').addEventListener('click', ()=>{
+  auth.signOut();
+});
+
+/* --------------------------
+  Sidebar navigation
+---------------------------*/
+document.querySelectorAll('.sidebar a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+
+    // If not logged in → force login modal
+    if(!auth.currentUser) {
+      const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+      loginModal.show();
+      return;
+    }
+
+    // Highlight active link
+    document.querySelectorAll('.sidebar a').forEach(x=>x.classList.remove('active'));
+    a.classList.add('active');
+
+    // Show the correct page
+    const page = a.dataset.page;
+    Object.values(pages).forEach(p=>p.classList.remove('active'));
+    if(pages[page]) pages[page].classList.add('active');
+
+    // Close sidebar on mobile
+    document.getElementById('sidebar').classList.remove('show');
+  });
+});
+
+/* --------------------------
+  Utility helpers
+---------------------------*/
+function fmtISO(d){ 
+  if(!d) return ''; 
+  if(typeof d === 'string') return d.split('T')[0]; 
+  if(d.toDate) d = d.toDate(); 
+  return new Date(d).toISOString().split('T')[0]; 
+}
+
+function downloadJSON(filename,obj){ 
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}); 
+  const url=URL.createObjectURL(blob); 
+  const a=document.createElement('a'); 
+  a.href=url; a.download=filename; 
+  document.body.appendChild(a); a.click(); a.remove(); 
+}
+
+function downloadCSV(filename,rows){ 
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n'); 
+  const blob=new Blob([csv],{type:'text/csv'}); 
+  const url=URL.createObjectURL(blob); 
+  const a=document.createElement('a'); 
+  a.href=url; a.download=filename; 
+  document.body.appendChild(a); a.click(); a.remove(); 
+}
+/* --------------------------
+  Realtime listeners (on sign in)
+---------------------------*/
+let unsubscribers = [];
+function startRealtimeListeners(){
+  // clear old
+  unsubscribers.forEach(u => u && typeof u === 'function' && u());
+  unsubscribers = [];
+
+  
+
+  // Livestock
+  unsubscribers.push(db.collection('livestock').onSnapshot(snap=>{
+    const tbody = document.querySelector('#animalTable tbody'); tbody.innerHTML='';
+    let animals = 0;
+    snap.forEach(doc=>{
+      const d = doc.data(); animals++;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.earTag}</td><td>${d.breed}</td><td>${fmtISO(d.dob)}</td>
+        <td>
+          <button class="btn-outline-primary btn btn-sm" onclick="viewAnimal('${doc.id}')">View</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDoc('livestock','${doc.id}')">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('kpiLivestock').innerText = animals;
+  }));
+  const milkCowSelect = document.getElementById('milkCowSelect');
+
+function loadCowOptions() {
+  db.collection('livestock').onSnapshot(snapshot => {
+    milkCowSelect.innerHTML = '<option value="">-- Select a cow --</option>';
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const option = document.createElement('option');
+      option.value = doc.id;
+      option.text = `${d.earTag} (${d.breed})`;
+      milkCowSelect.appendChild(option);
+    });
+  });
+}
+
+loadCowOptions();
+
+
+  // Crops
+  unsubscribers.push(db.collection('crops').onSnapshot(snap=>{
+    const tbody = document.querySelector('#fieldTable tbody'); tbody.innerHTML='';
+    let fields = 0;
+    snap.forEach(doc=>{
+      const d = doc.data(); fields++;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.cropType}</td><td>${d.area}</td><td>${fmtISO(d.plantedOn)}</td>
+        <td>
+          <button class="btn-outline-primary btn btn-sm" onclick="viewField('${doc.id}')">View</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDoc('crops','${doc.id}')">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }));
+  
+
+  unsubscribers.push(
+  db.collection('poultryFlocks').onSnapshot(snap => {
+    const tbody = document.querySelector('#flockTable tbody');
+    tbody.innerHTML = '';
+    let birdsTotal = 0;
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      birdsTotal += parseInt(d.birdsCount || 0);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${d.flockName}</td>
+        <td>${d.birdsCount}</td>
+        <td>${fmtISO(d.startDate)}</td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="viewFlock('${doc.id}')">View</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDoc('poultryFlocks','${doc.id}')">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('kpiPoultry').innerText = birdsTotal;
+  })
+);
+
+  // Inventory
+  unsubscribers.push(db.collection('inventory').onSnapshot(snap=>{
+    const tbody = document.querySelector('#inventoryTable tbody'); tbody.innerHTML='';
+    let items = 0;
+    snap.forEach(doc=>{
+      const d = doc.data(); items++;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.name}</td><td>${d.category}</td><td>${d.qty}</td><td>${d.unit||''}</td>
+        <td>
+          <button class="btn-outline-primary btn btn-sm" onclick="editInventory('${doc.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDoc('inventory','${doc.id}')">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('kpiInventory').innerText = items;
+  }));
+  
+
+  // Finance (expenses & sales)
+unsubscribers.push(
+  db.collection('finance')
+    .orderBy('date', 'desc')
+    .onSnapshot(snap => {
+      const expenseTbody = document.querySelector('#expenseTable tbody');
+      const saleTbody = document.querySelector('#saleTable tbody');
+      const quickSaleTbody = document.querySelector('#quickSaleTable tbody');
+      const recentSalesList = document.getElementById('recentSales');
+
+      expenseTbody.innerHTML = '';
+      saleTbody.innerHTML = '';
+      quickSaleTbody.innerHTML = '';
+      recentSalesList.innerHTML = '';
+
+      let salesTotal = 0;
+      let expenseTotal = 0;
+      const recent = [];
+
+      snap.forEach(doc => {
+        const d = doc.data();
+        const date = fmtISO(d.date);
+        const amount = parseFloat(d.amount || 0).toLocaleString();
+
+        if (d.type === 'expense') {
+          expenseTotal += parseFloat(d.amount || 0);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${date}</td>
+            <td>${d.category || d.note || 'Expense'}</td>
+            <td>${amount}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button>
+            </td>
+          `;
+          expenseTbody.appendChild(tr);
+        } else { // sale
+          salesTotal += parseFloat(d.amount || 0);
+
+          // Sales table
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${date}</td>
+            <td>${d.product || d.note || 'Sale'}</td>
+            <td>${amount}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button>
+            </td>
+          `;
+          saleTbody.appendChild(tr);
+
+          // Quick sale table
+          const qtr = document.createElement('tr');
+          qtr.innerHTML = `
+            <td>${date}</td>
+            <td>${d.product || d.note || 'Sale'}</td>
+            <td>${d.qty || ''}</td>
+            <td>${amount}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button>
+            </td>
+          `;
+          quickSaleTbody.appendChild(qtr);
+
+          recent.push(d);
+        }
+      });
+
+      // Update KPI
+      const kpiCash = document.getElementById('kpiCash');
+      if (kpiCash) kpiCash.innerText = (salesTotal - expenseTotal).toLocaleString();
+
+      // Update recent sales list
+      recentSalesList.innerHTML = recent.length
+        ? recent.slice(0, 5)
+            .map(r => `
+              <li class="list-group-item d-flex justify-content-between">
+                <div>${r.product || r.note}</div>
+                <div>KSh ${parseFloat(r.amount || 0).toLocaleString()}</div>
+              </li>
+            `).join('')
+        : '<li class="list-group-item">No recent sales</li>';
+    })
+);
+
+
+  // Staff
+  
+
+  
+
+  
+
+  // Tasks
+ 
+
+  // Production chart aggregation (simple)
+  unsubscribers.push(db.collection('poultryFlocks').onSnapshot(pSnap=>{
+    db.collection('livestock').get().then(lSnap=>{
+      db.collection('crops').get().then(cSnap=>{
+        let eggsTotal = 0, milkTotal = 0;
+        pSnap.forEach(d=>{ (d.data().eggProduction||[]).forEach(e=> eggsTotal += parseInt(e.eggs||0)); });
+        lSnap.forEach(d=>{ (d.data().milkRecords||[]).forEach(m=> milkTotal += parseFloat(m.liters||0)); });
+        renderProductionChart(Math.round(milkTotal), eggsTotal, cSnap.size);
+      });
+    });
+  }));
+}
+
+/* --------------------------
+  Generic CRUD helpers
+---------------------------*/
+function deleteDoc(collection, id){
+  if(!confirm('Delete item?')) return;
+  db.collection(collection).doc(id).delete().catch(e=>alert(e.message));
+}
+
+/* --------------------------
+  Poultry: add & view
+---------------------------*/
+document.getElementById('flockForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('flockName').value.trim();
+  const count = parseInt(document.getElementById('flockCount').value) || 0;
+  const start = document.getElementById('flockStart').value || new Date().toISOString();
+  if(!name) return alert('Enter flock name');
+  await db.collection('poultryFlocks').add({ flockName: name, birdsCount: count, startDate: start, feedLogs: [], eggProduction: [], vaccinations: [] });
+  e.target.reset();
+});
+function viewFlock(id){ db.collection('poultryFlocks').doc(id).get().then(snap=>{ const d=snap.data(); alert(`Flock: ${d.flockName}\nBirds: ${d.birdsCount}\nStart: ${fmtISO(d.startDate)}\n\nEggs:\n${(d.eggProduction||[]).map(x=>`${x.date||''} - ${x.eggs||0}`).join('\\n')}`); }); }
+
+/* --------------------------
+  Livestock
+---------------------------*/
+
+
+
+/* --------------------------
+  Finance: add expense & sale
+---------------------------*/
+
+
+/* --------------------------
+  Inventory CRUD
+---------------------------*/
+// Inventory
+let editInventoryId = null;
+
+// Real-time listener for inventory
+unsubscribers.push(db.collection('inventory').orderBy('name').onSnapshot(snap => {
+  const tbody = document.querySelector('#inventoryTable tbody');
+  tbody.innerHTML = '';
+  let items = 0;
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    items++;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.name}</td>
+      <td>${d.category}</td>
+      <td>${d.qty}</td>
+      <td>${d.unit || ''}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="editInventory('${doc.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('inventory','${doc.id}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('kpiInventory').innerText = items;
+}));
+
+// Add / Update Inventory via modal
+const inventoryForm = document.getElementById('inventoryForm');
+inventoryForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = document.getElementById('itemName').value;
+  const category = document.getElementById('itemCategory').value;
+  const qty = parseFloat(document.getElementById('itemQty').value);
+  const unit = document.getElementById('itemUnit').value;
+
+  if(editInventoryId){
+    await db.collection('inventory').doc(editInventoryId).update({ name, category, qty, unit });
+    editInventoryId = null;
+  } else {
+    await db.collection('inventory').add({ name, category, qty, unit, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }
+
+  inventoryForm.reset();
+  bootstrap.Modal.getInstance(document.getElementById('inventoryModal')).hide();
+});
+
+// Edit Inventory function
+async function editInventory(id){
+  const docSnap = await db.collection('inventory').doc(id).get();
+  if(docSnap.exists){
+    const d = docSnap.data();
+    document.getElementById('itemName').value = d.name;
+    document.getElementById('itemCategory').value = d.category;
+    document.getElementById('itemQty').value = d.qty;
+    document.getElementById('itemUnit').value = d.unit || '';
+    editInventoryId = id;
+    new bootstrap.Modal(document.getElementById('inventoryModal')).show();
+  }
+}
+
+// Export Inventory PDF
+document.getElementById('downloadInventoryPdfBtn').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text("Inventory Report", 105, 15, { align: "center" });
+
+  const snap = await db.collection('inventory').orderBy('name').get();
+  const data = snap.docs.map(doc => {
+    const d = doc.data();
+    return [d.name, d.category, d.qty, d.unit || ''];
+  });
+
+  doc.autoTable({
+    startY: 25,
+    head: [['Item', 'Category', 'Qty', 'Unit']],
+    body: data,
+    styles: { fontSize: 11 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 245, 245] }
+  });
+
+  doc.save("Inventory_Report.pdf");
+});
+
+/* --------------------------
+  Staff CRUD
+---------------------------*/
+document.getElementById('addStaffBtn').addEventListener('click', ()=>{
+  const name = prompt('Name'); if(!name) return;
+  const role = prompt('Role (Manager, Worker, Vet)') || 'Worker';
+  const phone = prompt('Phone') || '';
+  const salary = parseFloat(prompt('Monthly Salary (KSh)')) || 0;
+  db.collection('staff').add({ name, role, phone, salary, createdAt: new Date().toISOString() }).catch(e=>alert(e.message));
+});
+function editStaff(id){ db.collection('staff').doc(id).get().then(snap=>{ const d=snap.data(); const name = prompt('Name', d.name); if(!name) return; const role = prompt('Role', d.role); const phone = prompt('Phone', d.phone); const salary = parseFloat(prompt('Salary', d.salary))||0; db.collection('staff').doc(id).set({ name, role, phone, salary }).catch(e=>alert(e.message)); }); }
+
+/* --------------------------
+  Quick Sale: updates finance + inventory
+---------------------------*/
+document.getElementById('quickSaleNewBtn').addEventListener('click', async ()=>{
+  const product = prompt('Product (eggs, milk, Layer Feed)'); if(!product) return;
+  const qty = parseFloat(prompt('Quantity')) || 1;
+  const price = parseFloat(prompt('Total Amount (KSh)')) || 0;
+  const date = new Date().toISOString();
+
+  // create finance record
+  const saleRef = await db.collection('finance').add({ type:'sale', product, qty, amount: price, date });
+
+  // try to reduce inventory: find matching item by name (case-insensitive contains)
+  const invSnap = await db.collection('inventory').get();
+  let matchedDoc = null;
+  invSnap.forEach(d=>{
+    const name = (d.data().name||'').toLowerCase();
+    if(name.includes(product.toLowerCase())) matchedDoc = { id: d.id, data: d.data() };
+  });
+  if(matchedDoc){
+    const newQty = (parseFloat(matchedDoc.data.qty||0) - qty);
+    await db.collection('inventory').doc(matchedDoc.id).update({ qty: newQty < 0 ? 0 : newQty, updatedAt: new Date().toISOString() });
+  }
+
+  alert('Quick sale recorded.');
+});
+
+/* --------------------------
+  Orders
+---------------------------*/
+document.getElementById('addOrderBtn').addEventListener('click', ()=>{
+  const customerName = prompt('Customer name'); if(!customerName) return;
+  const product = prompt('Product'); const qty = parseFloat(prompt('Qty')) || 1;
+  const status = 'Pending';
+  db.collection('orders').add({ customerName, product, qty, status, createdAt: new Date().toISOString() }).catch(e=>alert(e.message));
+});
+function viewOrder(id){ db.collection('orders').doc(id).get().then(snap=>{ const d=snap.data(); alert(`Customer: ${d.customerName}\nProduct: ${d.product}\nQty: ${d.qty}\nStatus: ${d.status}`); }); }
+
+/* --------------------------
+  Customers
+---------------------------*/
+document.getElementById('addCustomerBtn').addEventListener('click', ()=>{
+  const name = prompt('Name'); if(!name) return;
+  const phone = prompt('Phone') || ''; const address = prompt('Address') || '';
+  db.collection('customers').add({ name, phone, address, createdAt: new Date().toISOString() }).catch(e=>alert(e.message));
+});
+function viewCustomer(id){ db.collection('customers').doc(id).get().then(snap=>{ const d=snap.data(); alert(`Name: ${d.name}\nPhone: ${d.phone}\nAddress: ${d.address}`); }); }
+
+/* --------------------------
+  Tasks
+---------------------------*/
+document.getElementById('addTaskBtn').addEventListener('click', ()=>{
+  const title = prompt('Task title (e.g., Feed Layer A)'); if(!title) return;
+  const assignedTo = prompt('Assign to (staff name)') || '';
+  const due = prompt('Due date (YYYY-MM-DD)') || new Date().toISOString();
+  db.collection('tasks').add({ title, assignedTo, due, status: 'open', createdAt: new Date().toISOString() }).catch(e=>alert(e.message));
+});
+function editTask(id){ db.collection('tasks').doc(id).get().then(snap=>{ const d=snap.data(); const title = prompt('Title', d.title); if(!title) return; const assignedTo = prompt('Assigned', d.assignedTo); const due = prompt('Due', d.due); const status = prompt('Status (open,done)', d.status) || d.status; db.collection('tasks').doc(id).set({ title, assignedTo, due, status }).catch(e=>alert(e.message)); }); }
+
+/* --------------------------
+  Reports: query by date & type
+---------------------------*/
+
+/* --------------------------
+  Export snapshot
+---------------------------*/
+
+
+/* --------------------------
+  Small view helpers
+---------------------------*/
+function renderProductionChart(milk, eggs, fields){
+  const ctx = document.getElementById('productionChart').getContext('2d');
+  if(window.productionChart) window.productionChart.destroy();
+  window.productionChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: ['Milk (L)','Eggs','Fields'], datasets: [{ label:'Totals', data:[milk, eggs, fields], backgroundColor:['#66bb6a','#fdd835','#42a5f5'] }] },
+    options: { responsive:true, plugins:{ legend:{ display:false } } }
+  });
+}
+// wire quickSale button to open modal
+document.getElementById('quickSaleBtn').addEventListener('click', () => {
+  const quickModalEl = document.getElementById('quickSaleModal');
+  const quickModal = new bootstrap.Modal(quickModalEl);
+  // reset form each time
+  document.getElementById('quickSaleForm').reset();
+  document.getElementById('qsError').style.display = 'none';
+  quickModal.show();
+});
+
+// handle quick sale submit (uses compat APIs like db.collection)
+document.getElementById('quickSaleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const saveBtn = document.getElementById('qsSaveBtn');
+  const errEl = document.getElementById('qsError');
+  errEl.style.display = 'none';
+  saveBtn.disabled = true;
+  try {
+    const customer = document.getElementById('qsCustomer').value.trim();
+    const item = document.getElementById('qsItem').value.trim();
+    const qty = Number(document.getElementById('qsQuantity').value) || 0;
+    const amount = parseFloat(document.getElementById('qsAmount').value) || 0;
+
+    if (!item || qty <= 0 || amount < 0) throw new Error('Please enter valid item, quantity and amount');
+
+    // create order record
+    const orderData = {
+      customerName: customer || 'Walk-in',
+      product: item,
+      qty,
+      status: 'Completed',
+      createdAt: new Date().toISOString(),
+      createdBy: auth.currentUser ? auth.currentUser.email : null,
+      type: 'quickSale'
+    };
+    await db.collection('orders').add(orderData);
+
+    // create finance record (sale)
+    const financeData = {
+      type: 'sale',
+      product: item,
+      amount,
+      qty,
+      date: new Date().toISOString(),
+      createdBy: auth.currentUser ? auth.currentUser.email : null
+    };
+    await db.collection('finance').add(financeData);
+
+    // attempt to reduce matching inventory item (case-insensitive contains)
+    try {
+      const invSnap = await db.collection('inventory').get();
+      let matched = null;
+      invSnap.forEach(doc => {
+        const d = doc.data();
+        const name = (d.name || '').toLowerCase();
+        if (name && item.toLowerCase() && name.includes(item.toLowerCase())) {
+          matched = { id: doc.id, data: d };
+        }
+      });
+      if (matched) {
+        const currentQty = parseFloat(matched.data.qty || 0);
+        const newQty = Math.max(0, currentQty - qty);
+        await db.collection('inventory').doc(matched.id).update({ qty: newQty, updatedAt: new Date().toISOString() });
+      }
+    } catch(invErr) {
+      // inventory update failed — not fatal
+      console.warn('Inventory update failed', invErr);
+    }
+
+    // hide modal & notify
+    const quickModalEl = document.getElementById('quickSaleModal');
+    bootstrap.Modal.getInstance(quickModalEl).hide();
+    alert('Quick sale recorded ✅');
+
+    // let realtime listeners update UI (you already have those)
+  } catch (err) {
+    console.error(err);
+    errEl.textContent = err.message || 'Error recording quick sale';
+    errEl.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+/* --------------------------
+  Start with dashboard visible
+---------------------------*/
+document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+document.getElementById('dashboard').classList.add('active');
+
+</script>
+<!-- jsPDF & autoTable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+document.getElementById('exportSnapshotBtn').addEventListener('click', async () => {
+  if (!confirm('Download full collections snapshot PDF?')) return;
+
+  const collections = [
+    'poultryFlocks',
+    'eggProduction',
+    'livestock',
+    'crops',
+    'inventory',
+    'finance',
+    'staff',
+    'customers',
+    'orders',
+    'tasks'
+  ];
+
+  const snapshot = {};
+  for (const c of collections) {
+    const s = await db.collection(c).get();
+    snapshot[c] = s.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+
+  // Create PDF
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("p", "pt", "a4");
+
+  // Title Page
+  doc.setFontSize(22);
+  doc.text("AgriERP - Full Farm Report", 210, 60, { align: "center" });
+
+  doc.setFontSize(14);
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, 210, 90, { align: "center" });
+  doc.line(40, 110, 550, 110);
+
+  let pageHeight = doc.internal.pageSize.height;
+  let y = 140;
+
+  for (const [section, records] of Object.entries(snapshot)) {
+    if (y > pageHeight - 100) {
+      doc.addPage();
+      y = 60;
+    }
+
+    // Section Heading
+    doc.setFontSize(16);
+    doc.setTextColor(0, 102, 204);
+    doc.text(section.toUpperCase(), 40, y);
+    y += 20;
+
+    if (records.length === 0) {
+      doc.setFontSize(12);
+      doc.setTextColor(150, 150, 150);
+      doc.text("No records found.", 60, y);
+      y += 20;
+      continue;
+    }
+
+    // AutoTable for data
+    const keys = Object.keys(records[0]);
+    const body = records.map(r => keys.map(k => String(r[k] ?? "")));
+
+    doc.autoTable({
+      startY: y,
+      head: [keys],
+      body: body,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 40, right: 40 },
+      tableWidth: "auto",
+      didDrawPage: (data) => {
+        // Footer
+        let str = "Page " + doc.internal.getNumberOfPages();
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+      }
+    });
+
+    y = doc.lastAutoTable.finalY + 30;
+  }
+
+  // Save PDF
+  doc.save(`AgriERP_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+});
+</script>
+<!-- Chart.js (put before </body>) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  // --- Production Chart ---
+  const ctx = document.getElementById("productionChart").getContext("2d");
+  const productionChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [], // dates
+      datasets: [
+        {
+          label: "Eggs (dozens)",
+          data: [],
+          borderColor: "rgba(75, 192, 192, 1)",
+          backgroundColor: "rgba(75, 192, 192, 0.2)",
+          tension: 0.3,
+          fill: true
+        },
+        {
+          label: "Milk (litres)",
+          data: [],
+          borderColor: "rgba(255, 159, 64, 1)",
+          backgroundColor: "rgba(255, 159, 64, 0.2)",
+          tension: 0.3,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "bottom" } }
+    }
+  });
+
+  // Load sample production data (replace with Firestore later)
+  const sampleProduction = [
+    { date: "2025-09-01", eggs: 120, milk: 60 },
+    { date: "2025-09-02", eggs: 100, milk: 55 },
+    { date: "2025-09-03", eggs: 130, milk: 70 },
+    { date: "2025-09-04", eggs: 110, milk: 65 },
+    { date: "2025-09-05", eggs: 150, milk: 80 }
+  ];
+
+  productionChart.data.labels = sampleProduction.map(r => r.date);
+  productionChart.data.datasets[0].data = sampleProduction.map(r => r.eggs);
+  productionChart.data.datasets[1].data = sampleProduction.map(r => r.milk);
+  productionChart.update();
+
+  // --- Recent Sales ---
+  const recentSales = document.getElementById("recentSales");
+  const salesData = [
+    { product: "Eggs", amount: "KSh 1200", date: "2025-09-20" },
+    { product: "Milk", amount: "KSh 900", date: "2025-09-19" },
+    { product: "Maize", amount: "KSh 3000", date: "2025-09-18" }
+  ];
+  recentSales.innerHTML = salesData
+    .map(s => `<li class="list-group-item"><b>${s.product}</b> — ${s.amount} <small class="text-muted">(${s.date})</small></li>`)
+    .join("");
+
+  // --- Upcoming Tasks ---
+  const taskList = document.getElementById("taskList");
+  const tasks = [
+    { task: "Feed livestock", due: "Tomorrow" },
+    { task: "Harvest maize", due: "In 2 days" },
+    { task: "Vaccinate poultry", due: "Next week" }
+  ];
+  taskList.innerHTML = tasks
+    .map(t => `<li class="list-group-item d-flex align-items-center justify-content-between">${t.task}<span class="bg-primary badge">${t.due}</span></li>`)
+    .join("");
+});
+
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+// ---------------------------
+// EGGS / POULTRY
+// ---------------------------
+const eggsForm = document.getElementById("eggsForm");
+let editEggId = null;
+
+// Default Add Egg behavior
+async function defaultEggSubmit(e) {
+  e.preventDefault();
+  const date = document.getElementById("eggDate").value;
+  const collected = parseInt(document.getElementById("eggCount").value) || 0;
+  const broken = parseInt(document.getElementById("eggBroken").value) || 0;
+  const net = collected - broken;
+
+  await db.collection("eggs").add({
+    date: new Date(date),
+    collected,
+    broken,
+    net,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  eggsForm.reset();
+}
+
+// Add / Update Egg
+if (eggsForm) {
+  eggsForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const date = document.getElementById("eggDate").value;
+    const collected = parseInt(document.getElementById("eggCount").value) || 0;
+    const broken = parseInt(document.getElementById("eggBroken").value) || 0;
+    const net = collected - broken;
+
+    if (editEggId) {
+      // Update existing record
+      await db.collection("eggs").doc(editEggId).update({
+        date: new Date(date),
+        collected,
+        broken,
+        net,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      editEggId = null;
+    } else {
+      // Add new record
+      await db.collection("eggs").add({
+        date: new Date(date),
+        collected,
+        broken,
+        net,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    eggsForm.reset();
+  });
+}
+
+// Real-time Listener for Egg Records
+const eggsTableBody = document.querySelector("#eggsTable tbody");
+if (eggsTableBody) {
+  db.collection("eggs").orderBy("date", "desc").onSnapshot(snapshot => {
+    eggsTableBody.innerHTML = "";
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${d.date.toDate().toLocaleDateString()}</td>
+        <td>${d.collected}</td>
+        <td>${d.broken}</td>
+        <td>${d.net}</td>
+        <td>
+          <button class="btn btn-sm btn-warning" onclick="editEgg('${doc.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteEgg('${doc.id}')">Delete</button>
+        </td>
+      `;
+      eggsTableBody.appendChild(tr);
+    });
+  });
+}
+
+// Delete Egg Record
+async function deleteEgg(id) {
+  if (confirm("Delete this egg record?")) {
+    await db.collection("eggs").doc(id).delete();
+  }
+}
+
+// Edit Egg Record
+async function editEgg(id) {
+  const docSnap = await db.collection("eggs").doc(id).get();
+  if (docSnap.exists) {
+    const d = docSnap.data();
+    document.getElementById("eggDate").value = d.date.toDate().toISOString().split("T")[0];
+    document.getElementById("eggCount").value = d.collected;
+    document.getElementById("eggBroken").value = d.broken;
+    editEggId = id;
+  }
+}
+
+// ---------------------------
+// PDF Report for Eggs
+// ---------------------------
+async function generateEggsPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text("Egg Production Report", 105, 15, { align: "center" });
+
+  const snapshot = await db.collection('eggs').orderBy('date', 'desc').get();
+  const tableData = [];
+
+  snapshot.forEach(docSnap => {
+    const d = docSnap.data();
+    tableData.push([
+      d.date ? d.date.toDate().toLocaleDateString() : '',
+      d.collected,
+      d.broken,
+      d.net
+    ]);
+  });
+
+  doc.autoTable({
+    startY: 25,
+    head: [['Date', 'Collected', 'Broken', 'Net']],
+    body: tableData,
+    styles: { fontSize: 11 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 10, right: 10 },
+    theme: 'grid',
+  });
+
+  doc.save("Egg_Production_Report.pdf");
+}
+
+// Attach PDF button
+document.getElementById("downloadEggsPdfBtn").addEventListener("click", generateEggsPDF);
+
+</script>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script>
+/* --------------------------
+  CROPS / FIELDS
+---------------------------*/
+const fieldForm = document.getElementById('fieldForm');
+let editFieldId = null;
+
+fieldForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const cropType = document.getElementById('cropType').value.trim();
+  const area = document.getElementById('cropArea').value.trim();
+  const plantedOn = document.getElementById('cropPlanted').value || new Date().toISOString();
+
+  if (!cropType) return alert('Enter crop type');
+
+  if (editFieldId) {
+    await db.collection('crops').doc(editFieldId).update({ cropType, area, plantedOn });
+    editFieldId = null;
+  } else {
+    await db.collection('crops').add({ cropType, area, plantedOn, fertilizers: [], pesticides: [], irrigation: [], harvests: [] });
+  }
+
+  fieldForm.reset();
+  loadCrops();
+});
+
+/* --------------------------
+  LOAD CROPS TABLE
+---------------------------*/
+async function loadCrops() {
+  const snapshot = await db.collection('crops').get();
+  const tbody = document.querySelector('#fieldTable tbody');
+  tbody.innerHTML = '';
+
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.cropType}</td>
+      <td>${d.area}</td>
+      <td>${d.plantedOn ? new Date(d.plantedOn).toLocaleDateString() : ''}</td>
+      <td>
+        <button class="btn btn-sm btn-warning edit-field" data-id="${doc.id}">Edit</button>
+        <button class="btn btn-sm btn-danger delete-field" data-id="${doc.id}">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* --------------------------
+  EDIT / DELETE CROPS
+---------------------------*/
+document.querySelector('#fieldTable tbody').addEventListener('click', async (e) => {
+  const id = e.target.dataset.id;
+  if (e.target.classList.contains('delete-field')) {
+    if(confirm('Delete this crop?')) {
+      await db.collection('crops').doc(id).delete();
+      loadCrops();
+    }
+  } else if (e.target.classList.contains('edit-field')) {
+    const doc = await db.collection('crops').doc(id).get();
+    const d = doc.data();
+    document.getElementById('cropType').value = d.cropType;
+    document.getElementById('cropArea').value = d.area;
+    document.getElementById('cropPlanted').value = d.plantedOn ? d.plantedOn.split('T')[0] : '';
+    editFieldId = id;
+  }
+});
+
+/* --------------------------
+  HARVEST
+---------------------------*/
+const harvestForm = document.getElementById('harvestForm');
+let editHarvestId = null;
+
+harvestForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const harvestCrop = document.getElementById('harvestCrop').value.trim();
+  const quantity = document.getElementById('harvestQuantity').value.trim();
+  const harvestedOn = document.getElementById('harvestDate').value || new Date().toISOString();
+
+  if (!harvestCrop) return alert('Enter crop for harvest');
+
+  const cropSnapshot = await db.collection('crops').where('cropType', '==', harvestCrop).get();
+  if (cropSnapshot.empty) return alert('Crop not found.');
+
+  const cropDoc = cropSnapshot.docs[0];
+  const cropData = cropDoc.data();
+  const harvests = cropData.harvests || [];
+
+  if (editHarvestId !== null) {
+    harvests[editHarvestId] = { date: harvestedOn, yield: quantity };
+    await db.collection('crops').doc(cropDoc.id).update({ harvests });
+    editHarvestId = null;
+  } else {
+    harvests.push({ date: harvestedOn, yield: quantity });
+    await db.collection('crops').doc(cropDoc.id).update({ harvests });
+  }
+
+  harvestForm.reset();
+  loadHarvests();
+});
+
+/* --------------------------
+  LOAD HARVEST TABLE
+---------------------------*/
+async function loadHarvests() {
+  const tbody = document.querySelector('#harvestTable tbody');
+  tbody.innerHTML = '';
+  const snapshot = await db.collection('crops').get();
+
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    (d.harvests || []).forEach((h, index) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${d.cropType}</td>
+        <td>${h.yield}</td>
+        <td>${h.date ? new Date(h.date).toLocaleDateString() : ''}</td>
+        <td>
+          <button class="btn btn-sm btn-warning edit-harvest" data-cropid="${doc.id}" data-index="${index}">Edit</button>
+          <button class="btn btn-sm btn-danger delete-harvest" data-cropid="${doc.id}" data-index="${index}">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+/* --------------------------
+  EDIT / DELETE HARVESTS
+---------------------------*/
+document.querySelector('#harvestTable tbody').addEventListener('click', async (e) => {
+  const cropId = e.target.dataset.cropid;
+  const index = parseInt(e.target.dataset.index);
+
+  if (e.target.classList.contains('delete-harvest')) {
+    const doc = await db.collection('crops').doc(cropId).get();
+    const harvests = doc.data().harvests || [];
+    harvests.splice(index, 1);
+    await db.collection('crops').doc(cropId).update({ harvests });
+    loadHarvests();
+  } else if (e.target.classList.contains('edit-harvest')) {
+    const doc = await db.collection('crops').doc(cropId).get();
+    const h = doc.data().harvests[index];
+    document.getElementById('harvestCrop').value = doc.data().cropType;
+    document.getElementById('harvestQuantity').value = h.yield;
+    document.getElementById('harvestDate').value = h.date ? h.date.split('T')[0] : '';
+    editHarvestId = index;
+  }
+});
+
+/* --------------------------
+  PDF CROPS REPORT (PROFESSIONAL)
+---------------------------*/
+async function generateCropsPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text("Crops Report", 105, 15, { align: "center" });
+
+  // Fetch crops
+  const cropsSnapshot = await db.collection('crops').get();
+  const tableData = [];
+
+  cropsSnapshot.forEach(docSnap => {
+    const d = docSnap.data();
+    const harvests = (d.harvests || []).length > 0 ? 
+      d.harvests.map(h => `${h.date ? new Date(h.date).toLocaleDateString() : ''} (${h.yield} kg)`).join(', ') 
+      : 'None';
+
+    tableData.push([
+      d.cropType,
+      d.area,
+      d.plantedOn ? new Date(d.plantedOn).toLocaleDateString() : '',
+      harvests
+    ]);
+  });
+
+  doc.autoTable({
+    startY: 25,
+    head: [['Crop', 'Area (ha)', 'Planted On', 'Harvests']],
+    body: tableData,
+    styles: { fontSize: 11 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 10, right: 10 },
+    theme: 'grid',
+  });
+
+  doc.save("Crops_Report.pdf");
+}
+
+// --------------------------
+// INITIAL LOAD & BUTTON
+// --------------------------
+loadCrops();
+loadHarvests();
+document.getElementById("downloadCropsPdfBtn").addEventListener("click", generateCropsPDF);
+</script>
+
+<!-- SCRIPT -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<script>
+  const expenseForm = document.getElementById('expenseForm');
+  const saleForm = document.getElementById('saleForm');
+
+  // Add Expense
+  expenseForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    await db.collection('finance').add({
+      type: 'expense',
+      date: new Date(document.getElementById('expenseDate').value),
+      category: document.getElementById('expenseCategory').value,
+      amount: parseFloat(document.getElementById('expenseAmount').value),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    expenseForm.reset();
+    bootstrap.Modal.getInstance(document.getElementById('expenseModal')).hide();
+  });
+
+  // Add Sale
+  saleForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    await db.collection('finance').add({
+      type: 'sale',
+      date: new Date(document.getElementById('saleDate').value),
+      product: document.getElementById('saleProduct').value,
+      amount: parseFloat(document.getElementById('saleAmount').value),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    saleForm.reset();
+    bootstrap.Modal.getInstance(document.getElementById('saleModal')).hide();
+  });
+
+  // Real-time Listener
+  unsubscribers.push(db.collection('finance').orderBy('date','desc').onSnapshot(snap => {
+    const expenseTbody = document.querySelector('#expenseTable tbody');
+    const saleTbody = document.querySelector('#saleTable tbody');
+    expenseTbody.innerHTML = '';
+    saleTbody.innerHTML = '';
+    let totalExpenses = 0, totalSales = 0;
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      const date = d.date.toDate().toLocaleDateString();
+      if(d.type === 'expense'){
+        totalExpenses += parseFloat(d.amount||0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${date}</td>
+          <td>${d.category}</td>
+          <td>${parseFloat(d.amount||0).toLocaleString()}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button></td>
+        `;
+        expenseTbody.appendChild(tr);
+      } else {
+        totalSales += parseFloat(d.amount||0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${date}</td>
+          <td>${d.product}</td>
+          <td>${parseFloat(d.amount||0).toLocaleString()}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button></td>
+        `;
+        saleTbody.appendChild(tr);
+      }
+    });
+
+    document.getElementById('kpiCash').innerText = (totalSales - totalExpenses).toLocaleString();
+  }));
+
+  // Export PDF
+  
+  document.getElementById('downloadFinancePdfBtn').addEventListener('click', async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Finance Report", 105, 15, { align: "center" });
+
+    const expenseSnap = await db.collection('finance').where('type','==','expense').orderBy('date','desc').get();
+    const saleSnap = await db.collection('finance').where('type','==','sale').orderBy('date','desc').get();
+
+    let totalExpenses = 0, totalSales = 0;
+    expenseSnap.forEach(d => totalExpenses += parseFloat(d.data().amount||0));
+    saleSnap.forEach(d => totalSales += parseFloat(d.data().amount||0));
+    const netCash = totalSales - totalExpenses;
+
+    doc.setFontSize(12);
+    doc.text(`Total Sales: KSh ${totalSales.toLocaleString()}`, 14, 25);
+    doc.text(`Total Expenses: KSh ${totalExpenses.toLocaleString()}`, 14, 32);
+    doc.text(`Net Cash: KSh ${netCash.toLocaleString()}`, 14, 39);
+
+    // Expenses Table
+    const expenseData = expenseSnap.docs.map(doc => {
+      const d = doc.data();
+      const dateStr = d.date.toDate().toLocaleDateString();
+      return [dateStr, d.category, parseFloat(d.amount||0).toLocaleString()];
+    });
+    doc.autoTable({ startY: 45, head: [['Date','Category','Amount (KSh)']], body: expenseData, styles:{fontSize:11}, headStyles:{fillColor:[192,57,43], textColor:255, fontStyle:'bold'} });
+
+    const startY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 55;
+
+    // Sales Table
+    const salesData = saleSnap.docs.map(doc => {
+      const d = doc.data();
+      const dateStr = d.date.toDate().toLocaleDateString();
+      return [dateStr, d.product, parseFloat(d.amount||0).toLocaleString()];
+    });
+    doc.autoTable({ startY, head: [['Date','Product','Amount (KSh)']], body: salesData, styles:{fontSize:11}, headStyles:{fillColor:[41,128,185], textColor:255, fontStyle:'bold'} });
+
+    doc.save("Finance_Report.pdf");
+  });
+</script>
+<script>
+// ------------------- LIVESTOCK TABLE -------------------
+unsubscribers.push(db.collection('livestock').onSnapshot(snap => {
+  const tbody = document.querySelector('#animalTable tbody');
+  tbody.innerHTML = '';
+  let animals = 0;
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    animals++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.earTag}</td>
+      <td>${d.breed}</td>
+      <td>${fmtISO(d.dob)}</td>
+      <td>
+        <button class="btn-outline-primary btn btn-sm" onclick="viewAnimal('${doc.id}')">View</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('livestock','${doc.id}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('kpiLivestock').innerText = animals;
+}));
+
+// ------------------- LOAD COW OPTIONS FOR MILK FORM -------------------
+const milkCowSelect = document.getElementById('milkCowSelect');
+
+function loadCowOptions() {
+  db.collection('livestock').onSnapshot(snapshot => {
+    milkCowSelect.innerHTML = '<option value="">-- Select a cow --</option>';
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const option = document.createElement('option');
+      option.value = doc.id;
+      option.text = `${d.earTag} (${d.breed})`;
+      milkCowSelect.appendChild(option);
+    });
+  });
+}
+
+loadCowOptions();
+
+// ------------------- MILK FORM -------------------
+const milkForm = document.getElementById('milkForm');
+const milkTableBody = document.querySelector('#milkTable tbody');
+const milkTotalEl = document.getElementById('milkTotal');
+let editingMilkId = null;
+
+// Add / Update milk
+milkForm.addEventListener('submit', async (e) => {
+  e.preventDefault(); // prevent page reload
+
+  const animalId = milkCowSelect.value;
+  const date = document.getElementById('milkDate').value;
+  const time = document.getElementById('milkTime').value;
+  const litres = parseFloat(document.getElementById('milkLitres').value);
+
+  if (!animalId || !date || !time || !litres) {
+    alert('Please fill all fields correctly.');
+    return;
+  }
+
+  try {
+    if (editingMilkId) {
+      // Update existing milk record
+      await db.collection('milk').doc(editingMilkId).update({ animalId, date, time, litres });
+      editingMilkId = null;
+    } else {
+      // Add new milk record
+      await db.collection('milk').add({ animalId, date, time, litres });
+    }
+    milkForm.reset();
+  } catch (err) {
+    console.error('Error saving milk record:', err);
+  }
+});
+
+// ------------------- LISTEN TO MILK RECORDS -------------------
+db.collection('milk').onSnapshot(snapshot => {
+  milkTableBody.innerHTML = '';
+  let total = 0;
+
+  if(snapshot.empty){
+    milkTableBody.innerHTML = `<tr><td colspan="4" class="text-muted text-center">No milk records yet</td></tr>`;
+    milkTotalEl.textContent = '0.0';
+    return;
+  }
+
+  snapshot.forEach(doc => {
+    const m = doc.data();
+    total += m.litres;
+
+    // Get animal info for display
+    db.collection('livestock').doc(m.animalId).get().then(animalDoc => {
+      const animal = animalDoc.data();
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${m.date}</td>
+        <td>${m.time}</td>
+        <td>${m.litres}</td>
+        <td>
+          <button class="btn btn-sm btn-warning" onclick="editMilk('${doc.id}','${m.animalId}','${m.date}','${m.time}','${m.litres}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteMilk('${doc.id}')">Delete</button>
+        </td>
+      `;
+      milkTableBody.appendChild(tr);
+    });
+  });
+
+  milkTotalEl.textContent = total.toFixed(1);
+});
+
+// ------------------- EDIT MILK -------------------
+function editMilk(id, animalId, date, time, litres) {
+  milkCowSelect.value = animalId;
+  document.getElementById('milkDate').value = date;
+  document.getElementById('milkTime').value = time;
+  document.getElementById('milkLitres').value = litres;
+  editingMilkId = id;
+}
+
+// ------------------- DELETE MILK -------------------
+function deleteMilk(id) {
+  if(confirm('Are you sure you want to delete this milk record?')) {
+    db.collection('milk').doc(id).delete();
+  }
+}
+</script>
+
+
+</body>
+</html>
