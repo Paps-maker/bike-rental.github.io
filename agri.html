@@ -159,6 +159,54 @@ main {
     </div>
   </div>
 </div>
+  <!-- Start Tutorial Button -->
+<div style="position: fixed; top: 20px; left: 200px; z-index: 10001;">
+  <button id="startTutorial" class="btn btn-success btn-sm">Start AI Tutorial</button>
+</div>
+
+<!-- Overlay -->
+<div id="tutorialOverlay" style="position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 9997; display:none;"></div>
+
+<!-- Tooltip -->
+<div id="tutorialTooltip" class="tutorial-tooltip" style="display:none; z-index:10002;">
+  <div class="tutorial-arrow"></div>
+  <p id="tutorialText"></p>
+  <div class="d-flex justify-content-between mt-2">
+    <button id="prevStep" class="btn btn-secondary btn-sm">Previous</button>
+    <span id="tutorialProgress"></span>
+    <button id="nextStep" class="btn btn-primary btn-sm">Next</button>
+  </div>
+</div>
+
+<style>
+/* Tooltip Style */
+.tutorial-tooltip {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 12px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  max-width: 300px;
+}
+
+.tutorial-arrow {
+  width: 0;
+  height: 0;
+  position: absolute;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  top: -8px;
+  left: 20px;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 10000;
+  box-shadow: 0 0 15px 3px rgba(255, 193, 7, 0.7);
+  border-radius: 5px;
+}
+</style>
 
 <!-- NAV BAR -->
 <nav class="navbar navbar-expand-lg">
@@ -4171,6 +4219,102 @@ function deleteMilk(id) {
 }
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tutorialSteps = [
+    { element: "a[data-page='dashboard']", text: "Welcome to your Dashboard! This is the overview of your farm." },
+    { element: "a[data-page='poultry']", text: "Here you can manage your Poultry activities and records." },
+    { element: "a[data-page='livestock']", text: "Track all your Livestock here, including cows and other animals." },
+    { element: "a[data-page='crops']", text: "Manage your Crops section: planting, harvesting, and tracking growth." },
+    { element: "a[data-page='finance']", text: "This is the Finance section to monitor your income, expenses, and reports." },
+    { element: "a[data-page='inventory']", text: "View and manage your Inventory of feed, supplies, and equipment." },
+    { element: "a[data-page='health']", text: "Manage Health Records of animals, add new records, and track recovery." },
+    { element: "a[data-page='staff']", text: "Here you can manage your Staff and assign roles." },
+    { element: "a[data-page='quickSale']", text: "Quick Sale section lets you add fast sales for products or livestock." },
+    { element: "a[data-page='orders']", text: "Track customer Orders and their statuses in this section." },
+    { element: "a[data-page='customers']", text: "Manage your Customers, their profiles, and contact info." },
+    { element: "a[data-page='tasks']", text: "Create and monitor Tasks assigned to staff or yourself." },
+    { element: "a[data-page='reports']", text: "View Reports for your farm’s overall performance and analytics." }
+  ];
+
+  let currentStep = 0;
+  const tooltip = document.getElementById("tutorialTooltip");
+  const tutorialText = document.getElementById("tutorialText");
+  const tutorialProgress = document.getElementById("tutorialProgress");
+  const nextBtn = document.getElementById("nextStep");
+  const prevBtn = document.getElementById("prevStep");
+  const overlay = document.getElementById("tutorialOverlay");
+  const arrow = document.querySelector(".tutorial-arrow");
+
+  function showStep(stepIndex) {
+    if (stepIndex < 0) stepIndex = 0;
+    if (stepIndex >= tutorialSteps.length) {
+      tooltip.style.display = "none";
+      overlay.style.display = "none";
+      document.querySelectorAll(".tutorial-highlight").forEach(el => el.classList.remove("tutorial-highlight"));
+      return;
+    }
+
+    currentStep = stepIndex;
+    const step = tutorialSteps[stepIndex];
+    const el = document.querySelector(step.element);
+
+    document.querySelectorAll(".tutorial-highlight").forEach(e => e.classList.remove("tutorial-highlight"));
+
+    if (el) {
+      el.classList.add("tutorial-highlight");
+      overlay.style.display = "block";
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      const rect = el.getBoundingClientRect();
+      const tooltipHeight = tooltip.offsetHeight;
+
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow > tooltipHeight + 20) {
+        tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
+        arrow.style.top = `-8px`;
+        arrow.style.borderBottom = `8px solid #fff`;
+        arrow.style.borderTop = `none`;
+      } else {
+        tooltip.style.top = `${rect.top + window.scrollY - tooltipHeight - 10}px`;
+        arrow.style.top = `${tooltipHeight}px`;
+        arrow.style.borderBottom = `none`;
+        arrow.style.borderTop = `8px solid #fff`;
+      }
+
+      tooltip.style.left = `${rect.left + window.scrollX}px`;
+    } else {
+      tooltip.style.top = `100px`;
+      tooltip.style.left = `100px`;
+    }
+
+    tutorialText.textContent = step.text;
+    tutorialProgress.textContent = `Step ${currentStep + 1} of ${tutorialSteps.length}`;
+
+    tooltip.style.display = "block";
+    prevBtn.style.display = currentStep === 0 ? "none" : "inline-block";
+    nextBtn.textContent = currentStep === tutorialSteps.length - 1 ? "Finish" : "Next";
+  }
+
+  nextBtn.addEventListener("click", () => {
+    if (currentStep < tutorialSteps.length - 1) {
+      showStep(currentStep + 1);
+    } else {
+      tooltip.style.display = "none";
+      overlay.style.display = "none";
+      document.querySelectorAll(".tutorial-highlight").forEach(el => el.classList.remove("tutorial-highlight"));
+    }
+  });
+
+  prevBtn.addEventListener("click", () => showStep(currentStep - 1));
+  document.getElementById("startTutorial").addEventListener("click", () => showStep(0));
+
+  // Optional: reposition tooltip on window resize
+  window.addEventListener("resize", () => showStep(currentStep));
+});
+</script>
 
 </body>
 </html>
