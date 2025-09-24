@@ -1120,31 +1120,56 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-</script>
+  // --------------------------
+// Secure Page Navigation
+// --------------------------
+function showPage(pageId) {
+  const user = firebase.auth().currentUser;
 
-<script>
-  // ------------------- PAGE NAVIGATION -------------------
-  function showPage(pageId) {
-    // hide all
+  if (!user) {
+    // User is not logged in → hide all pages and show login modal
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
 
-    // show selected
-    const target = document.getElementById(pageId);
-    if (target) target.style.display = 'block';
+    const loginModalEl = document.getElementById('loginModal');
+    const loginModal = bootstrap.Modal.getInstance(loginModalEl) || new bootstrap.Modal(loginModalEl);
+    loginModal.show();
+
+    return; // stop execution, do not show any page
   }
 
-  // attach click handlers to all <a data-page="">
-  document.querySelectorAll('[data-page]').forEach(link => {
-    link.addEventListener('click', function (e) {
-      e.preventDefault();
-      const pageId = this.getAttribute('data-page');
-      showPage(pageId);
-    });
-  });
+  // Hide all pages first
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
 
-  // ✅ Optional: show a default page on load
-  showPage('inventory'); // change to 'health' if you want Health to load first
+  // Show the selected page
+  const target = document.getElementById(pageId);
+  if (target) target.style.display = 'block';
+}
+
+// --------------------------
+// Attach click handlers to sidebar links
+// --------------------------
+document.querySelectorAll('[data-page]').forEach(link => {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    const pageId = this.getAttribute('data-page');
+    showPage(pageId);
+  });
+});
+
+// --------------------------
+// Show default page on load if logged in
+// --------------------------
+firebase.auth().onAuthStateChanged(user => {
+  if (user) {
+    showPage('inventory'); // Default page
+  } else {
+    // Hide everything immediately on logout
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  }
+});
+
 </script>
+
 
 <script>
 
