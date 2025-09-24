@@ -4263,14 +4263,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextBtn = document.getElementById("nextStep");
   const prevBtn = document.getElementById("prevStep");
   const overlay = document.getElementById("tutorialOverlay");
-  const arrow = document.querySelector(".tutorial-arrow");
+  const closeBtn = document.getElementById("closeTutorialText");
+  const startBtn = document.getElementById("startTutorial");
 
   function showStep(stepIndex) {
-    if (stepIndex < 0) stepIndex = 0;
-    if (stepIndex >= tutorialSteps.length) {
-      tooltip.style.display = "none";
-      overlay.style.display = "none";
-      document.querySelectorAll(".tutorial-highlight").forEach(el => el.classList.remove("tutorial-highlight"));
+    if(stepIndex < 0) stepIndex = 0;
+    if(stepIndex >= tutorialSteps.length){
+      closeTutorial();
       return;
     }
 
@@ -4280,83 +4279,73 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.querySelectorAll(".tutorial-highlight").forEach(e => e.classList.remove("tutorial-highlight"));
 
-    if (el) {
-      // Open parent menu if collapsed (for mobile)
+    if(el){
+      el.classList.add("tutorial-highlight");
+
+      // Open parent menu on mobile if collapsed
       const parentCollapse = el.closest(".collapse");
-      if (parentCollapse && !parentCollapse.classList.contains("show")) {
+      if(parentCollapse && !parentCollapse.classList.contains("show")){
         const bsCollapse = bootstrap.Collapse.getOrCreateInstance(parentCollapse);
         bsCollapse.show();
       }
 
-      el.classList.add("tutorial-highlight");
-      overlay.style.display = "block";
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({behavior:"smooth", block:"center"});
 
       const rect = el.getBoundingClientRect();
       const tooltipHeight = tooltip.offsetHeight;
       const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
 
-      if (spaceBelow > tooltipHeight + 20) {
+      if(spaceBelow > tooltipHeight + 20){
         tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
-        arrow.style.top = `-8px`;
-        arrow.style.borderBottom = `8px solid #fff`;
-        arrow.style.borderTop = `none`;
+        tooltip.querySelector(".tutorial-arrow").style.top = "-8px";
+        tooltip.querySelector(".tutorial-arrow").style.borderBottom = "8px solid #fff";
+        tooltip.querySelector(".tutorial-arrow").style.borderTop = "none";
       } else {
         tooltip.style.top = `${rect.top + window.scrollY - tooltipHeight - 10}px`;
-        arrow.style.top = `${tooltipHeight}px`;
-        arrow.style.borderBottom = `none`;
-        arrow.style.borderTop = `8px solid #fff`;
+        tooltip.querySelector(".tutorial-arrow").style.top = `${tooltipHeight}px`;
+        tooltip.querySelector(".tutorial-arrow").style.borderBottom = "none";
+        tooltip.querySelector(".tutorial-arrow").style.borderTop = "8px solid #fff";
       }
 
-      tooltip.style.left = `${rect.left + window.scrollX}px`;
+      tooltip.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - tooltip.offsetWidth - 10)}px`;
     } else {
       tooltip.style.top = `100px`;
-      tooltip.style.left = `100px`;
+      tooltip.style.left = `50%`;
+      tooltip.style.transform = `translateX(-50%)`;
     }
 
     tutorialText.textContent = step.text;
     tutorialProgress.textContent = `Step ${currentStep + 1} of ${tutorialSteps.length}`;
-
     tooltip.style.display = "block";
+    overlay.style.display = "block";
     prevBtn.style.display = currentStep === 0 ? "none" : "inline-block";
-    nextBtn.textContent = currentStep === tutorialSteps.length - 1 ? "Finish" : "Next";
+    nextBtn.textContent = currentStep === tutorialSteps.length-1 ? "Finish" : "Next";
+
+    // Center tooltip on small screens
+    if(window.innerWidth < 768){
+      tooltip.style.left = "50%";
+      tooltip.style.transform = "translateX(-50%)";
+    } else {
+      tooltip.style.transform = "none";
+    }
   }
 
-  nextBtn.addEventListener("click", () => {
-    if (currentStep < tutorialSteps.length - 1) {
-      showStep(currentStep + 1);
-    } else {
-      tooltip.style.display = "none";
-      overlay.style.display = "none";
-      document.querySelectorAll(".tutorial-highlight").forEach(el => el.classList.remove("tutorial-highlight"));
-    }
-  });
+  function closeTutorial(){
+    tooltip.style.display = "none";
+    overlay.style.display = "none";
+    document.querySelectorAll(".tutorial-highlight").forEach(el => el.classList.remove("tutorial-highlight"));
+  }
 
-  prevBtn.addEventListener("click", () => showStep(currentStep - 1));
-  document.getElementById("startTutorial").addEventListener("click", () => showStep(0));
+  nextBtn.addEventListener("click", ()=>showStep(currentStep+1));
+  prevBtn.addEventListener("click", ()=>showStep(currentStep-1));
+  closeBtn.addEventListener("click", closeTutorial);
+  overlay.addEventListener("click", closeTutorial);
 
-  // Optional: reposition tooltip on window resize
-  window.addEventListener("resize", () => showStep(currentStep));
+  // Only trigger tutorial when the button is pressed
+  startBtn.addEventListener("click", ()=>showStep(0));
+
+  window.addEventListener("resize", ()=>showStep(currentStep));
 });
-const tooltip = document.getElementById("tutorialTooltip");
-const overlay = document.getElementById("tutorialOverlay");
-
-// Close button hides tooltip and overlay, removes highlights
-document.getElementById("closeTutorialText").addEventListener("click", () => {
-  tooltip.style.display = "none";
-  overlay.style.display = "none";
-  document.querySelectorAll(".tutorial-highlight").forEach(el => el.classList.remove("tutorial-highlight"));
-});
-
-// Example: starting the tutorial
-document.getElementById("startTutorial").addEventListener("click", () => {
-  overlay.style.display = "block";
-  tooltip.style.display = "block";
-  // highlight first element or position tooltip
-});
-
-
 </script>
 
 </body>
