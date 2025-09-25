@@ -4266,6 +4266,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeBtn = document.getElementById("closeTutorialText");
   const startBtn = document.getElementById("startTutorial");
 
+  function openNavbar() {
+    // ✅ Force open bootstrap mobile navbar if collapsed
+    const navbarCollapse = document.querySelector(".navbar-collapse");
+    if (navbarCollapse && !navbarCollapse.classList.contains("show")) {
+      const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
+      bsCollapse.show();
+    }
+  }
+
   function showStep(stepIndex) {
     if (stepIndex < 0) stepIndex = 0;
     if (stepIndex >= tutorialSteps.length) {
@@ -4282,7 +4291,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) {
       el.classList.add("tutorial-highlight");
 
-      // Auto open collapsed nav items if needed
+      // Auto open parent collapses inside nav
       const parentCollapse = el.closest(".collapse");
       if (parentCollapse && !parentCollapse.classList.contains("show")) {
         const bsCollapse = bootstrap.Collapse.getOrCreateInstance(parentCollapse);
@@ -4322,7 +4331,7 @@ document.addEventListener("DOMContentLoaded", () => {
     prevBtn.style.display = currentStep === 0 ? "none" : "inline-block";
     nextBtn.textContent = currentStep === tutorialSteps.length - 1 ? "Finish" : "Next";
 
-    // ✅ Center tooltip on small screens
+    // ✅ Always center tooltip on mobile
     if (window.innerWidth < 768) {
       tooltip.style.left = "50%";
       tooltip.style.transform = "translateX(-50%)";
@@ -4338,9 +4347,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function finishTutorial() {
-    localStorage.setItem("tutorialFinished", "true"); // ✅ Remember it’s finished
+    localStorage.setItem("tutorialFinished", "true");
     closeTutorial();
-    // button stays visible, so user can restart manually
   }
 
   // Navigation
@@ -4356,14 +4364,14 @@ document.addEventListener("DOMContentLoaded", () => {
   closeBtn.addEventListener("click", closeTutorial);
   overlay.addEventListener("click", closeTutorial);
 
-  // ✅ Only trigger tutorial when button is pressed
+  // ✅ Start tutorial button
   startBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    openNavbar();     // 👈 Auto open nav bar before starting
     currentStep = 0;
     showStep(0);
   });
 
-  // Reposition tooltip on resize
   window.addEventListener("resize", () => {
     if (tooltip.style.display === "block") {
       showStep(currentStep);
