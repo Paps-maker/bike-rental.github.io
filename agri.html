@@ -946,6 +946,8 @@ document.getElementById('downloadMilkBtn')?.addEventListener('click', downloadMi
       </button>
       <button class="btn-outline-success btn btn-sm" id="downloadExpensePdf">Download Expenses PDF</button>
       <button class="btn-outline-primary btn btn-sm" id="downloadSalePdf">Download Sales PDF</button>
+      <button class="btn-outline-warning btn btn-sm" id="downloadAllPdf">Download All PDF</button>
+
     </div>
   </div>
 
@@ -978,43 +980,6 @@ document.getElementById('downloadMilkBtn')?.addEventListener('click', downloadMi
     </div>
   </div>
 </section>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-<script>
-  // Function to generate PDF
-  async function generatePdf(collectionName, headers, title, fileName) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const data = [];
-    const snapshot = await db.collection(collectionName).get();
-    snapshot.forEach(docSnap => {
-      const item = docSnap.data();
-      if(collectionName === 'expenses') {
-        data.push([item.date, item.category, item.amount]);
-      } else if(collectionName === 'sales') {
-        data.push([item.date, item.product, item.amount]);
-      }
-    });
-    doc.text(title, 14, 15);
-    doc.autoTable({
-      head: [headers],
-      body: data,
-      startY: 20,
-      theme: 'striped'
-    });
-    doc.save(fileName);
-  }
-
-  // Button events
-  document.getElementById('downloadExpensePdf').addEventListener('click', () => {
-    generatePdf('expenses', ['Date', 'Category', 'Amount (KSh)'], 'expenses Report', 'expenses.pdf');
-  });
-
-  document.getElementById('downloadSalePdf').addEventListener('click', () => {
-    generatePdf('sales', ['Date', 'Product', 'Amount (KSh)'], 'sales Report', 'sales.pdf');
-  });
-</script>
-
 
 <!-- MODALS -->
 <!-- Expense Modal -->
@@ -1060,6 +1025,181 @@ document.getElementById('downloadMilkBtn')?.addEventListener('click', downloadMi
     </div>
   </div>
 </div>
+<!-- MAIN SCRIPT -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+const expenseTableBody = document.querySelector("#expenseTable tbody");
+const saleTableBody = document.querySelector("#saleTable tbody");
+
+// Load Expenses
+function loadExpenses(){
+  expenseTableBody.innerHTML = "";
+  db.collection("expenses").get().then(snapshot=>{
+    snapshot.forEach(doc=>{
+      const item = doc.data();
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${item.date}</td><td>${item.category}</td><td>${item.amount}</td>
+      <td><button class="btn btn-sm btn-danger removeRow" data-id="${doc.id}" data-type="expense">Delete</button></td>`;
+      expenseTableBody.appendChild(row);
+    });
+  });
+}
+
+// Load Sales
+function loadSales(){
+  saleTableBody.innerHTML = "";
+  db.collection("sales").get().then(snapshot=>{
+    snapshot.forEach(doc=>{
+      const item = doc.data();
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${item.date}</td><td>${item.product}</td><td>${item.amount}</td>
+      <td><button class="btn btn-sm btn-danger removeRow" data-id="${doc.id}" data-type="sale">Delete</button></td>`;
+      saleTableBody.appendChild(row);
+    });
+  });
+}
+
+// Initial Load
+loadExpenses();
+loadSales();
+
+// Add Expense
+document.getElementById("expenseForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const date = document.getElementById("expenseDate").value;
+  const category = document.getElementById("expenseCategory").value;
+  const amount = document.getElementById("expenseAmount").value;
+  db.collection("expenses").add({date, category, amount})
+    .then(()=>{ loadExpenses(); document.getElementById("expenseForm").reset(); bootstrap.Modal.getInstance(document.getElementById('expenseModal')).hide(); });
+});
+
+// Add Sale
+document.getElementById("saleForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const date = document.getElementById("saleDate").value;
+  const product = document.getElementById("saleProduct").value;
+  const amount = document.getElementById("saleAmount").value;
+  db.collection("sales").add({date, product, amount})
+    .then(()=>{ loadSales(); document.getElementById("saleForm").reset(); bootstrap.Modal.getInstance(document.getElementById('saleModal')).hide(); });
+});
+
+// Delete row
+document.addEventListener("click", e=>{
+  if(e.target.classList.contains("removeRow")){
+    const id = e.target.dataset.id;
+    const type = e.target.dataset.type;
+    db.collection(type==="expense"?"expenses":"sales").doc(id).delete()
+      .then(()=>{ e.target.closest("tr").remove(); });
+  }
+});
+
+// PDF Functions
+function generatePdfFromTable(tableId, title, fileName){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const table = document.getElementById(tableId);
+  const headers = Array.from(table.querySelectorAll("thead th")).slice(0,-1).map(th=>th.innerText);
+  const data = Array.from(table.querySelectorAll("tbody tr")).map(tr=>Array.from(tr.querySelectorAll("td")).slice(0,-1).map(td=>td.innerText));
+  doc.text(title, 14, 15);
+  doc.autoTable({head:[headers], body:data, startY:20, theme:'striped'});
+  doc.save(fileName);
+}
+
+document.getElementById('downloadExpensePdf').addEventListener('click', ()=>{ generatePdfFromTable('expenseTable','Expenses Report','expenses.pdf'); });
+document.getElementById('downloadSalePdf').addEventListener('click', ()=>{ generatePdfFromTable('saleTable','Sales Report','sales.pdf'); });
+
+// Download All PDF
+document.getElementById('downloadAllPdf').addEventListener('click', ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const getTableData = tableId=>{
+    const table = document.getElementById(tableId);
+    const headers = Array.from(table.querySelectorAll("thead th")).slice(0,-1).map(th=>th.innerText);
+    const data = Array.from(table.querySelectorAll("tbody tr")).map(tr=>Array.from(tr.querySelectorAll("td")).slice(0,-1).map(td=>td.innerText));
+    return { headers, data };
+  };
+  const expenses = getTableData('expenseTable');
+  doc.text("Expenses Report",14,15);
+  doc.autoTable({head:[expenses.headers], body:expenses.data, startY:20, theme:'striped'});
+  const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 40;
+  const sales = getTableData('saleTable');
+  doc.text("Sales Report",14,finalY);
+  doc.autoTable({head:[sales.headers], body:sales.data, startY:finalY+5, theme:'striped'});
+  doc.save('finance_all.pdf');
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script>
+  function generatePdfFromTable(tableId, title, fileName) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const table = document.getElementById(tableId);
+
+    // Get headers excluding the last column (Actions)
+    const headers = Array.from(table.querySelectorAll("thead th"))
+                         .slice(0, -1)
+                         .map(th => th.innerText);
+
+    // Get rows excluding the last cell (Actions)
+    const data = Array.from(table.querySelectorAll("tbody tr")).map(tr => 
+      Array.from(tr.querySelectorAll("td"))
+           .slice(0, -1)
+           .map(td => td.innerText)
+    );
+
+    doc.text(title, 14, 15);
+    doc.autoTable({
+      head: [headers],
+      body: data,
+      startY: 20,
+      theme: 'striped'
+    });
+
+    doc.save(fileName);
+  }
+
+  document.getElementById('downloadExpensePdf').addEventListener('click', () => {
+    generatePdfFromTable('expenseTable', 'Expenses Report', 'expenses.pdf');
+  });
+
+  document.getElementById('downloadSalePdf').addEventListener('click', () => {
+    generatePdfFromTable('saleTable', 'Sales Report', 'sales.pdf');
+  });
+</script>
+<script>
+// Download All PDF
+document.getElementById('downloadAllPdf').addEventListener('click', () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Function to extract data from a table
+  const getTableData = (tableId) => {
+    const table = document.getElementById(tableId);
+    const headers = Array.from(table.querySelectorAll("thead th")).slice(0, -1).map(th => th.innerText);
+    const data = Array.from(table.querySelectorAll("tbody tr")).map(tr =>
+      Array.from(tr.querySelectorAll("td")).slice(0, -1).map(td => td.innerText)
+    );
+    return { headers, data };
+  };
+
+  // Expenses
+  const expenses = getTableData('expenseTable');
+  doc.text("Expenses Report", 14, 15);
+  doc.autoTable({ head: [expenses.headers], body: expenses.data, startY: 20, theme: 'striped' });
+
+  // Sales
+  const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 40; // space between tables
+  const sales = getTableData('saleTable');
+  doc.text("Sales Report", 14, finalY);
+  doc.autoTable({ head: [sales.headers], body: sales.data, startY: finalY + 5, theme: 'striped' });
+
+  doc.save('finance_all.pdf');
+});
+</script>
+
 <!-- Health Records Section -->
 <section id="health" class="page" style="display:none;">
   <div class="d-flex align-items-center justify-content-between">
