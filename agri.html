@@ -1007,11 +1007,11 @@ document.getElementById('downloadMilkBtn')?.addEventListener('click', downloadMi
 
   // Button events
   document.getElementById('downloadExpensePdf').addEventListener('click', () => {
-    generatePdf('expenses', ['Date', 'Category', 'Amount (KSh)'], 'Expenses Report', 'expenses.pdf');
+    generatePdf('Expenses', ['Date', 'Category', 'Amount (KSh)'], 'Expenses Report', 'expenses.pdf');
   });
 
   document.getElementById('downloadSalePdf').addEventListener('click', () => {
-    generatePdf('sales', ['Date', 'Product', 'Amount (KSh)'], 'Sales Report', 'sales.pdf');
+    generatePdf('Sales', ['Date', 'Product', 'Amount (KSh)'], 'Sales Report', 'sales.pdf');
   });
 </script>
 
