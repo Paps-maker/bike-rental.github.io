@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PharmaAdmin — Pharmacy Dashboard (Firebase + Prescriptions)</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link rel="icon" type="image/png" href="img/ph.jpg">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- jsPDF + autoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root{ --brand:#0d6efd; --accent:#0dcaf0; --card-bg:#fff; }
+    body { background:#f7f9fc; }
+    .sidebar { min-width:240px; max-width:240px; background:linear-gradient(180deg,var(--brand),#0b5ed7); color:#fff; height:100vh; }
+    .sidebar .nav-link{ color:rgba(255,255,255,0.9); }
+    .sidebar .nav-link.active{ background: rgba(255,255,255,0.08); border-radius:6px; }
+    .brand{ font-weight:700; letter-spacing:0.3px; }
+    .card-compact{ padding:1rem; border-radius:12px; background:var(--card-bg); box-shadow: 0 6px 18px rgba(13,110,253,0.06); }
+    .low-stock{ color:#b02a37; font-weight:700; }
+    @media (max-width:991.98px){ .sidebar{ position:fixed; z-index:1040; transform:translateX(-100%); transition:transform .25s ease;} .sidebar.show{ transform:translateX(0);} .content{ padding-top:4rem; } }
+    
+  </style>
+</head>
+<body>
+
+<div class="d-flex">
+  <!-- Sidebar -->
+  <nav id="sidebar" class="d-flex flex-column p-3 sidebar">
+    <div class="d-flex align-items-center mb-4">
+      <div class="me-2">
+        <div class="bg-white rounded-circle" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--brand);font-weight:700">P</div>
+      </div>
+      <div>
+        <div class="brand">PharmaAdmin</div>
+        <small class="text-white-50">Pharmacy Dashboard</small>
+      </div>
+    </div>
+
+    <ul class="flex-column mb-auto nav nav-pills">
+      <li class="nav-item"><a href="#" class="nav-link active" data-view="dashboard"><i class="me-2 bi bi-speedometer2"></i>Dashboard</a></li>
+      <li class="nav-item"><a href="#" class="nav-link" data-view="inventory"><i class="me-2 bi bi-box-seam"></i>Inventory</a></li>
+      <li class="nav-item"><a href="#" class="nav-link" data-view="sales"><i class="me-2 bi bi-cash-stack"></i>Sales</a></li>
+      <li class="nav-item"><a href="#" class="nav-link" data-view="purchases"><i class="me-2 bi bi-truck"></i>Purchases</a></li>
+      <li class="nav-item"><a href="#" class="nav-link" data-view="customers"><i class="me-2 bi bi-people"></i>Customers</a></li>
+      <li class="nav-item"><a href="#" class="nav-link" data-view="reports"><i class="me-2 bi bi-file-earmark-text"></i>Reports</a></li>
+      <li class="nav-item"><a href="#" class="nav-link" data-view="settings"><i class="me-2 bi bi-gear"></i>Settings</a></li>
+    </ul>
+
+    <div class="mt-auto">
+      <hr class="text-white-25" />
+      <div class="d-flex align-items-center">
+        <div class="me-2 text-white-50"><i class="bi bi-person-circle" style="font-size:1.5rem"></i></div>
+        <div>
+          <div id="topbarUserEmail" class="text-white">Not signed</div>
+          <small class="text-white-50">Sign in to manage</small>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <div class="flex-grow-1 content">
+    <!-- Topbar -->
+    <header class="d-flex align-items-center justify-content-between bg-white px-4 py-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <button class="me-2 btn btn-light d-lg-none" id="sidebarToggle"><i class="bi bi-list"></i></button>
+        <h4 class="mb-0">Dashboard</h4>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <input class="d-md-block form-control form-control-sm d-none" placeholder="Search medicines, customers..." id="globalSearch"/>
+        
+        <button class="btn-outline-secondary btn btn-sm" id="exportBtn"><i class="bi bi-download"></i> Export</button>
+        <script>
+document.getElementById("exportBtn").addEventListener("click", async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let yPos = 15;
+
+  doc.setFontSize(18);
+  doc.text("Pharmacy Full Report", 105, yPos, { align: "center" });
+  yPos += 10;
+
+  // --- Helper to add tables ---
+  async function addTable(title, collection, headers, mapper) {
+    doc.setFontSize(14);
+    yPos += 10;
+    doc.text(title, 15, yPos);
+    yPos += 5;
+
+    const snap = await db.collection(collection).orderBy("createdAt","desc").get();
+    const body = snap.docs.map(doc => mapper(doc.data()));
+
+    if (body.length === 0) {
+      doc.setFontSize(11);
+      doc.text("No records found.", 20, yPos + 10);
+      yPos += 15;
+    } else {
+      doc.autoTable({
+        startY: yPos,
+        head: [headers],
+        body,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [0, 128, 255], textColor: 255 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 15, right: 15 },
+      });
+      yPos = doc.lastAutoTable.finalY + 10;
+    }
+  }
+
+  // --- Add sections ---
+  await addTable("Inventory", "inventory",
+    ["Item", "Category", "Qty", "Unit"],
+    d => [d.name, d.category, d.qty, d.unit || ""]);
+
+  await addTable("Purchases", "purchases",
+    ["Medicine", "Supplier", "Qty", "Cost", "Date"],
+    d => [d.medicine, d.supplier, d.qty, d.cost, d.date]);
+
+  await addTable("Sales", "sales",
+    ["Medicine", "Customer", "Qty", "Price", "Date"],
+    d => [d.medicine, d.customer, d.qty, d.price, d.date]);
+
+  await addTable("Prescriptions", "prescriptions",
+    ["Patient", "Doctor", "Medicine", "Dosage", "Date"],
+    d => [d.patient, d.doctor, d.medicine, d.dosage, d.date]);
+
+  await addTable("Customers", "customers",
+    ["Name", "Phone", "Email"],
+    d => [d.name, d.phone, d.email || ""]);
+
+  // Save file
+  doc.save("Pharmacy_Report.pdf");
+})
+</script>
+        <div class="dropdown">
+          <a class="d-flex align-items-center text-decoration-none dropdown-toggle" href="#" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+           <div class="d-flex align-items-center justify-content-center bg-primary me-2 rounded-circle text-white"
+     style="width:36px; height:36px; font-size:16px;">
+  <i class="fa fa-pills"></i>
+</div>
+<!-- Font Awesome 6 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-p1CmjZLZg3hxjQ+q0fCz9jqUce2Gx9gH3c6xF1FryKxJKl+6P3fRk6ZL5p3M2bK5+OtxlH7x1U9U5jMnR1ibXg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+            <strong id="userNameShort">Admin</strong>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+            <li><a class="dropdown-item" href="#" data-action="profile">Profile</a></li>
+            <li><a class="dropdown-item" href="#" data-action="settings">Settings</a></li>
+            <script>
+  document.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', function(e) {
+      e.preventDefault(); // prevent default link behavior
+      const action = this.getAttribute('data-action');
+
+      switch(action) {
+        case 'profile':
+          alert("Opening Profile Page...");
+          // Or navigate: window.location.href = "profile.html";
+          break;
+        case 'settings':
+          alert("Opening Settings Page...");
+          // Or navigate: window.location.href = "settings.html";
+          break;
+        default:
+          console.log("No action defined");
+      }
+    });
+  });
+</script>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="text-danger dropdown-item" href="#" data-action="signout">Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </header>
+<script>
+async function loadSearchIndex() {
+  const res = await fetch("searchIndex.json");
+  return res.json();
+}
+
+document.getElementById("globalSearch").addEventListener("keyup", async function () {
+  const query = this.value.toLowerCase().trim();
+  const resultsDiv = document.getElementById("searchResults");
+  resultsDiv.innerHTML = "";
+
+  if (query.length < 2) return; // wait until 2+ letters typed
+
+  const pages = await loadSearchIndex();
+  const results = pages.filter(p => p.title.toLowerCase().includes(query));
+
+  if (results.length > 0) {
+    results.forEach(r => {
+      resultsDiv.innerHTML += `<div><a href="${r.url}">${r.title}</a></div>`;
+    });
+  } else {
+    resultsDiv.innerHTML = `<div class="text-danger">No results for "${query}"</div>`;
+  }
+});
+</script>
+
+    <!-- Views container -->
+    <main class="p-4">
+      <!-- Dashboard View -->
+      <section id="view-dashboard" class="view">
+        <div class="row g-3">
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="card-compact">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <small class="text-muted">Medicines in Stock</small>
+                  <div class="h4" id="kpiMedicines">0</div>
+                </div>
+                <div class="text-end">
+                  <i class="bi bi-box-seam" style="font-size:28px;color:var(--brand)"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="card-compact">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <small class="text-muted">Low Stock</small>
+                  <div class="h4 low-stock" id="kpiLowStock">0</div>
+                </div>
+                <div class="text-end">
+                  <i class="bi bi-exclamation-triangle" style="font-size:28px;color:#b02a37"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="card-compact">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <small class="text-muted">Today's Sales</small>
+                  <div class="h4" id="kpiSales">KSh 0</div>
+                </div>
+                <div class="text-end">
+                  <i class="bi bi-cash-stack" style="font-size:28px;color:var(--brand)"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="card-compact">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <small class="text-muted">Pending Orders</small>
+                  <div class="h4" id="kpiOrders">0</div>
+                </div>
+                <div class="text-end">
+                  <i class="bi bi-truck" style="font-size:28px;color:var(--brand)"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <div class="mt-4 row g-3">
+          <div class="col-lg-8">
+            <div class="p-3 card">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h6 class="mb-0">Sales This Week</h6>
+                <small class="text-muted">Revenue trend</small>
+              </div>
+              <canvas id="salesChart" height="160"></canvas>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="p-3 h-100 card">
+              <h6>Top Medicines</h6>
+              <ul id="topMedicines" class="list-group list-group-flush mt-2"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Inventory View -->
+      <section id="view-inventory" class="view d-none">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Inventory</h4>
+          <div>
+            <button class="me-2 btn-outline-secondary btn btn-sm" id="downloadInventoryPdfBtn"><i class="bi bi-file-earmark-pdf"></i> Export PDF</button>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#inventoryModal">Add Item</button>
+          </div>
+        </div>
+
+        <div class="p-3 card">
+          <table class="table table-hover table-striped" id="inventoryTable">
+            <thead>
+              <tr><th>Item</th><th>Category</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Unit</th><th>Actions</th></tr>
+            </thead>
+            <tbody><!-- filled by JS --></tbody>
+          </table>
+        </div>
+      </section>
+      
+
+      <!-- Sales View -->
+      <section id="view-sales" class="view d-none">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Sales</h4>
+          <div>
+            <button class="btn-outline-secondary btn btn-sm" id="downloadSalesPdfBtn"><i class="bi bi-file-earmark-pdf"></i> Export PDF</button>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#saleModal">New Sale</button>
+          </div>
+        </div>
+
+        <div class="p-3 card">
+          <table class="table table-sm" id="salesTable">
+            <thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Total</th><th>Payment</th><th>Prescription</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Purchase Section -->
+
+
+<!-- Purchase Modal -->
+<div class="modal fade" id="purchaseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="purchaseForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Purchase</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" class="mb-2 form-control" placeholder="Medicine Name" id="purchaseMedicine" required>
+          <input type="text" class="mb-2 form-control" placeholder="Supplier" id="purchaseSupplier" required>
+          <input type="number" class="mb-2 form-control" placeholder="Quantity" id="purchaseQty" required>
+          <input type="number" class="mb-2 form-control" placeholder="Cost" id="purchaseCost" required>
+          <input type="date" class="mb-2 form-control" id="purchaseDate" required>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+      <!-- Customers View -->
+<section id="view-customers" class="view d-none">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h4>Customers</h4>
+    <div>
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#customerModal">
+        <i class="fas fa-user-plus"></i> Add Customer
+      </button>
+    </div>
+  </div>
+
+  <div class="shadow-sm p-3 card">
+    <table class="table table-hover table-sm" id="customersTable">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Last Purchase</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+
+
+      <!-- Reports View -->
+      <section id="view-reports" class="view d-none">
+        <h4>Reports</h4>
+        <div class="mt-2 row g-3">
+          <div class="col-md-6">
+            <div class="p-3 card">
+              <h6>Inventory Report</h6>
+              <p class="text-muted">Export inventory & expiry reports.</p>
+              <button class="btn-outline-secondary btn btn-sm" id="exportInventoryBtn">Export Inventory</button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 card">
+              <h6>Sales Report</h6>
+              <p class="text-muted">Generate sales analytics & receipts.</p>
+              <button class="btn-outline-secondary btn btn-sm" id="exportSalesBtn">Export Sales</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings View -->
+<section id="view-settings" class="view d-none">
+  <h4>Settings</h4>
+  <div class="p-3 card">
+    <form id="settingsForm">
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label>Pharmacy Name</label>
+          <input class="form-control" id="pharmacyName" required />
+        </div>
+        <div class="col-md-6">
+          <label>Phone</label>
+          <input class="form-control" id="pharmacyPhone" required />
+        </div>
+        <div class="col-12">
+          <label>Address</label>
+          <input class="form-control" id="pharmacyAddress" required />
+        </div>
+      </div>
+      <div class="mt-3">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+      </div>
+    </form>
+    <!-- Header / Dashboard placeholders -->
+<div class="shadow-sm mb-3 p-3 card">
+  <div class="d-flex align-items-center">
+    <!-- Pharmacy Icon -->
+    <div class="me-3">
+      <i class="text-primary fa-solid fa-pills fa-2x"></i>
+    </div>
+    <!-- Pharmacy Info -->
+    <div>
+      <h5 id="headerPharmacyName" class="mb-1 text-dark fw-bold"></h5>
+      <p id="headerPharmacyPhone" class="mb-1 text-muted"><i class="me-1 fa fa-phone"></i></p>
+      <p id="headerPharmacyAddress" class="mb-0 text-muted"><i class="me-1 fa fa-map-marker-alt"></i></p>
+    </div>
+  </div>
+</div>
+
+  </div>
+</section>
+      
+      <section id="purchases" class="page">
+  <div class="d-flex align-items-center justify-content-between">
+    <h3>Purchases</h3>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#purchaseModal">Add Purchase</button>
+    <button class="btn-outline-secondary btn btn-sm" id="downloadPurchasePdfBtn">Export PDF</button>
+  </div>
+
+  <div class="mt-3 p-3 card">
+    <div class="card-header">Purchase Records</div>
+    <div class="card-body">
+      <table class="table table-sm" id="purchaseTable">
+        <thead>
+          <tr>
+            <th>Medicine</th>
+            <th>Supplier</th>
+            <th>Qty</th>
+            <th>Cost</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+    </main>
+  </div>
+</div>
+
+<!-- Modals -->
+<!-- Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="loginForm">
+      <div class="modal-header"><h5 class="modal-title">Sign in</h5></div>
+      <div class="modal-body">
+        <div class="mb-2"><label>Email</label><input type="email" id="loginEmail" class="form-control" required></div>
+        <div class="mb-2"><label>Password</label><input type="password" id="loginPassword" class="form-control" required></div>
+        <div id="loginError" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" type="submit">Sign in</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Inventory Modal -->
+<div class="modal fade" id="inventoryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="inventoryForm">
+      <div class="modal-header"><h5 class="modal-title">Add / Edit Inventory Item</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><label>Item Name</label><input class="form-control" id="inv_name" required></div>
+        <div class="mb-2"><label>Category</label><input class="form-control" id="inv_category"></div>
+        <div class="mb-2"><label>Batch No</label><input class="form-control" id="inv_batch"></div>
+        <div class="row g-2">
+          <div class="col-md-6"><label>Expiry Date</label><input type="date" class="form-control" id="inv_expiry"></div>
+          <div class="col-md-3"><label>Qty</label><input type="number" class="form-control" id="inv_qty"></div>
+          <div class="col-md-3"><label>Unit</label><input class="form-control" id="inv_unit"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" type="submit">Save Item</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Purchase Modal -->
+<div class="modal fade" id="purchaseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="purchaseForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Purchase</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" class="mb-2 form-control" placeholder="Medicine Name" id="purchaseMedicine" required>
+          <input type="text" class="mb-2 form-control" placeholder="Supplier" id="purchaseSupplier" required>
+          <input type="number" class="mb-2 form-control" placeholder="Quantity" id="purchaseQty" required>
+          <input type="number" class="mb-2 form-control" placeholder="Cost" id="purchaseCost" required>
+          <input type="date" class="mb-2 form-control" id="purchaseDate" required>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Sale Modal (with prescription upload) -->
+<div class="modal fade" id="saleModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <form class="modal-content" id="saleForm">
+      <div class="modal-header"><h5 class="modal-title">New Sale</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2 row g-2">
+          <div class="col-md-3"><label>Date</label><input type="date" id="sale_date" class="form-control" /></div>
+          <div class="col-md-4"><label>Customer</label><input id="sale_customer" class="form-control" /></div>
+          <div class="col-md-3"><label>Payment Method</label>
+            <select id="sale_payment" class="form-control"><option>Cash</option><option>M-PESA</option><option>Insurance</option></select>
+          </div>
+          <div class="col-md-2"><label>Prescription</label>
+            <input type="file" id="sale_prescription" accept=".pdf,image/*" class="form-control" />
+          </div>
+        </div>
+
+        <div id="saleItemsContainer" class="mb-2">
+          <!-- initial row -->
+        </div>
+        <div class="mb-2">
+          <button type="button" class="btn-outline-primary btn btn-sm" id="addSaleItemBtn"><i class="bi bi-plus"></i> Add Item</button>
+        </div>
+
+        <div class="mt-3">
+          <h6>Summary</h6>
+          <div>Total: KSh <span id="saleTotal">0</span></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" type="submit">Save Sale</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- View Sale Modal -->
+<div class="modal fade" id="viewSaleModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" id="viewSaleContent">
+      <div class="modal-header"><h5 class="modal-title">Sale</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="viewSaleBody"></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="customerForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="customerModalTitle">Add Customer</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="cust_id" />
+          <div class="mb-2">
+            <label>Name</label>
+            <input type="text" id="cust_name" class="form-control" required />
+          </div>
+          <div class="mb-2">
+            <label>Phone</label>
+            <input type="text" id="cust_phone" class="form-control" required />
+          </div>
+          <div class="mb-2">
+            <label>Email</label>
+            <input type="email" id="cust_email" class="form-control" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" id="customerSubmitBtn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Customer Modal -->
+
+
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Firebase compat SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+
+<script>
+/* ======================
+  CONFIG: paste your Firebase config here
+  ====================== */
+const firebaseConfig = {
+ apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
+  authDomain: "gamers-65b44.firebaseapp.com",
+  projectId: "gamers-65b44",
+  storageBucket: "gamers-65b44.firebasestorage.app",
+  messagingSenderId: "97331968745",
+  appId: "1:97331968745:web:2bdb1a0e9f7ec038dcce78",
+  measurementId: "G-MEG94YHJ2Q"
+  // ... rest
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+
+/* ===== global state ===== */
+let unsubscribers = [];
+let currentUser = null;
+let editInventoryId = null;
+
+/* ===== UI helpers ===== */
+function showLoginModal(){ new bootstrap.Modal(document.getElementById('loginModal'), {backdrop:'static'}).show(); }
+function hideLoginModal(){ const m=bootstrap.Modal.getInstance(document.getElementById('loginModal')); if(m) m.hide(); }
+function showToast(msg){ alert(msg); }
+function fmtDate(ts){ if(!ts) return ''; if(ts.toDate) return ts.toDate().toLocaleDateString(); return new Date(ts).toLocaleDateString(); }
+
+/* ===== Auth handlers ===== */
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+    hideLoginModal();
+  } catch(err){
+    const el = document.getElementById('loginError');
+    el.classList.remove('d-none'); el.innerText = err.message || 'Login failed';
+  }
+});
+document.addEventListener('click', (e)=>{ if(e.target.closest('[data-action="signout"]') || e.target.matches('[data-action="signout"]')) auth.signOut(); });
+
+auth.onAuthStateChanged(async (user)=>{
+  currentUser = user;
+  if(!user){ showLoginModal(); detachAll(); clearUI(); return; }
+  document.getElementById('topbarUserEmail').innerText = user.email;
+  document.getElementById('userNameShort').innerText = user.email.split('@')[0];
+  attachRealtimeListeners();
+});
+
+/* ===== helpers ===== */
+function detachAll(){ unsubscribers.forEach(u=>{ try{ u(); }catch(e){} }); unsubscribers=[]; }
+function clearUI(){
+  document.querySelector('#inventoryTable tbody').innerHTML=''; document.querySelector('#salesTable tbody').innerHTML='';
+  document.querySelector('#customersTable tbody') && (document.querySelector('#customersTable tbody').innerHTML='');
+  document.getElementById('kpiMedicines').innerText='0'; document.getElementById('kpiLowStock').innerText='0';
+  document.getElementById('kpiSales').innerText='KSh 0';
+}
+
+/* ===== Realtime listeners ===== */
+function attachRealtimeListeners(){
+  detachAll();
+
+  // Inventory
+  const invUnsub = db.collection('inventory').orderBy('name').onSnapshot(snap=>{
+    const tbody = document.querySelector('#inventoryTable tbody'); tbody.innerHTML='';
+    let totalQty=0, low=0;
+    snap.forEach(doc=>{
+      const d=doc.data(); totalQty += parseFloat(d.qty||0);
+      if(parseFloat(d.qty||0) < (d.reorderLevel || 20)) low++;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.name||''}</td><td>${d.category||''}</td><td>${d.batch||''}</td><td>${d.expiry? (d.expiry.toDate? d.expiry.toDate().toLocaleDateString(): new Date(d.expiry).toLocaleDateString()) : ''}</td>
+                      <td>${(d.qty||0).toLocaleString()}</td><td>${d.unit||''}</td>
+                      <td>
+                        <button class="me-1 btn btn-sm btn-warning" onclick="openEditInventory('${doc.id}')"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteDoc('inventory','${doc.id}')"><i class="bi bi-trash"></i></button>
+                      </td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('kpiMedicines').innerText = totalQty.toLocaleString();
+    document.getElementById('kpiLowStock').innerText = low;
+  }, err=>console.error(err));
+  unsubscribers.push(invUnsub);
+
+  // Finance (sales & expenses)
+  const finUnsub = db.collection('finance').orderBy('date','desc').onSnapshot(snap=>{
+    const tbody = document.querySelector('#salesTable tbody'); tbody.innerHTML='';
+    let totalSales = 0;
+    snap.forEach(doc=>{
+      const d = doc.data();
+      if(d.type === 'sale'){
+        totalSales += parseFloat(d.amount||0);
+        const presHtml = d.prescriptionUrl ? `<a href="${d.prescriptionUrl}" target="_blank" class="btn-outline-secondary btn btn-sm">View</a>` : '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${d.date && d.date.toDate? d.date.toDate().toLocaleDateString(): (d.date||'')}</td>
+                        <td>${d.invoice||doc.id}</td>
+                        <td>${d.customer||''}</td>
+                        <td>KSh ${parseFloat(d.amount||0).toLocaleString()}</td>
+                        <td>${d.payment||''}</td>
+                        <td>${presHtml}</td>
+                        <td>
+                          <button class="btn-outline-primary btn btn-sm" onclick="viewSale('${doc.id}')">View</button>
+                          <button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button>
+                        </td>`;
+        tbody.appendChild(tr);
+      }
+    });
+    document.getElementById('kpiSales').innerText = 'KSh ' + totalSales.toLocaleString();
+  }, err=>console.error(err));
+  unsubscribers.push(finUnsub);
+
+  let editPurchaseId = null;
+
+// Handle Purchase Form
+document.getElementById('purchaseForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const medicine = document.getElementById('purchaseMedicine').value;
+  const supplier = document.getElementById('purchaseSupplier').value;
+  const qty = parseFloat(document.getElementById('purchaseQty').value);
+  const cost = parseFloat(document.getElementById('purchaseCost').value);
+  const date = document.getElementById('purchaseDate').value;
+
+  if(editPurchaseId){
+    await db.collection('purchases').doc(editPurchaseId).update({ medicine, supplier, qty, cost, date });
+    editPurchaseId = null;
+  } else {
+    await db.collection('purchases').add({ medicine, supplier, qty, cost, date, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }
+
+  document.getElementById('purchaseForm').reset();
+  bootstrap.Modal.getInstance(document.getElementById('purchaseModal')).hide();
+});
+
+// Realtime Sync Purchases
+db.collection('purchases').orderBy('createdAt','desc').onSnapshot(snap=>{
+  const tbody = document.querySelector('#purchaseTable tbody');
+  tbody.innerHTML = '';
+  let total = 0;
+  snap.forEach(doc=>{
+    const d = doc.data();
+    total += d.cost;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.medicine}</td>
+      <td>${d.supplier}</td>
+      <td>${d.qty}</td>
+      <td>${d.cost}</td>
+      <td>${d.date}</td>
+      <td>
+        <button class="btn-outline-primary btn btn-sm" onclick="editPurchase('${doc.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('purchases','${doc.id}')">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('kpiPurchases').innerText = snap.size;
+  document.getElementById('kpiPurchaseValue').innerText = "KSh " + total.toFixed(2);
+});
+
+// Edit Purchase
+async function editPurchase(id){
+  const docSnap = await db.collection('purchases').doc(id).get();
+  if(docSnap.exists){
+    const d = docSnap.data();
+    document.getElementById('purchaseMedicine').value = d.medicine;
+    document.getElementById('purchaseSupplier').value = d.supplier;
+    document.getElementById('purchaseQty').value = d.qty;
+    document.getElementById('purchaseCost').value = d.cost;
+    document.getElementById('purchaseDate').value = d.date;
+    editPurchaseId = id;
+    new bootstrap.Modal(document.getElementById('purchaseModal')).show();
+  }
+}
+
+// Export Purchases to PDF
+document.getElementById('downloadPurchasePdfBtn').addEventListener('click', async ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text("Purchase Report", 105, 15, { align: "center" });
+
+  const snap = await db.collection('purchases').orderBy('createdAt','desc').get();
+  const data = snap.docs.map(doc=>{
+    const d = doc.data();
+    return [d.medicine, d.supplier, d.qty, d.cost, d.date];
+  });
+
+  doc.autoTable({
+    startY: 25,
+    head: [['Medicine', 'Supplier', 'Qty', 'Cost', 'Date']],
+    body: data,
+    styles: { fontSize: 11 },
+    headStyles: { fillColor: [46, 204, 113], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 245, 245] }
+  });
+
+  doc.save("Purchase_Report.pdf");
+});
+
+  
+}
+// Customers
+  const custUnsub = db.collection('customers').orderBy('name').onSnapshot(snap=>{
+    const tbody = document.querySelector('#customersTable tbody'); if(!tbody) return; tbody.innerHTML='';
+    snap.forEach(doc=>{
+      const d = doc.data();
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.name||''}</td><td>${d.phone||''}</td><td>${d.email||''}</td><td>${d.lastPurchase? (d.lastPurchase.toDate? d.lastPurchase.toDate().toLocaleDateString() : d.lastPurchase): ''}</td>
+        <td><button class="btn btn-sm btn-warning" onclick="openEditCustomer('${doc.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteDoc('customers','${doc.id}')">Delete</button></td>`;
+      tbody.appendChild(tr);
+    });
+  }, err=>console.error(err));
+  unsubscribers.push(custUnsub);
+  
+
+/* ===== CRUD helpers ===== */
+async function deleteDoc(collection, id){
+  if(!confirm('Delete this record?')) return;
+  try{ await db.collection(collection).doc(id).delete(); showToast('Deleted'); }
+  catch(err){ console.error(err); showToast('Delete failed'); }
+}
+
+/* ===== Inventory add/update ===== */
+document.getElementById('inventoryForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = {
+    name: document.getElementById('inv_name').value,
+    category: document.getElementById('inv_category').value,
+    batch: document.getElementById('inv_batch').value,
+    expiry: document.getElementById('inv_expiry').value ? new Date(document.getElementById('inv_expiry').value) : null,
+    qty: parseFloat(document.getElementById('inv_qty').value || 0),
+    unit: document.getElementById('inv_unit').value,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    if(editInventoryId){
+      await db.collection('inventory').doc(editInventoryId).update(payload);
+      editInventoryId = null;
+    } else {
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('inventory').add(payload);
+    }
+    bootstrap.Modal.getInstance(document.getElementById('inventoryModal')).hide();
+    document.getElementById('inventoryForm').reset();
+  } catch(err){ console.error(err); showToast('Save failed'); }
+});
+
+window.openEditInventory = async function(id){
+  try{
+    const snap = await db.collection('inventory').doc(id).get();
+    if(!snap.exists) return showToast('Item not found');
+    const d = snap.data();
+    document.getElementById('inv_name').value = d.name||'';
+    document.getElementById('inv_category').value = d.category||'';
+    document.getElementById('inv_batch').value = d.batch||'';
+    document.getElementById('inv_expiry').value = d.expiry && d.expiry.toDate ? d.expiry.toDate().toISOString().split('T')[0] : (d.expiry||'');
+    document.getElementById('inv_qty').value = d.qty||0;
+    document.getElementById('inv_unit').value = d.unit||'';
+    editInventoryId = id;
+    new bootstrap.Modal(document.getElementById('inventoryModal')).show();
+  }catch(e){ console.error(e); showToast('Load failed'); }
+};
+
+// ===== Load Customers from Sales and manual collection =====
+async function loadCustomers() {
+  try {
+    const salesSnapshot = await db.collection('finance').orderBy('date', 'desc').get();
+    const manualSnapshot = await db.collection('customers').orderBy('createdAt', 'desc').get();
+
+    const customersMap = new Map();
+
+    // Add customers from sales
+    salesSnapshot.forEach(doc => {
+      const sale = doc.data();
+      if (sale.customer) {
+        const key = sale.customer.toLowerCase();
+        const lastPurchase = sale.date && sale.date.toDate ? sale.date.toDate() : new Date();
+        if (!customersMap.has(key) || lastPurchase > customersMap.get(key).lastPurchase) {
+          customersMap.set(key, {
+            name: sale.customer,
+            phone: sale.customerPhone || '',
+            email: sale.customerEmail || '',
+            lastPurchase
+          });
+        }
+      }
+    });
+
+    // Add manually added customers
+    manualSnapshot.forEach(doc => {
+      const c = doc.data();
+      const key = c.name.toLowerCase();
+      const created = c.createdAt && c.createdAt.toDate ? c.createdAt.toDate() : new Date();
+      if (!customersMap.has(key)) {
+        customersMap.set(key, {
+          name: c.name,
+          phone: c.phone || '',
+          email: c.email || '',
+          lastPurchase: created
+        });
+      }
+    });
+
+    const tbody = document.querySelector('#customersTable tbody');
+    tbody.innerHTML = '';
+
+    if (customersMap.size === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center">No customers found</td></tr>`;
+      return;
+    }
+
+    Array.from(customersMap.values()).forEach(c => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${c.name}</td>
+        <td>${c.phone}</td>
+        <td>${c.email}</td>
+        <td>${c.lastPurchase.toLocaleString()}</td>
+        <td>
+          <button class="me-1 btn-outline-primary btn btn-sm" onclick="openEditCustomer('${c.name}')">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="btn-outline-danger btn btn-sm" onclick="deleteCustomer('${c.name}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+  } catch (err) {
+    console.error(err);
+    showToast('Error loading customers');
+  }
+}
+
+// ===== Delete Customer =====
+async function deleteCustomer(name) {
+  if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+  try {
+    await db.collection('customers').where('name', '==', name).get()
+      .then(snapshot => {
+        snapshot.forEach(doc => doc.ref.delete());
+      });
+    showToast('Customer deleted');
+    loadCustomers();
+  } catch(err) {
+    console.error(err);
+    showToast('Error deleting customer');
+  }
+}
+
+// ===== Add Customer Form =====
+document.getElementById('customerForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  try{
+    await db.collection('customers').add({
+      name: document.getElementById('cust_name').value,
+      phone: document.getElementById('cust_phone').value,
+      email: document.getElementById('cust_email').value,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    bootstrap.Modal.getInstance(document.getElementById('customerModal')).hide();
+    document.getElementById('customerForm').reset();
+    loadCustomers(); // refresh table
+  } catch(err){ console.error(err); showToast('Save failed'); }
+});
+
+/* ===== Open Edit Customer Modal ===== */
+window.openEditCustomer = async function(id){
+  try{
+    const doc = await db.collection('customers').doc(id).get();
+    if(!doc.exists) return showToast('Customer not found');
+    const d = doc.data();
+    
+    // Fill the modal form with customer data
+    document.getElementById('cust_id').value = doc.id;
+    document.getElementById('cust_name').value = d.name || '';
+    document.getElementById('cust_phone').value = d.phone || '';
+    document.getElementById('cust_email').value = d.email || '';
+
+    // Show the modal
+    new bootstrap.Modal(document.getElementById('customerModal')).show();
+  } catch(err){
+    console.error(err);
+    showToast('Error loading customer');
+  }
+};
+window.openEditCustomer = async function(id) {
+  try {
+    const doc = await db.collection('customers').doc(id).get();
+    if (!doc.exists) return showToast('Customer not found');
+
+    const d = doc.data();
+    document.getElementById('cust_id').value = id;
+    document.getElementById('cust_name').value = d.name || '';
+    document.getElementById('cust_phone').value = d.phone || '';
+    document.getElementById('cust_email').value = d.email || '';
+    document.getElementById('customerModalTitle').textContent = 'Edit Customer';
+
+    new bootstrap.Modal(document.getElementById('customerModal')).show();
+  } catch (err) {
+    console.error(err);
+    showToast('Error loading customer');
+  }
+}
+
+
+// ===== Initial load =====
+loadCustomers();
+
+
+/* ===== Sale items UI & logic (with prescription upload) ===== */
+const saleItemsContainer = document.getElementById('saleItemsContainer');
+function addSaleItemRow(name='', qty=1, price=0){
+  const div = document.createElement('div'); div.className = 'd-flex gap-2 mb-2 sale-row';
+  div.innerHTML = `
+    <input class="form-control item-name" placeholder="Medicine name" value="${name}" />
+    <input class="form-control item-qty" placeholder="Qty" style="width:90px" value="${qty}" />
+    <input class="form-control item-price" placeholder="Price" style="width:110px" value="${price}" />
+    <button class="btn-outline-danger btn btn-sm remove-item"><i class="bi bi-x"></i></button>
+  `;
+  div.querySelector('.remove-item').addEventListener('click', ()=>{ div.remove(); recalcSaleTotal(); });
+  div.querySelectorAll('input').forEach(inp=>inp.addEventListener('input', recalcSaleTotal));
+  saleItemsContainer.appendChild(div); recalcSaleTotal();
+}
+document.getElementById('addSaleItemBtn').addEventListener('click', ()=> addSaleItemRow());
+
+function recalcSaleTotal(){
+  const rows = document.querySelectorAll('#saleItemsContainer .sale-row');
+  let total = 0;
+  rows.forEach(r=>{
+    const q = parseFloat(r.querySelector('.item-qty').value||0);
+    const p = parseFloat(r.querySelector('.item-price').value||0);
+    total += q*p;
+  });
+  document.getElementById('saleTotal').innerText = total.toLocaleString();
+}
+
+/* ===== Upload helper for prescription ===== */
+async function uploadPrescriptionFile(file, saleId){
+  if(!file) return null;
+  const ext = file.name.split('.').pop();
+  const path = `prescriptions/${saleId || 'tmp'}-${Date.now()}.${ext}`;
+  const ref = storage.ref().child(path);
+  const snap = await ref.put(file);
+  return await snap.ref.getDownloadURL();
+}
+
+/* ===== Sales create (with inventory decrement via transaction) ===== */
+document.getElementById('saleForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const date = document.getElementById('sale_date').value ? new Date(document.getElementById('sale_date').value) : new Date();
+  const customer = document.getElementById('sale_customer').value || '';
+  const payment = document.getElementById('sale_payment').value || 'Cash';
+  const prescriptionFile = document.getElementById('sale_prescription').files[0] || null;
+
+  // collect items
+  const rows = Array.from(document.querySelectorAll('#saleItemsContainer .sale-row'));
+  const items = rows.map(r => ({
+    name: r.querySelector('.item-name').value,
+    qty: parseFloat(r.querySelector('.item-qty').value||0),
+    price: parseFloat(r.querySelector('.item-price').value||0)
+  })).filter(it => it.name && it.qty>0);
+
+  if(items.length === 0){ return showToast('Add at least one item'); }
+
+  // compute total
+  const total = items.reduce((s,i)=> s + i.qty*i.price, 0);
+
+  try {
+    // create a finance doc first to get an id
+    const saleRef = db.collection('finance').doc();
+    let prescriptionUrl = null;
+
+    // If prescription exists, upload to storage with sale id in path
+    if(prescriptionFile){
+      prescriptionUrl = await uploadPrescriptionFile(prescriptionFile, saleRef.id);
+    }
+
+    // perform inventory decrement using transactions for each item
+    // NOTE: this logic looks up inventory by name (exact match) and decrements first matching doc.
+    // For production, store inventory item IDs and reference them from sale items to ensure accuracy.
+    for(const it of items){
+      // find inventory doc with exact name
+      const q = await db.collection('inventory').where('name','==',it.name).limit(1).get();
+      if(q.empty){
+        // If not found, abort
+        throw new Error(`Inventory item not found: ${it.name}`);
+      }
+      const invDoc = q.docs[0];
+      const invRef = db.collection('inventory').doc(invDoc.id);
+
+      await db.runTransaction(async (tx)=>{
+        const snap = await tx.get(invRef);
+        if(!snap.exists) throw new Error('Inventory doc disappeared');
+        const curr = snap.data().qty || 0;
+        if(curr < it.qty) throw new Error(`Insufficient stock for ${it.name} (have ${curr}, need ${it.qty})`);
+        tx.update(invRef, { qty: curr - it.qty, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      });
+    }
+
+    // write sale doc
+    await saleRef.set({
+      type: 'sale',
+      date,
+      customer,
+      payment,
+      amount: total,
+      items,
+      prescriptionUrl: prescriptionUrl || null,
+      invoice: 'INV-' + Date.now(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    bootstrap.Modal.getInstance(document.getElementById('saleModal')).hide();
+    document.getElementById('saleForm').reset();
+    saleItemsContainer.innerHTML = '';
+    addSaleItemRow(); // one empty row
+    recalcSaleTotal();
+    showToast('Sale recorded successfully');
+  } catch(err){
+    console.error(err);
+    showToast('Error saving sale: ' + (err.message || err));
+  }
+});
+
+//* ===== view sale details with professional print and prescription input ===== */
+window.viewSale = async function(id) {
+  try {
+    const doc = await db.collection('finance').doc(id).get();
+    if (!doc.exists) return showToast('Sale not found');
+    const d = doc.data();
+    const body = document.getElementById('viewSaleBody');
+
+    // Prescription input (editable)
+    const prescriptionValue = d.prescription || '';
+
+    let html = `<p><strong>Invoice:</strong> ${d.invoice || id}</p>`;
+    html += `<p><strong>Date:</strong> ${d.date && d.date.toDate ? d.date.toDate().toLocaleString() : d.date}</p>`;
+    html += `<p><strong>Customer:</strong> ${d.customer || ''} &nbsp; <strong>Payment:</strong> ${d.payment || ''}</p>`;
+    html += `<h6>Items</h6><ul>`;
+    (d.items || []).forEach(it => html += `<li>${it.name} — ${it.qty} x ${it.price} = KSh ${(it.qty*it.price).toLocaleString()}</li>`);
+    html += `</ul><p><strong>Total:</strong> KSh ${parseFloat(d.amount||0).toLocaleString()}</p>`;
+
+    // Editable prescription
+    html += `
+      <div class="mb-2">
+        <label><strong>Prescription:</strong></label>
+        <textarea id="viewSalePrescription" class="form-control" rows="3" placeholder="Enter prescription">${prescriptionValue}</textarea>
+      </div>
+    `;
+
+    // Add Save and Print buttons
+    html += `
+      <div class="d-flex gap-2 mt-2">
+        <button class="btn btn-primary btn-sm" id="savePrescriptionBtn"><i class="fas fa-save"></i> Save Prescription</button>
+        <button class="btn btn-success btn-sm" id="printSaleBtn"><i class="fas fa-print"></i> Print Receipt</button>
+      </div>
+    `;
+
+    body.innerHTML = html;
+
+    const modalEl = document.getElementById('viewSaleModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    // Save prescription button
+    document.getElementById('savePrescriptionBtn').addEventListener('click', async () => {
+      const newPrescription = document.getElementById('viewSalePrescription').value.trim();
+      try {
+        await db.collection('finance').doc(id).update({ prescription: newPrescription });
+        showToast('Prescription saved successfully!');
+      } catch (err) {
+        console.error(err);
+        showToast('Error saving prescription');
+      }
+    });
+
+    // Print functionality with professional layout
+    document.getElementById('printSaleBtn').addEventListener('click', () => {
+      const pharmacyName = document.getElementById('headerPharmacyName')?.textContent || 'My Pharmacy';
+      const pharmacyPhone = document.getElementById('headerPharmacyPhone')?.textContent || '';
+      const pharmacyAddress = document.getElementById('headerPharmacyAddress')?.textContent || '';
+      const prescriptionText = document.getElementById('viewSalePrescription').value.trim();
+
+      let printContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 400px; margin:auto;">
+          <h2 style="text-align:center; margin-bottom:0;">${pharmacyName}</h2>
+          <p style="text-align:center; margin:0;">${pharmacyPhone}</p>
+          <p style="text-align:center; margin-bottom:20px;">${pharmacyAddress}</p>
+          <hr>
+          <p><strong>Invoice:</strong> ${d.invoice || id}</p>
+          <p><strong>Date:</strong> ${d.date && d.date.toDate ? d.date.toDate().toLocaleString() : d.date}</p>
+          <p><strong>Customer:</strong> ${d.customer || ''} &nbsp; <strong>Payment:</strong> ${d.payment || ''}</p>
+          <h4>Items</h4>
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr>
+                <th style="border-bottom:1px solid #000; text-align:left;">Item</th>
+                <th style="border-bottom:1px solid #000; text-align:right;">Qty</th>
+                <th style="border-bottom:1px solid #000; text-align:right;">Price</th>
+                <th style="border-bottom:1px solid #000; text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      (d.items || []).forEach(it => {
+        printContent += `
+          <tr>
+            <td>${it.name}</td>
+            <td style="text-align:right;">${it.qty}</td>
+            <td style="text-align:right;">${it.price.toLocaleString()}</td>
+            <td style="text-align:right;">${(it.qty*it.price).toLocaleString()}</td>
+          </tr>
+        `;
+      });
+
+      printContent += `
+            </tbody>
+          </table>
+          <hr>
+          <p style="text-align:right; font-size:1.2em;"><strong>Total: KSh ${parseFloat(d.amount||0).toLocaleString()}</strong></p>
+          ${prescriptionText ? `<p><strong>Prescription:</strong> ${prescriptionText}</p>` : ''}
+          <p style="text-align:center; margin-top:20px;">Thank you for your purchase!</p>
+        </div>
+      `;
+
+      const printWindow = window.open('', '', 'height=600,width=400');
+      printWindow.document.write('<html><head><title>Receipt</title></head><body>');
+      printWindow.document.write(printContent);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.print();
+    });
+
+  } catch(err) {
+    console.error(err);
+    showToast('Error loading sale');
+  }
+};
+
+// Download all sales as PDF
+document.getElementById('downloadSalesPdfBtn').addEventListener('click', async () => {
+  try {
+    const salesSnapshot = await db.collection('finance').orderBy('date', 'desc').get();
+    if (salesSnapshot.empty) return showToast('No sales found');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Add Pharmacy Header
+    const pharmacyName = document.getElementById('headerPharmacyName')?.textContent || 'My Pharmacy';
+    const pharmacyPhone = document.getElementById('headerPharmacyPhone')?.textContent || '';
+    const pharmacyAddress = document.getElementById('headerPharmacyAddress')?.textContent || '';
+
+    doc.setFontSize(16);
+    doc.text(pharmacyName, 105, 15, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(pharmacyPhone, 105, 22, { align: 'center' });
+    doc.text(pharmacyAddress, 105, 28, { align: 'center' });
+    doc.setLineWidth(0.5);
+    doc.line(15, 32, 195, 32);
+
+    // Prepare table
+    const tableData = [];
+    salesSnapshot.forEach(docSnap => {
+      const d = docSnap.data();
+      const dateStr = d.date && d.date.toDate ? d.date.toDate().toLocaleDateString() : d.date;
+      tableData.push([
+        dateStr,
+        d.invoice || docSnap.id,
+        d.customer || '',
+        (parseFloat(d.amount)||0).toLocaleString(),
+        d.payment || ''
+      ]);
+    });
+
+    doc.autoTable({
+      head: [['Date', 'Invoice', 'Customer', 'Total (KSh)', 'Payment']],
+      body: tableData,
+      startY: 38,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      styles: { fontSize: 10 }
+    });
+
+    doc.save(`All_Sales_${new Date().toISOString().split('T')[0]}.pdf`);
+
+  } catch(err) {
+    console.error(err);
+    showToast('Error generating PDF');
+  }
+});
+
+
+/* ===== PDF export functions (live data) ===== */
+async function exportInventoryPDF(){
+  const { jsPDF } = window.jspdf; const doc = new jsPDF();
+  doc.setFontSize(18); doc.text('Inventory Report', doc.internal.pageSize.getWidth()/2, 15, {align:'center'});
+  const snap = await db.collection('inventory').orderBy('name').get();
+  const data = snap.docs.map(d=>{ const v=d.data(); return [v.name||'', v.category||'', v.batch||'', v.expiry && v.expiry.toDate ? v.expiry.toDate().toLocaleDateString(): (v.expiry||''), (v.qty||0).toLocaleString(), v.unit||'']; });
+  doc.autoTable({ startY: 25, head:[['Item','Category','Batch','Expiry','Qty','Unit']], body:data, theme:'grid', headStyles:{fillColor:[41,128,185],textColor:255} });
+  doc.save('Inventory_Report.pdf');
+}
+document.getElementById('downloadInventoryPdfBtn').addEventListener('click', exportInventoryPDF);
+
+async function exportSalesPDF(){
+  const { jsPDF } = window.jspdf; const doc = new jsPDF();
+  doc.setFontSize(18); doc.text('Sales Report', doc.internal.pageSize.getWidth()/2, 15, {align:'center'});
+  const snap = await db.collection('finance').where('type','==','sale').orderBy('date','desc').get();
+  const data = snap.docs.map(d=>{ const v=d.data(); return [ v.date && v.date.toDate? v.date.toDate().toLocaleDateString() : (v.date||''), v.invoice||'', v.customer||'', parseFloat(v.amount||0).toLocaleString(), v.payment||'', v.prescriptionUrl? 'Yes' : 'No']; });
+  doc.autoTable({ startY: 25, head:[['Date','Invoice','Customer','Total','Payment','Prescription']], body:data, theme:'grid', headStyles:{fillColor:[41,128,185],textColor:255} });
+  doc.save('Sales_Report.pdf');
+}
+document.getElementById('downloadSalesPdfBtn').addEventListener('click', exportSalesPDF);
+
+async function exportFullPDF(){
+  const { jsPDF } = window.jspdf; const doc = new jsPDF();
+  doc.setFontSize(18); doc.text('Full Pharmacy Report', doc.internal.pageSize.getWidth()/2, 15, {align:'center'});
+  let y = 25;
+  // inventory
+  doc.setFontSize(14); doc.text('Inventory', 14, y); y+=6;
+  const invSnap = await db.collection('inventory').orderBy('name').get();
+  const invData = invSnap.docs.map(d=>{ const v=d.data(); return [v.name||'', v.category||'', (v.qty||0).toLocaleString(), v.unit||''];});
+  doc.autoTable({ startY: y, head:[['Item','Category','Qty','Unit']], body:invData, theme:'grid', headStyles:{fillColor:[41,128,185],textColor:255} });
+  y = doc.lastAutoTable.finalY + 10;
+  // finance summary
+  doc.setFontSize(14); doc.text('Finance (Sales & Expenses)', 14, y); y += 6;
+  const expenseSnap = await db.collection('finance').where('type','==','expense').orderBy('date','desc').get();
+  const saleSnap = await db.collection('finance').where('type','==','sale').orderBy('date','desc').get();
+  let totalExpenses=0,totalSales=0;
+  const expData = expenseSnap.docs.map(d=>{ const v=d.data(); totalExpenses += parseFloat(v.amount||0); return [ v.date && v.date.toDate? v.date.toDate().toLocaleDateString(): (v.date||''), v.category||'', parseFloat(v.amount||0).toLocaleString() ]; });
+  const saleData = saleSnap.docs.map(d=>{ const v=d.data(); totalSales += parseFloat(v.amount||0); return [ v.date && v.date.toDate? v.date.toDate().toLocaleDateString(): (v.date||''), v.invoice||'', parseFloat(v.amount||0).toLocaleString() ]; });
+  doc.setFontSize(12); doc.text(`Total Sales: KSh ${totalSales.toLocaleString()}`, 14, y); y+=6; doc.text(`Total Expenses: KSh ${totalExpenses.toLocaleString()}`, 14, y); y+=8;
+  if(expData.length){ doc.autoTable({ startY: y, head:[['Date','Category','Amount (KSh)']], body:expData, theme:'grid', headStyles:{fillColor:[192,57,43],textColor:255} }); y = doc.lastAutoTable.finalY + 8; }
+  if(saleData.length){ doc.autoTable({ startY: y, head:[['Date','Invoice','Amount (KSh)']], body:saleData, theme:'grid', headStyles:{fillColor:[41,128,185],textColor:255} }); }
+  doc.save('Full_Pharmacy_Report.pdf');
+}
+document.getElementById('exportBtn').addEventListener('click', exportFullPDF);
+
+/* ===== UI SPA & startup ===== */
+document.querySelectorAll('.sidebar .nav-link').forEach(a=>{
+  a.addEventListener('click', e=>{
+    e.preventDefault();
+    document.querySelectorAll('.sidebar .nav-link').forEach(x=>x.classList.remove('active'));
+    a.classList.add('active');
+    const v = a.dataset.view;
+    document.querySelectorAll('.view').forEach(sec=> sec.classList.add('d-none'));
+    document.getElementById('view-'+v).classList.remove('d-none');
+  });
+});
+document.getElementById('sidebarToggle').addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('show'));
+
+/* ===== Initialize sale modal with one row ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  addSaleItemRow();
+  // show login if not authed (handled by auth.onAuthStateChanged)
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// --- Sales Chart Setup ---
+const ctx = document.getElementById('salesChart').getContext('2d');
+let salesChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [], // Dates
+    datasets: [{
+      label: 'Sales (KSh)',
+      data: [],
+      borderColor: '#27ae60',
+      backgroundColor: 'rgba(39,174,96,0.2)',
+      fill: true,
+      tension: 0.3,
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true }
+    }
+  }
+});
+
+// --- Real-time Weekly Sales ---
+db.collection('sales')
+  .orderBy('date', 'asc')
+  .onSnapshot(snap => {
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
+    startOfWeek.setHours(0,0,0,0);
+
+    let totals = {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (d.date && d.date.toDate() >= startOfWeek) {
+        const date = d.date.toDate().toLocaleDateString('en-GB', { weekday: 'short' });
+        totals[date] = (totals[date] || 0) + (d.amount || 0);
+      }
+    });
+
+    salesChart.data.labels = Object.keys(totals);
+    salesChart.data.datasets[0].data = Object.values(totals);
+    salesChart.update();
+  });
+
+// --- Real-time Top Medicines ---
+db.collection('sales')
+  .orderBy('amount', 'desc')
+  .limit(5)
+  .onSnapshot(snap => {
+    const list = document.getElementById('topMedicines');
+    list.innerHTML = '';
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex justify-content-between align-items-center';
+      li.innerHTML = `
+        <span>${d.medicine}</span>
+        <span class="bg-success badge">${d.amount.toLocaleString()} KSh</span>
+      `;
+      list.appendChild(li);
+    });
+  });
+</script>
+<script>
+  // Make sure Firebase is already initialized in your project
+
+  const settingsForm = document.getElementById("settingsForm");
+  const pharmacyNameInput = document.getElementById("pharmacyName");
+  const pharmacyPhoneInput = document.getElementById("pharmacyPhone");
+  const pharmacyAddressInput = document.getElementById("pharmacyAddress");
+
+  const headerName = document.getElementById("headerPharmacyName");
+  const headerPhone = document.getElementById("headerPharmacyPhone");
+  const headerAddress = document.getElementById("headerPharmacyAddress");
+
+  // Load settings from Firestore
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      const docRef = firebase.firestore().collection("pharmacies").doc(user.uid);
+      docRef.get().then(doc => {
+        if (doc.exists) {
+          const data = doc.data();
+          pharmacyNameInput.value = data.name || "";
+          pharmacyPhoneInput.value = data.phone || "";
+          pharmacyAddressInput.value = data.address || "";
+          updateHeaderSettings(data); // update dashboard immediately
+        }
+      });
+    }
+  });
+
+  // Update header/dashboard
+  function updateHeaderSettings(data) {
+    headerName.textContent = data.name || "";
+    headerPhone.textContent = data.phone || "";
+    headerAddress.textContent = data.address || "";
+  }
+
+  // Save settings to Firestore
+  settingsForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = pharmacyNameInput.value.trim();
+    const phone = pharmacyPhoneInput.value.trim();
+    const address = pharmacyAddressInput.value.trim();
+
+    const user = firebase.auth().currentUser;
+    if (!user) return alert("User not logged in!");
+
+    firebase.firestore().collection("pharmacies").doc(user.uid)
+      .set({ name, phone, address }, { merge: true })
+      .then(() => {
+        alert("Settings saved successfully!");
+        updateHeaderSettings({ name, phone, address });
+      })
+      .catch(err => console.error("Error saving settings:", err));
+  });
+</script>
+
+</body>
+</html>
