@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bakery Admin Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --brand:#1b5e20; 
+  --accent:#66bb6a; 
+  --card-bg:#2e7d32; 
+  --text-color:#fff;
+}
+body{ background:#121212; color:var(--text-color); }
+.sidebar{ min-width:240px; max-width:240px; background:linear-gradient(180deg,var(--brand),#004d40); color:var(--text-color); height:100vh; }
+.sidebar .nav-link{ color:rgba(255,255,255,0.9); }
+.sidebar .nav-link.active{ background: rgba(255,255,255,0.15); border-radius:6px; }
+.brand{ font-weight:700; letter-spacing:0.3px; }
+.card-compact{ padding:1rem; border-radius:12px; background:var(--card-bg); color:#fff; box-shadow:0 6px 18px rgba(0,0,0,0.2); }
+.low-stock{ color:#b02a37; font-weight:700; }
+@media(max-width:991.98px){ 
+  .sidebar{ position:fixed; z-index:1040; transform:translateX(-100%); transition:transform .25s ease;} 
+  .sidebar.show{ transform:translateX(0);} 
+  .content{ padding-top:4rem; }
+}
+.modal-content{ background:#1e1e1e; color:#fff; }
+input, select, textarea{ background:#2c2c2c; color:#fff; border:1px solid #555; }
+</style>
+</head>
+<body>
+  
+
+<!-- Firebase Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="p-4 modal-content">
+      <h5 class="mb-3 text-center">Login</h5>
+      <form id="loginForm">
+        <div class="mb-3"><input type="email" id="loginEmail" class="form-control" placeholder="Email" required></div>
+        <div class="mb-3"><input type="password" id="loginPassword" class="form-control" placeholder="Password" required></div>
+        <button class="w-100 btn btn-success">Login</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex">
+  <!-- Sidebar -->
+  <nav id="sidebar" class="d-flex flex-column p-3 sidebar">
+    <div class="d-flex align-items-center mb-4">
+      <div class="me-2">
+        <div class="bg-white rounded-circle text-center" style="width:40px;height:40px;line-height:40px;font-weight:700;color:var(--brand)">B</div>
+      </div>
+      <div>
+        <div class="brand">BakeryAdmin</div>
+        <small class="text-white-50">Dashboard</small>
+      </div>
+    </div>
+
+    <ul class="flex-column mb-auto nav nav-pills">
+      <ul class="flex-column mb-auto nav nav-pills">
+  <li class="nav-item">
+    <a href="#" class="nav-link" data-view="dashboard">
+      <i class="me-2 bi bi-speedometer2"></i>Dashboard
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="#" class="nav-link" data-view="orders">
+      <i class="me-2 bi bi-receipt"></i>Orders
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="#" class="nav-link" data-view="products">
+      <i class="me-2 bi bi-basket"></i>Products
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="#" class="nav-link" data-view="customers">
+      <i class="me-2 bi bi-people"></i>Customers
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="#" class="nav-link" data-view="finance">
+      <i class="me-2 bi bi-wallet2"></i>Finance
+    </a>
+  </li>
+</ul>
+
+    </ul>
+  </nav>
+
+  <!-- Main content -->
+  <div class="flex-grow-1 content">
+    <header class="d-flex align-items-center justify-content-between bg-dark px-4 py-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <button class="me-2 btn btn-light d-lg-none" id="sidebarToggle"><i class="bi bi-list"></i></button>
+        <h4 class="mb-0" id="currentViewTitle">Dashboard</h4>
+      </div>
+    </header>
+
+    <div class="p-4" id="dashboardView">
+      <div class="mb-4 row g-3">
+        <div class="col-md-3">
+          <div class="text-center card-compact">
+            <h6>Total Sales</h6>
+            <h3 id="totalSales">KSh 0</h3>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-center card-compact">
+            <h6>Pending Orders</h6>
+            <h3 id="pendingOrders">0</h3>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-center card-compact">
+            <h6>Completed Orders</h6>
+            <h3 id="completedOrders">0</h3>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-center card-compact">
+            <h6>Low Stock Items</h6>
+            <h3 id="lowStock">0</h3>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Orders Table -->
+      <div class="mt-4 d-none" id="ordersSection">
+  <h5>Orders</h5>
+  <button class="mb-2 btn btn-primary" data-bs-toggle="modal" data-bs-target="#orderModal">Add Order</button>
+  <button class="btn btn-primary btn-sm" id="downloadAllOrdersPdf">
+  <i class="bi bi-download"></i> Download All Orders
+</button>
+
+
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Phone</th>
+        <th>Date</th>
+        <th>Items</th>
+        <th>Total</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="ordersTable"></tbody>
+  </table>
+</div>
+<button class="me-2 btn btn-primary" id="staffBtn">
+  <i class="bi bi-people"></i> Staff
+</button>
+<div class="mt-4 d-none" id="staffSection">
+  <h5>Staff Management</h5>
+  <button class="mb-2 btn btn-primary" data-bs-toggle="modal" data-bs-target="#staffModal">
+    Add Staff
+  </button>
+  <button class="btn btn-primary btn-sm" id="downloadAllStaffPdf">
+    <i class="bi bi-download"></i> Download All Staff
+  </button>
+
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr>
+        <th>Staff ID</th>
+        <th>Name</th>
+        <th>Position</th>
+        <th>Salary</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="staffTable"></tbody>
+  </table>
+</div>
+<div class="modal fade" id="staffModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form id="staffForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Staff</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="staffName" class="mb-2 form-control" placeholder="Name" required>
+        <input type="text" id="staffPosition" class="mb-2 form-control" placeholder="Position" required>
+        <input type="number" id="staffSalary" class="mb-2 form-control" placeholder="Salary" min="0" required>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+      <!-- Products Table -->
+      <div class="mt-4 d-none" id="productsSection">
+        <h5>Products</h5>
+        <button class="mb-2 btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal">Add Product</button>
+        <button class="mb-2 btn-outline-primary btn" id="downloadAllProductsPdf">Download All Products PDF</button>
+
+        <table class="table table-sm table-striped">
+          <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+          <tbody id="productsTable"></tbody>
+        </table>
+      </div>
+
+      <!-- Customers Table -->
+      <div class="mt-4 d-none" id="customersSection">
+        <h5>Customers</h5>
+        <button class="mb-2 btn btn-primary" data-bs-toggle="modal" data-bs-target="#customerModal">Add Customer</button>
+        <table class="table table-sm table-striped">
+          <button class="mb-2 btn-outline-primary btn" id="downloadAllCustomersPdf">Download All Customers PDF</button>
+          <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Actions</th></tr></thead>
+          <tbody id="customersTable"></tbody>
+        </table>
+      </div>
+
+      <!-- Finance Table -->
+      <div class="mt-4 d-none" id="financeSection">
+        <h5>Finance</h5>
+        <button class="mb-2 btn btn-primary" data-bs-toggle="modal" data-bs-target="#financeModal">Add Record</button>
+         <button class="btn btn-primary btn-sm" id="downloadAllFinancePdf">
+  <i class="bi bi-download"></i> Download All Finance
+</button>
+
+        <table class="table table-sm table-striped">
+          <thead><tr><th>Type</th><th>Description</th><th>Amount</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="financeTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals (Login, Orders, Products, Customers, Finance) -->
+<!-- Order Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="orderForm">
+        <div class="modal-title"><h5 class="modal-title">Add Order</h5></div>
+        <div class="modal-body">
+          <div class="mb-2 row g-2">
+            <div class="col-md-6"><label>Customer Name</label><input class="form-control" id="orderCustomer" required></div>
+            <div class="col-md-6"><label>Phone Number</label><input class="form-control" id="orderPhone"></div>
+          </div>
+          <div class="mb-2 row g-2">
+            <div class="col-md-6"><label>Delivery Date</label><input type="date" class="form-control" id="orderDate" required></div>
+          </div>
+          <div id="orderItemsContainer"></div>
+          <button type="button" class="mt-2 btn btn-secondary" id="addOrderItemBtn">Add Item</button>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary">Save Order</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal fade" id="productModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="productForm">
+        <div class="modal-header"><h5 class="modal-title">Add Product</h5></div>
+        <div class="modal-body">
+          <input class="mb-2 form-control" placeholder="Name" id="productName" required>
+          <input type="number" class="mb-2 form-control" placeholder="Price" id="productPrice" required>
+          <input type="number" class="mb-2 form-control" placeholder="Stock" id="productStock" required>
+        </div>
+        <div class="btn btn-primary"><button class="btn btn-primary">Save Product</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="customerForm">
+        <div class="modal-header"><h5 class="modal-title">Add Customer</h5></div>
+        <div class="modal-body">
+          
+
+          <input class="mb-2 form-control" placeholder="Name" id="custName" required>
+          <input class="mb-2 form-control" placeholder="Phone" id="custPhone">
+          <input type="email" class="mb-2 form-control" placeholder="Email" id="custEmail">
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary">Save Customer</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Finance Modal -->
+<div class="modal fade" id="financeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="financeForm">
+        <div class="modal-header"><h5 class="modal-title">Add Finance Record</h5></div>
+        <div class="modal-body">
+          <input class="mb-2 form-control" placeholder="Type" id="financeType" required>
+          <input class="mb-2 form-control" placeholder="Description" id="financeDesc" required>
+          <input type="number" class="mb-2 form-control" placeholder="Amount" id="financeAmount" required>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary">Save Record</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+const firebaseConfig = { 
+  apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
+  authDomain: "gamers-65b44.firebaseapp.com",
+  projectId: "gamers-65b44",
+  storageBucket: "gamers-65b44.firebasestorage.app",
+  messagingSenderId: "97331968745",
+  appId: "1:97331968745:web:2eccb28330c0d8c1dcce78",
+  measurementId: "G-LWMJSKDJ9T"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// ----- Login Modal -----
+const loginModal = new bootstrap.Modal(document.getElementById('loginModal'), { backdrop:'static', keyboard:false });
+auth.onAuthStateChanged(user=>{
+  if(user){ loginModal.hide(); document.body.style.overflow='auto'; }
+  else loginModal.show();
+});
+document.getElementById('loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  try{
+    await auth.signInWithEmailAndPassword(
+      document.getElementById('loginEmail').value,
+      document.getElementById('loginPassword').value
+    );
+  }catch(err){ alert(err.message); }
+});
+// Logout button
+const logoutBtn = document.createElement('button');
+logoutBtn.textContent='Logout';
+logoutBtn.classList.add('btn','btn-sm','btn-danger','ms-2');
+logoutBtn.addEventListener('click',()=> auth.signOut());
+document.querySelector('header .d-flex').appendChild(logoutBtn);
+
+// ----- Sidebar Toggle -----
+const sidebar = document.getElementById('sidebar');
+document.getElementById('sidebarToggle').addEventListener('click',()=> sidebar.classList.toggle('show'));
+sidebar.querySelectorAll('a[data-view]').forEach(link=>{
+  link.addEventListener('click',()=>{
+    const view = link.dataset.view;
+    document.getElementById('currentViewTitle').textContent = link.textContent.trim();
+    document.querySelectorAll('#dashboardView > div').forEach(div=>div.classList.add('d-none'));
+    if(document.getElementById(view+'Section')) document.getElementById(view+'Section').classList.remove('d-none');
+    if(window.innerWidth<992) sidebar.classList.remove('show');
+  });
+});
+
+function setupDashboardCounters() {
+  db.collection('orders').onSnapshot(snapshot => {
+    let pending = 0, completed = 0, totalSales = 0;
+
+    snapshot.forEach(doc => {
+      const o = doc.data();
+      const items = Array.isArray(o.items) ? o.items : [];
+      const total = items.reduce((sum, i) => sum + (i.qty || 0) * (i.price || 0), 0);
+      totalSales += total;
+
+      if (o.status && o.status.toLowerCase() === 'completed') completed++;
+      else pending++;
+    });
+
+    document.getElementById('totalSales').textContent = `KSh ${totalSales}`;
+    document.getElementById('pendingOrders').textContent = pending;
+    document.getElementById('completedOrders').textContent = completed;
+  });
+
+  db.collection('products').onSnapshot(snapshot => {
+    let lowStockCount = 0;
+    snapshot.forEach(doc => {
+      const stock = doc.data().stock ?? 0;
+      if (stock <= 5) lowStockCount++;
+    });
+    document.getElementById('lowStock').textContent = lowStockCount;
+  });
+}
+
+// Run after page is ready
+document.addEventListener('DOMContentLoaded', setupDashboardCounters);
+
+
+// ----- Generic Delete -----
+async function deleteDoc(col,id){
+  if(confirm('Delete this record?')) await db.collection(col).doc(id).delete();
+}
+
+// ----- Generic PDF -----
+async function downloadPDF(col,id){
+  const { jsPDF } = window.jspdf;
+  const docSnap = await db.collection(col).doc(id).get();
+  if(!docSnap.exists) return alert('Record not found');
+  const data = docSnap.data();
+  const pdf = new jsPDF();
+  pdf.setFontSize(16);
+  pdf.text(`${col.toUpperCase()} RECORD`, 14, 20);
+  let y=30;
+  for(let k in data) pdf.text(`${k}: ${JSON.stringify(data[k])}`, 14, y+=10);
+  pdf.save(`${col}_${id}.pdf`);
+}
+
+// ----- Products -----
+let editProductId=null;
+const productForm=document.getElementById('productForm');
+const productsTable=document.getElementById('productsTable');
+db.collection('products').onSnapshot(snap=>{
+  productsTable.innerHTML='';
+  snap.forEach(doc=>{
+    const p=doc.data();
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${p.name}</td><td>${p.price}</td><td>${p.stock}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="editProduct('${doc.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('products','${doc.id}')">Delete</button>
+        <button class="btn btn-sm btn-success" onclick="downloadPDF('products','${doc.id}')">PDF</button>
+      </td>`;
+    productsTable.appendChild(tr);
+  });
+});
+productForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const name=document.getElementById('productName').value.trim();
+  const price=Number(document.getElementById('productPrice').value);
+  const stock=Number(document.getElementById('productStock').value);
+  if(!name||isNaN(price)||isNaN(stock)) return alert('Fill all fields correctly');
+  if(editProductId) { await db.collection('products').doc(editProductId).update({name,price,stock}); editProductId=null; }
+  else await db.collection('products').add({name,price,stock});
+  bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+  productForm.reset();
+});
+async function editProduct(id){
+  const docSnap=await db.collection('products').doc(id).get();
+  if(!docSnap.exists) return alert('Product not found');
+  const p=docSnap.data();
+  document.getElementById('productName').value=p.name;
+  document.getElementById('productPrice').value=p.price;
+  document.getElementById('productStock').value=p.stock;
+  editProductId=id;
+  new bootstrap.Modal(document.getElementById('productModal')).show();
+}
+
+// ----- Customers -----
+let editCustomerId=null;
+const customerForm=document.getElementById('customerForm');
+const customersTable=document.getElementById('customersTable');
+db.collection('customers').onSnapshot(snap=>{
+  customersTable.innerHTML='';
+  snap.forEach(doc=>{
+    const c=doc.data();
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${c.name}</td><td>${c.phone||''}</td><td>${c.email||''}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="editCustomer('${doc.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('customers','${doc.id}')">Delete</button>
+        <button class="btn btn-sm btn-success" onclick="downloadPDF('customers','${doc.id}')">PDF</button>
+      </td>`;
+    customersTable.appendChild(tr);
+  });
+});
+customerForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const name=document.getElementById('custName').value.trim();
+  const phone=document.getElementById('custPhone').value.trim();
+  const email=document.getElementById('custEmail').value.trim();
+  if(!name||!phone||!email) return alert('Fill all fields correctly');
+  if(editCustomerId) { await db.collection('customers').doc(editCustomerId).update({name,phone,email}); editCustomerId=null; }
+  else await db.collection('customers').add({name,phone,email});
+  bootstrap.Modal.getInstance(document.getElementById('customerModal')).hide();
+  customerForm.reset();
+});
+async function editCustomer(id){
+  const docSnap=await db.collection('customers').doc(id).get();
+  if(!docSnap.exists) return alert('Customer not found');
+  const c=docSnap.data();
+  document.getElementById('custName').value=c.name;
+  document.getElementById('custPhone').value=c.phone;
+  document.getElementById('custEmail').value=c.email;
+  editCustomerId=id;
+  new bootstrap.Modal(document.getElementById('customerModal')).show();
+}
+sidebar.querySelectorAll('a[data-view]').forEach(link => {
+  link.addEventListener('click', () => {
+    const view = link.dataset.view;
+    document.getElementById('currentViewTitle').textContent = link.textContent.trim();
+
+    // Hide all sections
+    document.querySelectorAll('#dashboardView > div').forEach(div => div.classList.add('d-none'));
+
+    // Show the selected section
+    if (view === 'dashboard') {
+      // Show the cards row
+      document.querySelector('#dashboardView .row.g-3').classList.remove('d-none');
+    } else if (document.getElementById(view + 'Section')) {
+      document.getElementById(view + 'Section').classList.remove('d-none');
+    }
+
+    // Close sidebar on mobile
+    if (window.innerWidth < 992) sidebar.classList.remove('show');
+  });
+});
+
+
+
+// ----- Finance -----
+let editFinanceId=null;
+const financeForm=document.getElementById('financeForm');
+const financeTable=document.getElementById('financeTable');
+db.collection('finance').onSnapshot(snap=>{
+  financeTable.innerHTML='';
+  snap.forEach(doc=>{
+    const f=doc.data();
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${f.type}</td><td>${f.description}</td><td>${f.amount}</td><td>${f.date||''}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="editFinance('${doc.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('finance','${doc.id}')">Delete</button>
+        <button class="btn btn-sm btn-success" onclick="downloadPDF('finance','${doc.id}')">PDF</button>
+      </td>`;
+    financeTable.appendChild(tr);
+  });
+});
+financeForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const type=document.getElementById('financeType').value;
+  const description=document.getElementById('financeDesc').value.trim();
+  const amount=Number(document.getElementById('financeAmount').value);
+  const date=new Date().toISOString().split('T')[0];
+  if(!description||isNaN(amount)) return alert('Fill all fields correctly');
+  if(editFinanceId){ await db.collection('finance').doc(editFinanceId).update({type,description,amount,date}); editFinanceId=null;}
+  else await db.collection('finance').add({type,description,amount,date});
+  bootstrap.Modal.getInstance(document.getElementById('financeModal')).hide();
+  financeForm.reset();
+});
+async function editFinance(id){
+  const docSnap=await db.collection('finance').doc(id).get();
+  if(!docSnap.exists) return alert('Record not found');
+  const f=docSnap.data();
+  document.getElementById('financeType').value=f.type;
+  document.getElementById('financeDesc').value=f.description;
+  document.getElementById('financeAmount').value=f.amount;
+  editFinanceId=id;
+  new bootstrap.Modal(document.getElementById('financeModal')).show();
+}
+
+// ----- Download All Reports -----
+// ----- Download All Reports -----
+async function downloadAll(col, title, headers) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(18); doc.text(title, 14, 20);
+  doc.setFontSize(11); doc.setTextColor(100);
+
+  const snapshot = await db.collection(col).get();
+  if (snapshot.empty) return alert(`No ${col} to download`);
+
+  const rows = [];
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if (col === 'orders') {
+      // If you stored items array in your orders
+      const items = (data.items || []).map(i => `${i.name}(${i.qty})`).join(', ');
+      const total = (data.items || []).reduce((sum, i) => sum + i.qty * i.price, 0);
+      const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : '';
+      rows.push([doc.id, data.customer || '', data.phone || '', date, items, `KSh ${total}`, data.status || 'Pending']);
+    } else if (col === 'products') {
+      rows.push([doc.id, data.name || '', data.price != null ? `KSh ${data.price}` : '', data.stock != null ? data.stock : '']);
+    } else if (col === 'customers') {
+      rows.push([doc.id, data.name || '', data.phone || '', data.email || '']);
+    } else if (col === 'finance') {
+      const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : '';
+      rows.push([doc.id, data.type || '', data.description || '', data.amount != null ? `KSh ${data.amount}` : '', date]);
+    }
+  });
+
+  doc.autoTable({
+    head: headers,
+    body: rows,
+    startY: 30,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [52, 58, 64], textColor: 255 },
+    theme: 'striped'
+  });
+
+  const finalY = doc.lastAutoTable.finalY || 30;
+  doc.setFontSize(12);
+  doc.text(`Total ${col.charAt(0).toUpperCase() + col.slice(1)}: ${rows.length}`, 14, finalY + 10);
+  doc.save(`${col}_report.pdf`);
+}
+
+// ----- Event Listeners -----
+document.getElementById('downloadAllOrdersPdf').addEventListener('click', () =>
+  downloadAll('orders', 'All Orders Report', [['Order ID','Customer','Phone','Date','Items','Total','Status']])
+);
+document.getElementById('downloadAllProductsPdf').addEventListener('click', () =>
+  downloadAll('products', 'Products Report', [['ID','Name','Price','Stock']])
+);
+document.getElementById('downloadAllCustomersPdf').addEventListener('click', () =>
+  downloadAll('customers', 'Customers Report', [['ID','Name','Phone','Email']])
+);
+document.getElementById('downloadAllFinancePdf').addEventListener('click', () =>
+  downloadAll('finance', 'Finance Report', [['ID','Type','Description','Amount','Date']])
+);
+</script>
+
+<script>
+document.getElementById('downloadAllOrdersPdf').addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Fetch all orders
+  const snapshot = await db.collection('orders').get();
+  if (snapshot.empty) return alert("No orders to download");
+
+  // Prepare data for table
+  const ordersData = snapshot.docs.map(doc => {
+    const o = doc.data();
+    const itemsList = (Array.isArray(o.items) ? o.items : []).map(i => `${i.name} (${i.qty})`).join(', ');
+    const total = (Array.isArray(o.items) ? o.items : []).reduce((sum, i) => sum + (i.qty || 0) * (i.price || 0), 0);
+    return [
+      doc.id,
+      o.customer || '',
+      o.phone || '',
+      o.date || '',
+      itemsList,
+      `KSh ${total}`,
+      o.status || 'Pending'
+    ];
+  });
+
+  // Total sales
+  const totalSales = snapshot.docs.reduce((sum, doc) => {
+    const o = doc.data();
+    return sum + (Array.isArray(o.items) ? o.items.reduce((s, i) => s + (i.qty || 0) * (i.price || 0), 0) : 0);
+  }, 0);
+
+  // Title
+  doc.setFontSize(18);
+  doc.text("All Orders Report", 14, 20);
+  doc.setFontSize(11);
+  doc.setTextColor(100);
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+
+  // AutoTable
+  doc.autoTable({
+    startY: 35,
+    head: [['Order ID', 'Customer', 'Phone', 'Date', 'Items', 'Total', 'Status']],
+    body: ordersData,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    foot: [['', '', '', '', 'Total Sales', `KSh ${totalSales}`, '']],
+    footStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' }
+  });
+
+  doc.save(`All_Orders_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+});
+
+// ----- Orders -----
+const orderForm = document.getElementById('orderForm');
+const ordersTable = document.getElementById('ordersTable');
+const orderItemsContainer = document.getElementById('orderItemsContainer');
+
+// Add new order item row
+function addOrderItemRow() {
+  const div = document.createElement('div');
+  div.classList.add('mb-2', 'row', 'g-2', 'order-item');
+  div.innerHTML = `
+    <div class="col-md-5">
+      <select class="form-select productSelect" required>
+        <option value="">Loading...</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <input type="number" class="form-control qtyInput" placeholder="Qty" value="1" min="1" required>
+    </div>
+    <div class="col-md-3">
+      <input type="number" class="form-control priceInput" placeholder="Price" readonly>
+    </div>
+    <div class="col-md-1">
+      <button type="button" class="w-100 btn btn-danger" onclick="this.closest('.order-item').remove()">X</button>
+    </div>
+  `;
+  orderItemsContainer.appendChild(div);
+
+  const select = div.querySelector('.productSelect');
+  db.collection('products').get().then(snap => {
+    select.innerHTML = '<option value="">-- Select Product --</option>';
+    snap.forEach(doc => select.innerHTML += `<option value="${doc.id}" data-price="${doc.data().price}">${doc.data().name}</option>`);
+    select.addEventListener('change', function () {
+      div.querySelector('.priceInput').value = this.selectedOptions[0].dataset.price || 0;
+    });
+  });
+}
+
+document.getElementById('addOrderItemBtn').addEventListener('click', addOrderItemRow);
+
+// Submit new order
+orderForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const items = [];
+  document.querySelectorAll('#orderItemsContainer .order-item').forEach(div => {
+    const select = div.querySelector('.productSelect');
+    const qty = parseInt(div.querySelector('.qtyInput').value);
+    const price = parseFloat(div.querySelector('.priceInput').value);
+    if (select.value) items.push({ productId: select.value, name: select.selectedOptions[0].textContent, qty, price });
+  });
+  if (items.length === 0) return alert("Add at least one item");
+
+  await db.collection('orders').add({
+    customer: document.getElementById('orderCustomer').value,
+    phone: document.getElementById('orderPhone').value,
+    date: document.getElementById('orderDate').value,
+    items,
+    status: 'Pending',
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  orderForm.reset();
+  orderItemsContainer.innerHTML = '';
+  bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
+});
+
+// Mark order complete
+async function markOrderComplete(id) {
+  await db.collection('orders').doc(id).update({ status: 'Completed' });
+}
+
+// Delete document
+async function deleteDoc(collection, id) {
+  if (!confirm("Are you sure you want to delete this?")) return;
+  await db.collection(collection).doc(id).delete();
+}
+
+// Download individual order receipt
+async function downloadOrderReceipt(orderId) {
+  const { jsPDF } = window.jspdf;
+  const docSnap = await db.collection('orders').doc(orderId).get();
+  if (!docSnap.exists) return alert("Order not found");
+  const o = docSnap.data();
+  const doc = new jsPDF();
+  doc.text("Order Receipt", 20, 20);
+  doc.text(`Order ID: ${orderId}`, 20, 30);
+  doc.text(`Customer: ${o.customer}`, 20, 40);
+  doc.text(`Phone: ${o.phone}`, 20, 50);
+  doc.text(`Date: ${o.date}`, 20, 60);
+  let y = 80, total = 0;
+  (o.items || []).forEach(i => { doc.text(`${i.name} - ${i.qty} x ${i.price} = ${i.qty * i.price}`, 20, y); y += 10; total += i.qty * i.price; });
+  doc.text(`Total: KSh ${total}`, 20, y + 10);
+  doc.save(`receipt_${orderId}.pdf`);
+}
+
+// ----- Render Orders -----
+function renderOrders(snapshot) {
+  ordersTable.innerHTML = '';
+  // Convert snapshot to array with fallback timestamp
+  const ordersArray = snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      timestamp: data.timestamp ? data.timestamp.toMillis() : 0 // fallback to 0 for old orders
+    };
+  });
+
+  // Sort by timestamp descending
+  ordersArray.sort((a, b) => b.timestamp - a.timestamp);
+
+  ordersArray.forEach(o => {
+    const tr = document.createElement('tr');
+    const itemsList = (Array.isArray(o.items) ? o.items : []).map(i => `${i.name} (${i.qty})`).join(', ');
+    const total = (Array.isArray(o.items) ? o.items : []).reduce((sum, i) => sum + (i.qty || 0) * (i.price || 0), 0);
+    tr.innerHTML = `
+      <td>${o.id}</td>
+      <td>${o.customer || ''}</td>
+      <td>${o.phone || ''}</td>
+      <td>${o.date || ''}</td>
+      <td>${itemsList}</td>
+      <td>KSh ${total}</td>
+      <td>${o.status || 'Pending'}</td>
+      <td>
+        <button class="btn btn-sm btn-success" onclick="markOrderComplete('${o.id}')">Complete</button>
+        <button class="btn btn-sm btn-primary" onclick="downloadOrderReceipt('${o.id}')">Receipt</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('orders','${o.id}')">Delete</button>
+      </td>
+    `;
+    ordersTable.appendChild(tr);
+  });
+}
+
+// Snapshot listener
+db.collection('orders').onSnapshot(renderOrders);
+
+</script>
+<script>
+  document.getElementById('staffBtn').addEventListener('click', () => {
+  // Hide other sections
+  document.querySelectorAll('#ordersSection, #productsSection, #financeSection').forEach(s => s.classList.add('d-none'));
+  
+  // Show staff section
+  document.getElementById('staffSection').classList.remove('d-none');
+});
+// ----- Staff Management -----
+const staffForm = document.getElementById('staffForm');
+const staffTable = document.getElementById('staffTable');
+const downloadAllStaffPdfBtn = document.getElementById('downloadAllStaffPdf');
+let editStaffId = null; // To track editing staff
+
+// Add or Update Staff
+staffForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = document.getElementById('staffName').value.trim();
+  const position = document.getElementById('staffPosition').value.trim();
+  const salary = parseFloat(document.getElementById('staffSalary').value);
+  if(!name || !position || isNaN(salary)) return alert("Please fill all fields correctly");
+
+  if(editStaffId){
+    // Update existing staff
+    await db.collection('staff').doc(editStaffId).update({ name, position, salary });
+    editStaffId = null;
+  } else {
+    // Add new staff
+    await db.collection('staff').add({
+      name, position, salary, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  staffForm.reset();
+  bootstrap.Modal.getInstance(document.getElementById('staffModal')).hide();
+});
+
+// Render Staff Table
+function renderStaff(snapshot){
+  staffTable.innerHTML = '';
+  let totalSalary = 0;
+  snapshot.forEach(doc => {
+    const s = doc.data();
+    totalSalary += s.salary || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${doc.id}</td>
+      <td>${s.name}</td>
+      <td>${s.position}</td>
+      <td>KSh ${s.salary}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="editStaff('${doc.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteDoc('staff','${doc.id}')">Delete</button>
+      </td>
+    `;
+    staffTable.appendChild(tr);
+  });
+  // Total salary row
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td colspan="3" class="text-end"><strong>Total Salary:</strong></td><td colspan="2"><strong>KSh ${totalSalary}</strong></td>`;
+  staffTable.appendChild(tr);
+}
+
+// Listen for staff changes
+db.collection('staff').orderBy('timestamp', 'desc').onSnapshot(renderStaff);
+
+// Edit Staff
+function editStaff(id){
+  db.collection('staff').doc(id).get().then(doc=>{
+    if(!doc.exists) return alert("Staff not found");
+    const s = doc.data();
+    document.getElementById('staffName').value = s.name;
+    document.getElementById('staffPosition').value = s.position;
+    document.getElementById('staffSalary').value = s.salary;
+    editStaffId = id;
+    new bootstrap.Modal(document.getElementById('staffModal')).show();
+  });
+}
+
+// Download All Staff PDF
+downloadAllStaffPdfBtn.addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text("Staff Report", 14, 20);
+  doc.setFontSize(12);
+  
+  const snapshot = await db.collection('staff').orderBy('timestamp', 'desc').get();
+  if(snapshot.empty) return alert("No staff to download");
+  
+  const tableData = [];
+  let totalSalary = 0;
+  snapshot.forEach(doc => {
+    const s = doc.data();
+    tableData.push([doc.id, s.name, s.position, `KSh ${s.salary}`]);
+    totalSalary += s.salary || 0;
+  });
+  
+  doc.autoTable({
+    head: [['Staff ID', 'Name', 'Position', 'Salary']],
+    body: tableData,
+    startY: 30
+  });
+  
+  doc.text(`Total Salary: KSh ${totalSalary}`, 14, doc.lastAutoTable.finalY + 10);
+  doc.save('staff_report.pdf');
+});
+
+</script>
+
+</body>
+</html>
