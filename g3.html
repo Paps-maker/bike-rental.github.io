@@ -1,0 +1,1761 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gaming Admin Dashboard — Firebase</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Firebase (compat CDN for easy browser usage) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root{--bg:#071021;--card:#0b1220;--muted:#9aa4b2;--accent:#7c3aed}
+    body{background:linear-gradient(180deg,#071021 0%,#071829 60%);color:#e6eef6;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    .app-shell{display:flex;min-height:100vh}
+    .sidebar{width:260px;padding:1rem;background:rgba(255,255,255,0.02);border-right:1px solid rgba(255,255,255,0.03)}
+    .main{flex:1;padding:1rem}
+    .stat-card{background:var(--card);padding:1rem;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
+    .station-card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); border-radius:8px;padding:.7rem;margin-bottom:.6rem}
+    .rounded-input{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:.45rem .6rem;border-radius:6px;color:inherit}
+    .logo-preview{width:64px;height:64px;border-radius:6px;object-fit:contain}
+    .btn-accent{background:var(--accent);border:none;color:#fff}
+    @media (max-width:900px){ .sidebar{display:none} .app-shell{flex-direction:column} }
+  </style>
+</head>
+<style>
+  /* Make select inputs visible on dark modal */
+  #modalSession select,
+  #modalSession input,
+  #modalSession textarea {
+    background-color: #343a40; /* dark gray */
+    color: #fff;               /* white text */
+    border: 1px solid #555;    /* subtle border for contrast */
+  }
+
+  #modalSession select option {
+    background-color: #343a40; /* dark for dropdown options */
+    color: #fff;               /* white text */
+  }
+
+  #modalSession .rounded-input:focus {
+    background-color: #495057; /* slightly lighter on focus */
+    color: #fff;
+  }
+</style>
+
+<body>
+  <!-- Authentication modals -->
+  <div class="modal fade" id="authModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="bg-dark text-white modal-content">
+    <div class="modal-header"><h5 id="authTitle" class="modal-title">Admin Sign In</h5></div>
+    <div class="modal-body">
+      <div class="mb-2"><input id="authEmail" class="rounded-input w-100" placeholder="Email" type="email"></div>
+      <div class="mb-2"><input id="authPassword" class="rounded-input w-100" placeholder="Password" type="password"></div>
+      <div id="authMessage" class="small-muted"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline-light btn" id="toggleAuthMode">Create account</button>
+      <button class="btn btn-accent" id="authSubmit">Sign in</button>
+    </div>
+  </div></div></div>
+
+  <!-- main app -->
+  <div class="app-shell" id="appShell" style="display:none">
+    <aside class="d-flex flex-column sidebar">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <img id="logoPreviewSidebar" style="display:none" class="logo-preview" />
+        <div>
+          <div class="mb-0 h5" id="businessTitle">Gaming Centre Admin</div>
+          <div class="small-muted" id="businessSubtitle">Manage sessions & tournaments</div>
+        </div>
+      </div>
+
+      <nav class="flex-column mb-3 nav">
+        <a class="nav-link active" data-section="dashboard">Dashboard</a>
+        <a class="nav-link" data-section="sessions">Sessions</a>
+        <a class="nav-link" data-section="stations">Stations</a>
+        <a class="nav-link" data-section="games">Games</a>
+        <a class="nav-link" data-section="tournaments">Tournaments</a>
+        <a class="nav-link" data-section="memberships">Memberships</a>
+        <a class="nav-link" data-section="birthdays">Birthdays</a>
+        <a class="nav-link" data-section="offers">Offers</a>
+        <a class="nav-link" data-section="reports">Reports</a>
+        <a class="nav-link" data-section="settings">Settings</a>
+        <hr style="border-color:rgba(255,255,255,0.03)">
+        <a class="text-danger nav-link" id="btnLogout"><i class="bi-box-arrow-right bi"></i> Logout</a>
+      </nav>
+
+      <div class="mt-auto small-muted">Realtime via Firestore</div>
+    </aside>
+
+    <main class="main">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div><h4 id="pageTitle">Dashboard</h4></div>
+        <div class="d-flex align-items-center gap-2">
+          <input id="globalSearch" class="rounded-input" placeholder="Search players/games..." />
+          <button class="btn btn-light" id="btnExportAllPdf"><i class="bi bi-download"></i> Export PDF</button>
+        </div>
+      </div>
+
+      <!-- Sections -->
+      <section id="section-dashboard" class="section">
+        <div class="mb-3 row g-3">
+          <div class="col-6 col-md-3"><div class="stat-card"><div class="small-muted">Active Sessions</div><div id="statActive" class="mt-1 h4">0</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat-card"><div class="small-muted">Stations In Use</div><div id="statInUse" class="mt-1 h4">0 / 0</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat-card"><div class="small-muted">Today's Revenue</div><div id="statRevenue" class="mt-1 h4">KSh 0</div></div></div>
+          <div class="col-6 col-md-3"><div class="stat-card"><div class="small-muted">Tournaments</div><div id="statTournaments" class="mt-1 h6">0</div></div></div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="mb-3 stat-card">
+              <div class="d-flex align-items-center justify-content-between">
+                <div><strong>Stations</strong><div class="small-muted">Start/Stop sessions</div></div>
+                <div><button class="btn btn-sm btn-accent" id="btnNewSession">New Session</button></div>
+              </div>
+              <div id="stationsList" class="mt-3"></div>
+            </div>
+
+            <div class="stat-card">
+              <strong>Active Sessions</strong>
+              <div id="activeSessionsList" class="mt-2"></div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <div class="mb-3 stat-card">
+              <div class="d-flex justify-content-between">
+                <div><strong>Tournaments</strong><div class="small-muted">Manage entries</div></div>
+                <div><button class="btn-outline-light btn btn-sm" id="btnNewTournament">New</button></div>
+              </div>
+              <div id="tournamentsList" class="mt-3"></div>
+            </div>
+
+            <div class="stat-card">
+              <strong>Offers & Birthdays</strong>
+              <div id="birthdaysList" class="mt-2 small-muted"></div>
+              <div id="offersList" class="mt-2 small-muted"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sessions Section -->
+      <section id="section-sessions" style="display:none">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div><h5>Sessions</h5><div class="small-muted">Manage sessions & receipts</div></div>
+          <div>
+            <button class="btn-outline-light btn" id="btnDownloadSessionsPdf">Download Sessions PDF</button>
+            <button class="btn btn-accent" id="btnCreateSession">Create Session</button>
+          </div>
+        </div>
+        <div id="allSessionsList"></div>
+      </section>
+
+      <!-- Stations -->
+      <section id="section-stations" style="display:none">
+        <div class="d-flex justify-content-between mb-2"><div><h5>Stations</h5></div><div><button class="btn-outline-light btn" id="btnResetStations">Reset Stations</button></div></div>
+        <div id="manageStations" class="row g-2"></div>
+      </section>
+
+      <!-- Games -->
+      <section id="section-games" style="display:none">
+        <div class="d-flex justify-content-between mb-2"><div><h5>Games</h5></div><div><button class="btn btn-accent" id="btnAddGame">Add Game</button></div></div>
+        <div id="gamesList" class="row g-2"></div>
+      </section>
+
+      <!-- Tournaments -->
+<!-- Tournaments Section -->
+<section id="section-tournaments" style="display:none">
+  <div class="d-flex justify-content-between mb-2">
+    <div><h5>Tournaments</h5></div>
+    <button class="btn btn-sm btn-primary" id="btnAddTournament">➕ Add Tournament</button>
+
+  </div>
+  <div id="tournamentsAdminList"></div>
+</section>
+
+
+
+      <!-- Memberships -->
+      <section id="section-memberships" style="display:none">
+        <div class="d-flex justify-content-between mb-2"><div><h5>Memberships</h5></div><div><button class="btn btn-accent" id="btnAddMembership">Add</button></div></div>
+        <button class="mb-2 btn btn-accent" id="btnExportMembersPdf">Download Members PDF</button>
+
+        <div id="membershipsList"></div>
+      </section>
+
+      <!-- Birthdays -->
+      <section id="section-birthdays" style="display:none">
+  <div class="d-flex justify-content-between mb-2">
+    <div><h5>Birthdays</h5></div>
+    <div><button class="btn btn-accent" id="btnAddBirthday">Add</button></div>
+  </div>
+  <div id="birthdaysAdminList"></div>
+  <div class="mt-2" id="birthdaysList"></div> <!-- top 3 birthdays display -->
+</section>
+
+
+      <!-- Offers -->
+     <section id="section-offers" style="display:none">
+  <div class="d-flex justify-content-between mb-2">
+    <div><h5>Offers</h5></div>
+    <div><button class="btn btn-accent" id="btnCreateOffer">New Offer</button></div>
+  </div>
+  <div id="offersAdminList"></div>
+  <div class="mt-2" id="offersList"></div> <!-- Top 3 offers for dashboard -->
+</section>
+
+
+      <!-- Reports -->
+      <section id="section-reports" style="display:none">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div><h5>Reports</h5><div class="small-muted">Generate PDF reports</div></div>
+          <div>
+            <input type="date" id="reportFrom" class="rounded-input" /> to
+            <input type="date" id="reportTo" class="rounded-input" />
+            <button class="btn btn-accent" id="btnGenerateReport">Generate PDF</button>
+          </div>
+        </div>
+        <div id="reportPreview"></div>
+      </section>
+
+      <!-- Settings -->
+      <section id="section-settings" style="display:none">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="stat-card">
+              <h6>Business / Receipt</h6>
+              <div class="mb-2 small-muted">Upload logo and details</div>
+              <input id="logoUpload" type="file" accept="image/*" />
+              <div class="mt-2"><input id="businessName" class="rounded-input w-100" placeholder="Business name"></div>
+              <div class="mt-2"><input id="businessAddress" class="rounded-input w-100" placeholder="Address"></div>
+            </div>
+            <div class="mt-3 stat-card">
+              <h6>Pricing & Stations</h6>
+              <div class="small-muted">Default rate per hour (KSh)</div>
+              <input id="defaultRate" type="number" class="rounded-input" value="300" />
+              <div class="mt-2 small-muted">Stations</div>
+              <input id="stationsCount" type="number" class="rounded-input" value="6" min="1" />
+              <div class="mt-2"><button class="btn-outline-light btn" id="btnSaveSettings">Save Settings</button></div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="stat-card">
+              <h6>Quick Actions</h6>
+              <div class="mt-2">
+                <button class="btn-outline-light btn" id="btnClearDataLocal">Clear local cache</button>
+                <button class="btn-outline-light btn" id="btnLoadDemo">Load demo data</button>
+              </div>
+            </div>
+            <div class="mt-3 stat-card">
+              <h6>Receipt Preview</h6>
+              <div id="receiptPreview" class="mt-2"></div>
+              <div class="mt-2"><button class="btn btn-light" id="btnPrintDemoReceipt">Print Demo Receipt</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modals / small forms used by app -->
+  <!-- Create/Edit Session Modal -->
+  <div class="modal fade" id="modalSession" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="bg-dark text-white modal-content">
+    <div class="modal-header"><h5 class="modal-title">Create Session</h5></div>
+    <div class="modal-body">
+      <div class="mb-2"><input id="sessionPlayer" class="rounded-input w-100" placeholder="Player name"></div>
+      <div class="mb-2"><select id="sessionStation" class="rounded-input w-100"></select></div>
+      <div class="mb-2"><select id="sessionGame" class="rounded-input w-100"></select></div>
+      <div class="mb-2"><select id="sessionType" class="rounded-input w-100"><option value="hourly">Hourly</option><option value="custom">Per Game</option></select></div>
+      <div class="mb-2" id="durationRow"><input id="sessionDuration" type="number" class="rounded-input w-100" value="60"></div>
+      <div class="mb-2"><input id="sessionPrice" type="number" class="rounded-input w-100"></div>
+      <div class="mb-2"><textarea id="sessionNotes" class="rounded-input w-100" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline-light btn" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-accent" id="saveSessionBtn">Create</button>
+    </div>
+  </div></div></div>
+  <!-- Add/Edit Game Modal -->
+<div class="modal fade" id="gameModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <form id="gameForm">
+        <div class="border-0 modal-header">
+          <h5 class="modal-title fw-bold" id="gameModalTitle">Add Game</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="gameId">
+          <div class="mb-3">
+            <label class="text-muted form-label">Game Name</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="gameName" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Category</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="gameCategory" placeholder="e.g. FPS, Fighting, Sports">
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Price per Hour (KSh)</label>
+            <input type="number" class="bg-secondary border-0 text-light form-control" id="gamePrice" value="300" required>
+          </div>
+        </div>
+        <div class="border-0 modal-footer">
+          <button type="submit" class="px-4 btn btn-primary"> Save</button>
+          <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Add/Edit Tournament Modal -->
+
+<div class="modal fade" id="tournamentModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <form id="tournamentForm">
+        <div class="border-0 modal-header">
+          <h5 class="modal-title fw-bold" id="tournamentModalTitle">Add Tournament</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="tournamentId">
+          <div class="mb-3">
+            <label class="text-muted form-label">Tournament Name</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="tournamentName" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Game</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="tournamentGame" placeholder="e.g. Call of Duty, FIFA 26" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Date</label>
+            <input type="date" class="bg-secondary border-0 text-light form-control" id="tournamentDate" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Entry Fee (KSh)</label>
+            <input type="number" class="bg-secondary border-0 text-light form-control" id="tournamentFee" placeholder="300" required>
+          </div>
+        </div>
+        <div class="border-0 modal-footer">
+          <button type="submit" class="px-4 btn btn-primary">Save</button>
+          <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="registerPlayerModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <form id="registerPlayerForm">
+        <div class="border-0 modal-header">
+          <h5 class="modal-title">Register Player / Team</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="regTournamentId">
+          <div class="mb-3">
+            <label class="text-muted form-label">Player / Team Name</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="regPlayerName" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Contact Info</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="regPlayerContact" placeholder="Email or Phone">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="regPlayerPaid">
+            <label class="text-light form-check-label" for="regPlayerPaid">Paid Entry Fee</label>
+          </div>
+        </div>
+        <div class="border-0 modal-footer">
+          <button type="submit" class="px-4 btn btn-success"> Register</button>
+          <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="viewPlayersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <div class="border-0 modal-header">
+        <h5 class="modal-title" id="viewPlayersTitle">Registered Players</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-dark table-striped" id="playersTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Paid</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="border-0 modal-footer">
+        <button class="btn btn-success" id="exportPlayersPdf">📄 Download All Players PDF</button>
+        <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add/Edit Membership Modal -->
+<div class="modal fade" id="membershipModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <form id="membershipForm">
+        <div class="border-0 modal-header">
+          <h5 class="modal-title" id="membershipModalTitle">Add Membership</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="membershipId">
+          <div class="mb-3">
+            <label class="text-muted form-label">Membership Name</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="membershipName" placeholder="e.g. Gold, Silver, Platinum" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Price (KSh)</label>
+            <input type="number" class="bg-secondary border-0 text-light form-control" id="membershipPrice" value="1000" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Duration (Months)</label>
+            <input type="number" class="bg-secondary border-0 text-light form-control" id="membershipDuration" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Description</label>
+            <textarea class="bg-secondary border-0 text-light form-control" id="membershipDesc" rows="3" placeholder="Optional details about the membership"></textarea>
+          </div>
+        </div>
+        <div class="border-0 modal-footer">
+          <button type="submit" class="px-4 btn btn-primary">💾 Save</button>
+          <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Add/Edit Birthday Modal -->
+<!-- Add/Edit Birthday Modal -->
+<div class="modal fade" id="birthdayModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <form id="birthdayForm">
+        <div class="border-0 modal-header">
+          <h5 class="modal-title" id="birthdayModalTitle">Add Birthday</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="birthdayId">
+          <div class="mb-3">
+            <label class="text-muted form-label">Name</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="birthdayName" placeholder="Player/Customer Name" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Date of Birth</label>
+            <input type="date" class="bg-secondary border-0 text-light form-control" id="birthdayDate" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Phone</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="birthdayPhone" placeholder="Optional phone">
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Notes</label>
+            <textarea class="bg-secondary border-0 text-light form-control" id="birthdayNotes" rows="2" placeholder="Optional notes"></textarea>
+          </div>
+        </div>
+        <div class="border-0 modal-footer">
+          <button type="submit" class="px-4 btn btn-primary">💾 Save</button>
+          <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Add/Edit Offer Modal -->
+<div class="modal fade" id="offerModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="bg-dark shadow-lg border-0 rounded-3 text-light modal-content">
+      <form id="offerForm">
+        <div class="border-0 modal-header">
+          <h5 class="modal-title" id="offerModalTitle">New Offer</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="offerId">
+          <div class="mb-3">
+            <label class="text-muted form-label">Game</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="offerGame" placeholder="Game name or 'All'" required>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Description</label>
+            <input type="text" class="bg-secondary border-0 text-light form-control" id="offerDesc" placeholder="Offer description">
+          </div>
+          <div class="mb-3">
+            <label class="text-muted form-label">Discount (%)</label>
+            <input type="number" class="bg-secondary border-0 text-light form-control" id="offerDiscount" placeholder="0">
+          </div>
+        </div>
+        <div class="border-0 modal-footer">
+          <button type="submit" class="px-4 btn btn-primary">💾 Save</button>
+          <button type="button" class="btn-outline-light btn" data-bs-dismiss="modal">✖ Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+
+  <!-- Tournament / Offer / Birthday modals simplified (not repeated to keep file concise) -->
+<!-- jsPDF core -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- jsPDF AutoTable plugin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Bootstrap Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  /************************************************************************
+   * Firebase-enabled single-file admin dashboard
+   *
+   * Replace the firebaseConfig below with your project's config.
+   * Ensure "Email/Password" sign-in is enabled in Firebase Authentication.
+   *
+   * Firestore collections used:
+   *  - settings (single doc id: 'global')
+   *  - stations (docs per station)
+   *  - games
+   *  - sessions
+   *  - tournaments
+   *  - offers
+   *  - birthdays
+   *  - memberships
+   *
+   * IMPORTANT: Secure your DB with rules so only authenticated admins can read/write.
+   ************************************************************************/
+
+  // ---------- Put your Firebase config here (replace placeholders) ----------
+  const firebaseConfig = {
+   apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:bf708184ffad9e76b98139",
+  measurementId: "G-4HJ16YWNYB"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // ---------- Simple auth UI ----------
+  const authModal = new bootstrap.Modal(document.getElementById('authModal'));
+  let authMode = 'login'; // or 'signup'
+  const $ = sel => document.querySelector(sel);
+
+  $('#authSubmit').addEventListener('click', async ()=>{
+    const email = $('#authEmail').value.trim();
+    const pw = $('#authPassword').value;
+    try{
+      if(authMode === 'login'){
+        await auth.signInWithEmailAndPassword(email, pw);
+      } else {
+        await auth.createUserWithEmailAndPassword(email, pw);
+        // optionally mark new user as admin in Firestore (requires a server or manual promotion)
+      }
+      $('#authMessage').textContent = '';
+    } catch(err){
+      $('#authMessage').textContent = err.message;
+    }
+  });
+
+  $('#toggleAuthMode').addEventListener('click', ()=>{
+    authMode = authMode === 'login' ? 'signup' : 'login';
+    $('#authTitle').textContent = authMode === 'login' ? 'Admin Sign In' : 'Create Admin Account';
+    $('#authSubmit').textContent = authMode === 'login' ? 'Sign in' : 'Create';
+    $('#toggleAuthMode').textContent = authMode === 'login' ? 'Create account' : 'Back to sign in';
+  });
+
+  // ---------- State & helper utils ----------
+  const state = {
+    settings: null,
+    stations: {},   // stationId -> station doc
+    games: {},      // gameId -> game doc
+    sessions: {},   // sessionId -> session doc
+    tournaments: {},
+    offers: {},
+    birthdays: {},
+    memberships: {}
+  };
+
+  function uid(n=8){ return Math.random().toString(36).slice(2,2+n); }
+  function fmtDate(d){ return d ? new Date(d).toLocaleString() : '-'; }
+  function formatDuration(sec){
+    sec = Math.max(0, Math.floor(sec||0));
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  }
+
+  // ---------- Auth state listener ----------
+  auth.onAuthStateChanged(async user=>{
+    if(user){
+      // optionally verify user is admin (e.g., check custom claim or a Firestore 'admins' collection)
+      document.getElementById('appShell').style.display = 'flex';
+      authModal.hide();
+      initRealtimeListeners();
+    } else {
+      document.getElementById('appShell').style.display = 'none';
+      authModal.show();
+    }
+  });
+
+  // Logout
+  $('#btnLogout').addEventListener('click', ()=> auth.signOut());
+
+  // ---------- Realtime listeners (Firestore onSnapshot) ----------
+  let unsubscribers = [];
+  function initRealtimeListeners(){
+    // settings (single doc)
+    const settingsDoc = db.collection('settings').doc('global');
+    unsubscribers.push(settingsDoc.onSnapshot(doc=>{
+      state.settings = doc.exists ? doc.data() : null;
+      renderSettingsUI();
+    }));
+
+    // stations
+    unsubscribers.push(db.collection('stations').orderBy('name').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=>{
+        const id = ch.doc.id;
+        if(ch.type === 'removed') delete state.stations[id]; else state.stations[id] = { id, ...ch.doc.data() };
+      });
+      renderStations();
+    }));
+
+    // games
+    unsubscribers.push(db.collection('games').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=> state.games[ch.doc.id] = { id: ch.doc.id, ...ch.doc.data() });
+      renderGames();
+    }));
+
+    // sessions (live)
+    unsubscribers.push(db.collection('sessions').orderBy('startTime','desc').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=>{
+        if(ch.type === 'removed') delete state.sessions[ch.doc.id];
+        else state.sessions[ch.doc.id] = { id: ch.doc.id, ...ch.doc.data() };
+      });
+      renderDashboard();
+      renderAllSessions();
+      renderActiveSessions();
+    }));
+
+    // tournaments
+    unsubscribers.push(db.collection('tournaments').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=> state.tournaments[ch.doc.id] = {id:ch.doc.id, ...ch.doc.data()});
+      renderTournamentsAdmin();
+    }));
+
+    // offers
+    unsubscribers.push(db.collection('offers').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=> state.offers[ch.doc.id] = {id:ch.doc.id, ...ch.doc.data()});
+      renderOffers();
+    }));
+
+    // birthdays
+    unsubscribers.push(db.collection('birthdays').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=> state.birthdays[ch.doc.id] = {id:ch.doc.id, ...ch.doc.data()});
+      renderBirthdays();
+    }));
+
+    // memberships
+    unsubscribers.push(db.collection('memberships').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=> state.memberships[ch.doc.id] = {id:ch.doc.id, ...ch.doc.data()});
+      renderMemberships();
+    }));
+  }
+
+  // ---------- Render functions ----------
+  function setActiveSection(key){
+    document.querySelectorAll('.sidebar .nav-link').forEach(a=> a.classList.toggle('active', a.dataset.section === key));
+    document.querySelectorAll('section').forEach(s => s.style.display = (s.id === 'section-'+key) ? 'block' : 'none');
+    document.getElementById('pageTitle').textContent = key.charAt(0).toUpperCase() + key.slice(1);
+    if(key === 'dashboard') renderDashboard();
+    if(key === 'sessions') renderAllSessions();
+    if(key === 'stations') renderStationsAdmin();
+    if(key === 'games') renderGames();
+    if(key === 'tournaments') renderTournamentsAdmin();
+    if(key === 'memberships') renderMemberships();
+    if(key === 'birthdays') renderBirthdaysAdmin();
+    if(key === 'offers') renderOffersAdmin();
+    if(key === 'reports') renderReportPreview();
+    if(key === 'settings') renderSettingsUI();
+  }
+
+  document.querySelectorAll('.sidebar .nav-link').forEach(a => a.addEventListener('click', (e)=> { e.preventDefault(); setActiveSection(a.dataset.section); }));
+
+  // Dashboard stats and station list
+  function renderDashboard(){
+    const sessionsArr = Object.values(state.sessions || {});
+    const activeCount = sessionsArr.filter(s=> s.status === 'active').length;
+    $('#statActive').textContent = activeCount;
+    const stationArr = Object.values(state.stations || {});
+    const inUse = stationArr.filter(st=> st.status === 'busy').length;
+    $('#statInUse').textContent = `${inUse} / ${stationArr.length}`;
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    let revenue = 0;
+    sessionsArr.forEach(s => { if(s.endTime && new Date(s.endTime) >= todayStart) revenue += (s.price || 0); });
+    $('#statRevenue').textContent = `KSh ${revenue.toLocaleString()}`;
+    $('#statTournaments').textContent = Object.keys(state.tournaments || {}).length;
+
+    // stationsList
+    const list = $('#stationsList'); list.innerHTML = '';
+    stationArr.forEach(st => {
+      const div = document.createElement('div');
+      div.className = 'station-card d-flex justify-content-between align-items-center';
+      div.innerHTML = `<div><div class="fw-bold">${st.name}</div><div class="small-muted">${st.status==='busy' ? 'In Use' : 'Available'}</div><div class="small-muted">${st.currentSessionId ? (state.sessions[st.currentSessionId] ? state.sessions[st.currentSessionId].playerName : '') : ''}</div></div>
+        <div>${st.status==='free' ? `<button class="btn btn-sm btn-accent start-station-btn" data-id="${st.id}">Start</button>` : `<button class="btn-outline-light btn btn-sm stop-station-btn" data-id="${st.id}">Stop</button>`}</div>`;
+      list.appendChild(div);
+    });
+  }
+
+  // -------------------- TIMERS --------------------
+const timers = {}; // sessionId -> interval
+
+function computeElapsedSeconds(session) {
+  if (!session) return 0;
+  const acc = session.accumulatedSeconds || 0;
+
+  if (session.status === 'active') {
+    const now = Date.now();
+    const start = session.startTime ? new Date(session.startTime).getTime() : now;
+    return acc + Math.floor((now - start) / 1000);
+  } else if (session.endTime) {
+    const start = new Date(session.startTime).getTime();
+    const end = new Date(session.endTime).getTime();
+    return Math.max(0, Math.floor((end - start)/1000) + acc);
+  }
+
+  return acc; // paused
+}
+
+function computeElapsedStr(session) {
+  return formatDuration(computeElapsedSeconds(session));
+}
+
+function startLocalTimer(sessionId) {
+  if (timers[sessionId]) return;
+  timers[sessionId] = setInterval(() => {
+    const el = document.getElementById(`timer-${sessionId}`);
+    if (el && state.sessions[sessionId]) el.textContent = computeElapsedStr(state.sessions[sessionId]);
+  }, 1000);
+}
+
+function stopLocalTimer(sessionId) {
+  if (timers[sessionId]) {
+    clearInterval(timers[sessionId]);
+    delete timers[sessionId];
+  }
+}
+
+// -------------------- ACTIVE SESSIONS --------------------
+function renderActiveSessions() {
+  const container = $('#activeSessionsList');
+  container.innerHTML = '';
+  Object.values(state.sessions || {}).filter(s => s.status === 'active' || s.status === 'paused').forEach(s => {
+    const st = state.stations[s.stationId] || {};
+    const g = state.games[s.gameId] || {};
+    const card = document.createElement('div');
+    card.className = 'station-card d-flex justify-content-between align-items-center';
+    card.innerHTML = `
+      <div>
+        <div class="fw-bold">${s.playerName} — ${g.name || '-'}</div>
+        <div class="small-muted">${st.name || '-'}</div>
+        <div id="timer-${s.id}" class="timer-big">${computeElapsedStr(s)}</div>
+      </div>
+      <div class="d-flex flex-column gap-1">
+        <button class="btn-outline-light btn btn-sm pause-session" data-id="${s.id}">${s.status==='active'?'Pause':'Resume'}</button>
+        <button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>
+        <button class="btn btn-sm btn-light print-session" data-id="${s.id}"><i class="bi bi-printer"></i></button>
+        <button class="btn-outline-light btn btn-sm pdf-session" data-id="${s.id}"><i class="bi bi-file-earmark-pdf"></i></button>
+        <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}">Delete</button>
+      </div>
+    `;
+    container.appendChild(card);
+    if (s.status === 'active') startLocalTimer(s.id);
+  });
+}
+
+// -------------------- ALL SESSIONS --------------------
+function renderAllSessions() {
+  const wrap = $('#allSessionsList');
+  wrap.innerHTML = '';
+  const rows = Object.values(state.sessions || {}).sort((a,b) => new Date(b.startTime) - new Date(a.startTime));
+  if (rows.length === 0) {
+    wrap.innerHTML = '<div class="small-muted">No sessions yet</div>';
+    return;
+  }
+
+  rows.forEach(s => {
+    const st = state.stations[s.stationId] || {};
+    const g = state.games[s.gameId] || {};
+    const row = document.createElement('div');
+    row.className = 'station-card d-flex justify-content-between align-items-center';
+    row.innerHTML = `
+      <div>
+        <div class="fw-bold">${s.playerName} • ${g.name || '-'}</div>
+        <div class="small-muted">${st.name || '-'} • ${fmtDate(s.startTime)} • ${s.endTime ? 'Ended ' + fmtDate(s.endTime) : s.status==='paused'?'Paused':'Active'}</div>
+      </div>
+      <div class="d-flex flex-column gap-1">
+        ${s.status==='active' ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>` : ''}
+        <button class="btn btn-sm btn-light print-session" data-id="${s.id}"><i class="bi bi-printer"></i></button>
+        <button class="btn-outline-light btn btn-sm pdf-session" data-id="${s.id}"><i class="bi bi-file-earmark-pdf"></i></button>
+        <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}">Delete</button>
+      </div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+// -------------------- CREATE SESSION --------------------
+function openCreateSessionModal(prefStationId) {
+  const stationSel = $('#sessionStation'); stationSel.innerHTML = '';
+  Object.values(state.stations || {}).filter(st => st.status !== 'busy').forEach(st => {
+    const o = document.createElement('option'); o.value = st.id; o.textContent = st.name; stationSel.appendChild(o);
+  });
+  if(prefStationId) stationSel.value = prefStationId;
+
+  const gameSel = $('#sessionGame'); gameSel.innerHTML = '';
+  Object.values(state.games || {}).forEach(g => {
+    const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gameSel.appendChild(o);
+  });
+
+  $('#sessionPrice').value = state.settings?.defaultRate || 300;
+  $('#sessionDuration').value = 60;
+
+  new bootstrap.Modal($('#modalSession')).show();
+}
+
+$('#btnNewSession').addEventListener('click', () => openCreateSessionModal());
+
+$('#saveSessionBtn').addEventListener('click', async () => {
+  const player = $('#sessionPlayer').value || 'Guest';
+  const stationId = $('#sessionStation').value;
+  const gameId = $('#sessionGame').value;
+  const duration = Number($('#sessionDuration').value) || 60;
+  const price = Number($('#sessionPrice').value) || ((state.settings?.defaultRate||300) * duration/60);
+  const notes = $('#sessionNotes').value || '';
+  const startTime = new Date().toISOString();
+
+  const doc = {
+    playerName: player,
+    stationId,
+    gameId,
+    startTime,
+    accumulatedSeconds: 0,
+    status: 'active',
+    durationMinutes: duration,
+    price: Math.round(price),
+    notes
+  };
+
+  const newDocRef = await db.collection('sessions').add(doc);
+  await db.collection('stations').doc(stationId).set({ status:'busy', currentSessionId:newDocRef.id }, { merge:true });
+  bootstrap.Modal.getInstance($('#modalSession')).hide();
+  renderActiveSessions();
+  renderAllSessions();
+});
+
+// -------------------- PAUSE / RESUME --------------------
+async function togglePauseSession(sessionId) {
+  const s = state.sessions[sessionId];
+  if (!s) return;
+
+  if (s.status==='active') {
+    const elapsed = computeElapsedSeconds(s);
+    await db.collection('sessions').doc(sessionId).update({ status:'paused', accumulatedSeconds: elapsed, pausedAt: new Date().toISOString() });
+    stopLocalTimer(sessionId);
+  } else if (s.status==='paused') {
+    await db.collection('sessions').doc(sessionId).update({ status:'active', startTime: new Date().toISOString(), pausedAt: null });
+    startLocalTimer(sessionId);
+  }
+
+  renderActiveSessions();
+  renderAllSessions();
+}
+
+// -------------------- STOP SESSION --------------------
+async function stopSession(sessionId) {
+  const s = state.sessions[sessionId];
+  if (!s) return;
+  const elapsed = computeElapsedSeconds(s);
+  const rate = state.settings?.defaultRate || 300;
+  const price = Math.round((elapsed / 3600) * rate);
+
+  await db.collection('sessions').doc(sessionId).update({
+    status:'ended',
+    endTime: new Date().toISOString(),
+    accumulatedSeconds: elapsed,
+    price
+  });
+
+  if (s.stationId) await db.collection('stations').doc(s.stationId).set({ status:'free', currentSessionId:null }, { merge:true });
+
+  stopLocalTimer(sessionId);
+  renderActiveSessions();
+  renderAllSessions();
+  alert(`Session ended — price KSh ${price}`);
+}
+
+// -------------------- DELETE SESSION --------------------
+async function deleteSession(sessionId) {
+  if (!confirm('Are you sure you want to delete this session?')) return;
+  stopLocalTimer(sessionId);
+  await db.collection('sessions').doc(sessionId).delete();
+  renderActiveSessions();
+  renderAllSessions();
+}
+
+// -------------------- PDF & PRINT --------------------
+window.printReceiptFromId = async function(sessionId) {
+  const s = state.sessions[sessionId];
+  if(!s) return alert('Session not found');
+  const game = state.games[s.gameId] || {};
+  const station = state.stations[s.stationId] || {};
+  const logoHtml = state.settings?.logoUrl ? `<img src="${state.settings.logoUrl}" style="max-width:120px;margin-bottom:10px">` : '';
+  const html = `
+    <div style="font-family:Arial;color:#000">
+      ${logoHtml}<h2>${state.settings?.businessName||'Gaming Centre'}</h2>
+      <div style="font-size:12px">${state.settings?.businessAddress||''}</div>
+      <hr/>
+      <div><strong>Receipt #:</strong> ${sessionId}</div>
+      <div><strong>Customer:</strong> ${s.playerName}</div>
+      <div><strong>Station:</strong> ${station.name||''}</div>
+      <div><strong>Game:</strong> ${game.name||''}</div>
+      <div><strong>Start:</strong> ${fmtDate(s.startTime)}</div>
+      <div><strong>End:</strong> ${s.endTime?fmtDate(s.endTime):'-'}</div>
+      <div><strong>Duration:</strong> ${formatDuration(computeElapsedSeconds(s))}</div>
+      <div><strong>Price:</strong> KSh ${s.price||0}</div>
+      <hr/><div style="font-size:12px">Thank you!</div>
+    </div>`;
+  const w = window.open('','_blank','width=600,height=800');
+  w.document.write('<html><head><title>Receipt</title></head><body>'+html+'</body></html>');
+  w.document.close();
+  setTimeout(()=> w.print(), 500);
+};
+
+async function makePdfForSession(sessionId) {
+  const { jsPDF } = window.jspdf;
+  const s = state.sessions[sessionId];
+  if (!s) return alert('Session not found');
+
+  const doc = new jsPDF();
+  if (state.settings?.logoUrl) try { doc.addImage(state.settings.logoUrl, 'PNG', 15, 10, 60, 30); } catch(e){}
+  doc.setFontSize(14); doc.text(state.settings?.businessName||'Gaming Centre', 105, 20, null, null, 'center');
+
+  let y = 45;
+  doc.setFontSize(11);
+  doc.text(`Receipt #: ${sessionId}`, 15, y); y+=8;
+  doc.text(`Customer: ${s.playerName}`, 15, y); y+=8;
+  doc.text(`Station: ${state.stations[s.stationId]?.name || '-'}`, 15, y); y+=8;
+  doc.text(`Game: ${state.games[s.gameId]?.name || '-'}`, 15, y); y+=8;
+  doc.text(`Start: ${fmtDate(s.startTime)}`, 15, y); y+=8;
+  doc.text(`End: ${s.endTime ? fmtDate(s.endTime) : '-'}`, 15, y); y+=8;
+  doc.text(`Duration: ${formatDuration(computeElapsedSeconds(s))}`, 15, y); y+=8;
+  doc.text(`Price: KSh ${s.price||0}`, 15, y); y+=12;
+  doc.save(`receipt-${sessionId}.pdf`);
+}
+
+// -------------------- EVENT LISTENERS --------------------
+document.body.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.closest('.pause-session')) togglePauseSession(t.closest('.pause-session').dataset.id);
+  if (t.closest('.stop-session')) stopSession(t.closest('.stop-session').dataset.id);
+  if (t.closest('.print-session')) printReceiptFromId(t.closest('.print-session').dataset.id);
+  if (t.closest('.pdf-session')) makePdfForSession(t.closest('.pdf-session').dataset.id);
+  if (t.closest('.delete-session')) deleteSession(t.closest('.delete-session').dataset.id);
+});
+
+  // Stations management UI
+  function renderStations(){
+    const wrap = $('#manageStations'); wrap.innerHTML = '';
+    Object.values(state.stations || {}).forEach(st=>{
+      const col = document.createElement('div'); col.className = 'col-12 col-md-6';
+      col.innerHTML = `<div class="d-flex align-items-center justify-content-between stat-card"><div><strong>${st.name}</strong><div class="small-muted">${st.status}</div></div><div><button class="btn-outline-light btn btn-sm reset-station" data-id="${st.id}">Reset</button></div></div>`;
+      wrap.appendChild(col);
+    });
+    // dashboard stations also need rendering
+    renderDashboard();
+    // bind reset buttons
+    document.querySelectorAll('.reset-station').forEach(btn=> btn.onclick = async ()=> {
+      const id = btn.dataset.id; await db.collection('stations').doc(id).set({status:'free', currentSessionId:null},{merge:true});
+    });
+  }
+
+  function renderStationsAdmin(){ renderStations(); }
+
+  // Games UI
+function renderGames(){
+  const wrap = $('#gamesList'); 
+  wrap.innerHTML = '';
+
+  Object.values(state.games || {}).forEach(g=>{
+    const col = document.createElement('div'); 
+    col.className='col-12 col-md-6';
+    col.innerHTML = `
+      <div class="d-flex align-items-center justify-content-between stat-card">
+        <div>
+          <strong>${g.name}</strong>
+          <div class="small-muted">${g.category || ''} • KSh ${g.pricePerHour || state.settings?.defaultRate}</div>
+        </div>
+        <div>
+          <button class="btn-outline-primary btn btn-sm edit-game" data-id="${g.id}">Edit</button>
+          <button class="btn-outline-danger btn btn-sm delete-game" data-id="${g.id}">Delete</button>
+        </div>
+      </div>`;
+    wrap.appendChild(col);
+  });
+
+  // Open Add Game modal
+  document.getElementById('btnAddGame').onclick = ()=> {
+    $('#gameModalTitle').textContent = "Add Game";
+    $('#gameId').value = "";
+    $('#gameName').value = "";
+    $('#gameCategory').value = "";
+    $('#gamePrice').value = state.settings?.defaultRate || 300;
+    new bootstrap.Modal(document.getElementById('gameModal')).show();
+  };
+
+  // Edit game
+  document.querySelectorAll('.edit-game').forEach(btn=> btn.onclick = ()=>{
+    const g = state.games[btn.dataset.id];
+    $('#gameModalTitle').textContent = "Edit Game";
+    $('#gameId').value = g.id;
+    $('#gameName').value = g.name;
+    $('#gameCategory').value = g.category;
+    $('#gamePrice').value = g.pricePerHour;
+    new bootstrap.Modal(document.getElementById('gameModal')).show();
+  });
+
+  // Delete game
+  document.querySelectorAll('.delete-game').forEach(btn=> btn.onclick = async ()=>{
+    if(!confirm('Delete game?')) return;
+    await db.collection('games').doc(btn.dataset.id).delete();
+  });
+}
+
+// Save (Add/Edit) Game
+document.getElementById('gameForm').onsubmit = async (e)=>{
+  e.preventDefault();
+  const id = $('#gameId').value;
+  const data = {
+    name: $('#gameName').value,
+    category: $('#gameCategory').value,
+    pricePerHour: Number($('#gamePrice').value) || (state.settings?.defaultRate||300)
+  };
+  if(id){
+    await db.collection('games').doc(id).update(data);
+  } else {
+    await db.collection('games').add(data);
+  }
+  bootstrap.Modal.getInstance(document.getElementById('gameModal')).hide();
+};
+
+  // Tournaments
+ document.addEventListener('DOMContentLoaded', ()=>{
+
+  // Add Tournament button
+  document.getElementById('btnAddTournament').onclick = ()=>{
+    $('#tournamentModalTitle').textContent = "Add Tournament";
+    $('#tournamentId').value = "";
+    $('#tournamentName').value = "";
+    $('#tournamentGame').value = "";
+    $('#tournamentDate').value = "";
+    $('#tournamentFee').value = "300";
+    new bootstrap.Modal(document.getElementById('tournamentModal')).show();
+  };
+
+  renderTournamentsAdmin();
+});
+
+// Render tournaments list
+function renderTournamentsAdmin(){
+  const wrap = $('#tournamentsAdminList'); wrap.innerHTML = '';
+  Object.values(state.tournaments||{}).forEach(t=>{
+    const div = document.createElement('div');
+    div.className = 'station-card d-flex justify-content-between align-items-center mb-2 p-2';
+    div.innerHTML = `
+      <div>
+        <strong>${t.name}</strong>
+        <div class="small-muted">${t.game || '-'} • ${t.date || '-'}</div>
+        <div class="small-muted">Fee: KSh ${t.fee || 0}</div>
+      </div>
+      <div>
+        <button class="btn btn-sm btn-success register-player-btn" data-id="${t.id}">Register</button>
+        <button class="btn btn-sm btn-primary edit-tournament-btn" data-id="${t.id}">Edit</button>
+        <button class="btn btn-sm btn-danger delete-tournament-btn" data-id="${t.id}">Delete</button>
+        <button class="btn btn-sm btn-info view-players-btn" data-id="${t.id}">View Players</button>
+      </div>`;
+    wrap.appendChild(div);
+  });
+  attachTournamentButtons();
+}
+
+// Attach buttons
+function attachTournamentButtons(){
+  // Register player
+  document.querySelectorAll('.register-player-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      $('#regTournamentId').value = btn.dataset.id;
+      $('#regPlayerName').value = '';
+      $('#regPlayerContact').value = '';
+      $('#regPlayerPaid').checked = false;
+      new bootstrap.Modal(document.getElementById('registerPlayerModal')).show();
+    };
+  });
+
+  // Edit tournament
+  document.querySelectorAll('.edit-tournament-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const t = state.tournaments[btn.dataset.id];
+      $('#tournamentModalTitle').textContent = "Edit Tournament";
+      $('#tournamentId').value = t.id;
+      $('#tournamentName').value = t.name;
+      $('#tournamentGame').value = t.game;
+      $('#tournamentDate').value = t.date;
+      $('#tournamentFee').value = t.fee;
+      new bootstrap.Modal(document.getElementById('tournamentModal')).show();
+    };
+  });
+
+  // Delete tournament
+  document.querySelectorAll('.delete-tournament-btn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      if(!confirm('Delete this tournament?')) return;
+      await db.collection('tournaments').doc(btn.dataset.id).delete();
+    };
+  });
+
+  // View players
+  document.querySelectorAll('.view-players-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const t = state.tournaments[btn.dataset.id];
+      $('#viewPlayersTitle').textContent = `Players: ${t.name}`;
+      const tbody = $('#playersTable tbody'); tbody.innerHTML = '';
+      (t.participants||[]).forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${p.contact||'-'}</td>
+          <td>${p.paid?'✅':'❌'}</td>
+          <td>
+            <button class="btn btn-sm btn-warning edit-player-btn" data-tid="${t.id}" data-pid="${p.id}">Edit</button>
+            <button class="btn btn-sm btn-danger delete-player-btn" data-tid="${t.id}" data-pid="${p.id}">Delete</button>
+            <button class="btn btn-sm btn-primary print-receipt-btn" data-tid="${t.id}" data-pid="${p.id}">Print Receipt</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
+    };
+  });
+}
+
+// Add/Edit Tournament form
+document.getElementById('tournamentForm').onsubmit = async e=>{
+  e.preventDefault();
+  const id = $('#tournamentId').value;
+  const data = {
+    name: $('#tournamentName').value,
+    game: $('#tournamentGame').value,
+    date: $('#tournamentDate').value,
+    fee: Number($('#tournamentFee').value)
+  };
+  if(id) await db.collection('tournaments').doc(id).update(data);
+  else await db.collection('tournaments').add(data);
+  bootstrap.Modal.getInstance(document.getElementById('tournamentModal')).hide();
+  renderTournamentsAdmin();
+};
+
+// Register player form
+document.getElementById('registerPlayerForm').onsubmit = async e=>{
+  e.preventDefault();
+  const tid = $('#regTournamentId').value;
+  const participant = {
+    id: uid(),
+    name: $('#regPlayerName').value,
+    contact: $('#regPlayerContact').value,
+    paid: $('#regPlayerPaid').checked,
+    timestamp: Date.now()
+  };
+  await db.collection('tournaments').doc(tid).update({
+    participants: firebase.firestore.FieldValue.arrayUnion(participant)
+  });
+  bootstrap.Modal.getInstance(document.getElementById('registerPlayerModal')).hide();
+  alert('Player / Team registered successfully!');
+  renderTournamentsAdmin();
+};
+
+// Print receipt per player
+document.addEventListener('click', e=>{
+  if(e.target.classList.contains('print-receipt-btn')){
+    const tid = e.target.dataset.tid;
+    const pid = e.target.dataset.pid;
+    const t = state.tournaments[tid];
+    const p = (t.participants||[]).find(x=>x.id===pid);
+    if(!p) return alert('Player not found');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Tournament Receipt', 14, 20);
+    doc.setFontSize(12);
+    doc.text(`Tournament: ${t.name}`, 14, 40);
+    doc.text(`Player/Team: ${p.name}`, 14, 50);
+    doc.text(`Contact: ${p.contact||'-'}`, 14, 60);
+    doc.text(`Entry Fee: KSh ${t.fee || 0}`, 14, 70);
+    const startTime = new Date(p.timestamp).toLocaleString();
+    const stopTime = new Date().toLocaleString();
+    doc.text(`Start Time: ${startTime}`, 14, 80);
+    doc.text(`Receipt Time: ${stopTime}`, 14, 90);
+    doc.save(`${p.name}_${t.name}_receipt.pdf`);
+  }
+});
+
+// Download all players PDF
+document.getElementById('exportPlayersPdf').onclick = () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const title = document.getElementById('viewPlayersTitle').textContent || 'Players';
+  doc.setFontSize(16);
+  doc.text(title, 14, 20);
+
+  const rows = [];
+  const tbody = document.querySelectorAll('#playersTable tbody tr');
+  tbody.forEach(tr => {
+    const cols = Array.from(tr.querySelectorAll('td')).slice(0,3).map(td => td.textContent);
+    rows.push(cols);
+  });
+
+  doc.autoTable({
+    head: [['Name', 'Contact', 'Paid']],
+    body: rows,
+    startY: 30,
+  });
+
+  doc.save(`${title.replace(/\s+/g,'_')}_players.pdf`);
+};
+
+
+  // Offers & birthdays & memberships rendering
+  document.addEventListener('DOMContentLoaded', () => {
+
+  const offersAdminList = document.getElementById('offersAdminList');
+  const offersTopList = document.getElementById('offersList');
+  const btnCreateOffer = document.getElementById('btnCreateOffer');
+  const offerForm = document.getElementById('offerForm');
+  const offerModalEl = document.getElementById('offerModal');
+
+  // Render Offers
+  function renderOffers(state){
+    offersAdminList.innerHTML = '';
+    const offersArr = Object.values(state.offers || {});
+
+    // Admin List
+    offersArr.forEach(o => {
+      const div = document.createElement('div');
+      div.className = 'station-card d-flex justify-content-between align-items-center mb-2 p-2';
+      div.innerHTML = `
+        <div>
+          <strong>${o.game || 'All'}</strong>
+          <div class="small-muted">${o.desc || ''} • ${o.discount || 0}%</div>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-primary edit-offer-btn" data-id="${o.id}">Edit</button>
+          <button class="btn btn-sm btn-danger remove-offer-btn" data-id="${o.id}">Remove</button>
+        </div>
+      `;
+      offersAdminList.appendChild(div);
+    });
+
+    // Top 3 offers for dashboard
+    offersTopList.innerHTML = offersArr.slice(0,3)
+      .map(o => `• ${o.game}: ${o.desc || ''} (${o.discount || 0}%)`)
+      .join('<br>') || '<div class="small-muted">No offers</div>';
+
+    // Remove Offer
+    document.querySelectorAll('.remove-offer-btn').forEach(btn => {
+      btn.onclick = async () => {
+        if(!confirm('Delete this offer?')) return;
+        await db.collection('offers').doc(btn.dataset.id).delete();
+      };
+    });
+
+    // Edit Offer
+    document.querySelectorAll('.edit-offer-btn').forEach(btn => {
+      btn.onclick = () => {
+        const o = state.offers[btn.dataset.id];
+        document.getElementById('offerModalTitle').textContent = "Edit Offer";
+        document.getElementById('offerId').value = o.id;
+        document.getElementById('offerGame').value = o.game || '';
+        document.getElementById('offerDesc').value = o.desc || '';
+        document.getElementById('offerDiscount').value = o.discount || 0;
+        new bootstrap.Modal(offerModalEl).show();
+      };
+    });
+  }
+
+  // Add New Offer Button
+  btnCreateOffer.addEventListener('click', () => {
+    document.getElementById('offerModalTitle').textContent = "New Offer";
+    document.getElementById('offerId').value = "";
+    document.getElementById('offerGame').value = "";
+    document.getElementById('offerDesc').value = "";
+    document.getElementById('offerDiscount').value = 0;
+    new bootstrap.Modal(offerModalEl).show();
+  });
+
+  // Offer Form Submission
+  offerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('offerId').value;
+    const data = {
+      game: document.getElementById('offerGame').value,
+      desc: document.getElementById('offerDesc').value,
+      discount: Number(document.getElementById('offerDiscount').value) || 0
+    };
+
+    if(id) await db.collection('offers').doc(id).update(data);
+    else await db.collection('offers').add(data);
+
+    bootstrap.Modal.getInstance(offerModalEl).hide();
+  });
+
+  // Firestore real-time updates
+  db.collection('offers').onSnapshot(snapshot => {
+    const state = { offers: {} };
+    snapshot.forEach(doc => {
+      state.offers[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    renderOffers(state);
+  });
+
+});
+
+ window.onload = () => {
+
+  const birthdaysAdminList = document.getElementById('birthdaysAdminList');
+  const birthdaysTopList = document.getElementById('birthdaysList');
+  const btnAddBirthday = document.getElementById('btnAddBirthday');
+  const birthdayForm = document.getElementById('birthdayForm');
+
+  // ----------------------------
+  // Render birthdays
+  // ----------------------------
+  function renderBirthdays(state) {
+    birthdaysAdminList.innerHTML = '';
+    const birthdaysArr = Object.values(state.birthdays || {});
+
+    birthdaysArr.forEach(b => {
+      const div = document.createElement('div');
+      div.className = 'station-card d-flex justify-content-between align-items-center mb-2 p-2';
+      div.innerHTML = `
+        <div>
+          <strong>${b.name}</strong>
+          <div class="small-muted">${b.dob || '-'} • ${b.phone || '-'}</div>
+          <div class="small-muted">${b.notes || ''}</div>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-primary edit-birthday-btn" data-id="${b.id}">Edit</button>
+          <button class="btn btn-sm btn-danger remove-b" data-id="${b.id}">Remove</button>
+        </div>
+      `;
+      birthdaysAdminList.appendChild(div);
+    });
+
+    // Top 3 birthdays
+    birthdaysTopList.innerHTML = birthdaysArr
+      .sort((a,b)=> new Date(a.dob) - new Date(b.dob))
+      .slice(0,3)
+      .map(b=>`• ${b.name} — ${b.dob}`)
+      .join('<br>') || '<div class="small-muted">No birthdays</div>';
+
+    // Remove
+    document.querySelectorAll('.remove-b').forEach(btn=>{
+      btn.onclick = async ()=>{
+        if(!confirm('Delete this birthday?')) return;
+        await db.collection('birthdays').doc(btn.dataset.id).delete();
+      };
+    });
+
+    // Edit
+    document.querySelectorAll('.edit-birthday-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        const b = state.birthdays[btn.dataset.id];
+        document.getElementById('birthdayModalTitle').textContent = "Edit Birthday";
+        document.getElementById('birthdayId').value = b.id;
+        document.getElementById('birthdayName').value = b.name;
+        document.getElementById('birthdayDate').value = b.dob;
+        document.getElementById('birthdayPhone').value = b.phone || '';
+        document.getElementById('birthdayNotes').value = b.notes || '';
+        new bootstrap.Modal(document.getElementById('birthdayModal')).show();
+      };
+    });
+  }
+
+  // ----------------------------
+  // Add Birthday Button
+  // ----------------------------
+  btnAddBirthday.addEventListener('click', ()=>{
+    document.getElementById('birthdayModalTitle').textContent = "Add Birthday";
+    document.getElementById('birthdayId').value = "";
+    document.getElementById('birthdayName').value = "";
+    document.getElementById('birthdayDate').value = "";
+    document.getElementById('birthdayPhone').value = "";
+    document.getElementById('birthdayNotes').value = "";
+    new bootstrap.Modal(document.getElementById('birthdayModal')).show();
+  });
+
+  // ----------------------------
+  // Form Submit
+  // ----------------------------
+  birthdayForm.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = document.getElementById('birthdayId').value;
+    const data = {
+      name: document.getElementById('birthdayName').value,
+      dob: document.getElementById('birthdayDate').value,
+      phone: document.getElementById('birthdayPhone').value,
+      notes: document.getElementById('birthdayNotes').value
+    };
+
+    if(id) await db.collection('birthdays').doc(id).update(data);
+    else await db.collection('birthdays').add(data);
+
+    bootstrap.Modal.getInstance(document.getElementById('birthdayModal')).hide();
+  });
+
+  // ----------------------------
+  // Subscribe to Firestore updates
+  // ----------------------------
+  db.collection('birthdays').onSnapshot(snapshot=>{
+    const state = { birthdays: {} };
+    snapshot.forEach(doc=>{
+      state.birthdays[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    renderBirthdays(state);
+  });
+
+};
+
+  // Render memberships list
+function renderMemberships() {
+  const out = $('#membershipsList');
+  out.innerHTML = '';
+
+  Object.values(state.memberships || {}).forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'station-card d-flex justify-content-between align-items-center mb-2 p-2';
+    div.innerHTML = `
+      <div>
+        <strong>${m.name}</strong>
+        <div class="small-muted">KSh ${m.price} • ${m.duration || 1} month(s)</div>
+        <div class="small-muted">${m.description || ''}</div>
+      </div>
+      <div>
+        <button class="btn btn-sm btn-primary edit-membership-btn" data-id="${m.id}">Edit</button>
+        <button class="btn btn-sm btn-danger remove-m" data-id="${m.id}">Remove</button>
+      </div>
+    `;
+    out.appendChild(div);
+  });
+
+  // Remove membership
+  document.querySelectorAll('.remove-m').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Delete this membership?')) return;
+      await db.collection('memberships').doc(btn.dataset.id).delete();
+    };
+  });
+
+  // Edit membership
+  document.querySelectorAll('.edit-membership-btn').forEach(btn => {
+    btn.onclick = () => {
+      const m = state.memberships[btn.dataset.id];
+      $('#membershipModalTitle').textContent = "Edit Membership";
+      $('#membershipId').value = m.id;
+      $('#membershipName').value = m.name;
+      $('#membershipPrice').value = m.price;
+      $('#membershipDuration').value = m.duration || 1;
+      $('#membershipDesc').value = m.description || '';
+      new bootstrap.Modal(document.getElementById('membershipModal')).show();
+    };
+  });
+}
+
+// Add membership button
+$('#btnAddMembership').onclick = () => {
+  $('#membershipModalTitle').textContent = "Add Membership";
+  $('#membershipId').value = "";
+  $('#membershipName').value = "";
+  $('#membershipPrice').value = "1000";
+  $('#membershipDuration').value = "1";
+  $('#membershipDesc').value = "";
+  new bootstrap.Modal(document.getElementById('membershipModal')).show();
+};
+
+// Membership form submission
+$('#membershipForm').onsubmit = async e => {
+  e.preventDefault();
+  const id = $('#membershipId').value;
+  const data = {
+    name: $('#membershipName').value,
+    price: Number($('#membershipPrice').value),
+    duration: Number($('#membershipDuration').value),
+    description: $('#membershipDesc').value
+  };
+
+  if (id) await db.collection('memberships').doc(id).update(data);
+  else await db.collection('memberships').add(data);
+
+  bootstrap.Modal.getInstance(document.getElementById('membershipModal')).hide();
+  renderMemberships();
+};
+$('#btnExportMembersPdf').onclick = () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p','pt','a4');
+
+  // Header
+  const businessName = state.settings?.businessName || 'Gaming Centre';
+  doc.setFontSize(18);
+  doc.setFont('helvetica','bold');
+  doc.text(businessName, 40, 40);
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica','normal');
+  doc.text(`Memberships Report — ${new Date().toLocaleString()}`, 40, 60);
+
+  // Prepare table
+  const membershipsArr = Object.values(state.memberships || {});
+  const tableBody = membershipsArr.map(m => [
+    m.name,
+    `KSh ${m.price}`,
+    `${m.duration || 1} month(s)`,
+    m.description || '-'
+  ]);
+
+  doc.autoTable({
+    startY: 80,
+    head: [['Membership', 'Price', 'Duration', 'Description']],
+    body: tableBody,
+    styles: { fontSize: 10, cellPadding: 4 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 40, right: 40 },
+    didDrawPage: (data) => {
+      const page = doc.internal.getNumberOfPages();
+      doc.setFontSize(10);
+      doc.text(`Page ${page}`, data.settings.margin.left, doc.internal.pageSize.height - 10);
+    }
+  });
+
+  doc.save('memberships-report.pdf');
+};
+
+
+  // Settings UI
+  function renderSettingsUI(){
+    $('#businessName').value = state.settings?.businessName || '';
+    $('#businessAddress').value = state.settings?.businessAddress || '';
+    $('#defaultRate').value = state.settings?.defaultRate || 300;
+    $('#stationsCount').value = Object.keys(state.stations||{}).length || 6;
+    if(state.settings?.logoUrl){ $('#logoPreviewSidebar').src = state.settings.logoUrl; $('#logoPreviewSidebar').style.display = 'block'; $('#businessTitle').textContent = state.settings.businessName || 'Gaming Centre'; }
+  }
+
+  // Save settings & stations count
+  $('#btnSaveSettings').addEventListener('click', async ()=>{
+    const businessName = $('#businessName').value;
+    const businessAddress = $('#businessAddress').value;
+    const defaultRate = Number($('#defaultRate').value) || 300;
+    await db.collection('settings').doc('global').set({ businessName, businessAddress, defaultRate }, { merge:true });
+    // adjust stations count
+    const desired = Number($('#stationsCount').value) || 6;
+    const existing = Object.keys(state.stations||{}).length;
+    if(desired > existing){
+      for(let i=existing+1;i<=desired;i++){
+        await db.collection('stations').doc('s'+i).set({ id:'s'+i, name:'Station '+i, status:'free', currentSessionId:null });
+      }
+    } else if(desired < existing){
+      // caution: do not delete active stations. here we only keep docs up to desired; you might want to add safe deletion logic.
+      // For safety we won't auto-delete; just inform user
+      alert('Reducing station count requires manual deletion of station docs in Firestore or implement safe removal logic.');
+    }
+    alert('Settings saved');
+  });
+
+  // Logo upload store in settings as data URL
+  $('#logoUpload').addEventListener('change', (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = async ()=> {
+      const url = reader.result;
+      // save to settings
+      await db.collection('settings').doc('global').set({ logoUrl: url }, { merge:true });
+    };
+    reader.readAsDataURL(f);
+  });
+
+  // Add demo data
+  $('#btnLoadDemo').addEventListener('click', async ()=>{
+    if(!confirm('Load demo content to Firestore?')) return;
+    // add sample games
+    const sampleGames = ['Call of Duty','Battlefield','God of War','Mortal Kombat','FC 26'];
+    for(const name of sampleGames) await db.collection('games').add({ name, category:'Game', pricePerHour:300 });
+    // add stations if none
+    const stCount = Object.keys(state.stations||{}).length;
+    if(stCount === 0) for(let i=1;i<=6;i++) await db.collection('stations').doc('s'+i).set({ id:'s'+i, name:'Station '+i, status:'free', currentSessionId:null });
+    alert('Demo data added — refresh will show it.');
+  });
+
+  // small utilities for adding offers, birthdays, membership via prompt buttons
+  $('#btnCreateOffer').addEventListener('click', async ()=>{
+    const game = prompt('Game name or all'); if(game === null) return;
+    const desc = prompt('Offer description'); const discount = Number(prompt('Discount %','20'))||0;
+    await db.collection('offers').add({ game, desc, discount, from:null, to:null });
+  });
+  $('#btnAddBirthday').addEventListener('click', async ()=>{
+    const name = prompt('Customer name'); if(!name) return;
+    const dob = prompt('DOB (YYYY-MM-DD)'); const phone = prompt('Phone');
+    await db.collection('birthdays').add({ name, dob, phone });
+  });
+  $('#btnAddMembership').addEventListener('click', async ()=>{
+    const name = prompt('Plan name'); if(!name) return;
+    const price = Number(prompt('Price','2000'))||0; await db.collection('memberships').add({ name, price });
+  });
+
+  // Generate report by date range: preview (and call export)
+  $('#btnGenerateReport').addEventListener('click', async ()=>{
+    const from = $('#reportFrom').value ? new Date($('#reportFrom').value) : null;
+    const to = $('#reportTo').value ? new Date($('#reportTo').value) : null;
+    // Query sessions between dates (simple client filter)
+    const rows = Object.values(state.sessions||{}).filter(s=>{
+      if(!from && !to) return true;
+      const st = new Date(s.startTime);
+      if(from && st < from) return false;
+      if(to){ to.setHours(23,59,59,999); if(st > to) return false; }
+      return true;
+    });
+    $('#reportPreview').innerHTML = `<div class="stat-card"><h6>Preview (${rows.length})</h6><div style="max-height:300px;overflow:auto"><table class="table table-dark table-sm"><thead><tr><th>Receipt</th><th>Customer</th><th>Game</th><th>Start</th><th>End</th><th>Price</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.id}</td><td>${r.playerName}</td><td>${state.games[r.gameId]?.name||''}</td><td>${fmtDate(r.startTime)}</td><td>${r.endTime?fmtDate(r.endTime):'-'}</td><td>KSh ${r.price||0}</td></tr>`).join('')}</tbody></table></div></div>`;
+    // generate PDF
+    $('#btnExportAllPdf').click();
+  });
+
+  // Search
+  $('#globalSearch').addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toLowerCase();
+    if(!q) { renderAllSessions(); return; }
+    const match = Object.values(state.sessions||{}).filter(s => (s.playerName||'').toLowerCase().includes(q) || (state.games[s.gameId]?.name||'').toLowerCase().includes(q));
+    const wrap = $('#allSessionsList'); wrap.innerHTML = `<div class="small-muted">Search results (${match.length})</div>` + match.map(s=>`<div class="d-flex align-items-center justify-content-between station-card"><div><strong>${s.playerName}</strong><div class="small-muted">${state.games[s.gameId]?.name||''}</div></div><div><button class="btn btn-sm btn-light" onclick="printReceiptFromId('${s.id}')"><i class="bi bi-printer"></i></button></div></div>`).join('');
+  });
+
+  // Bind some small page-level actions
+  $('#btnOpenSessions')?.addEventListener('click', ()=> setActiveSection('sessions'));
+  $('#btnDownloadSessionsPdf')?.addEventListener('click', ()=> $('#btnExportAllPdf').click());
+
+  // Clean up unsubscribers on unload
+  window.addEventListener('beforeunload', ()=> unsubscribers.forEach(u=> u && typeof u === 'function' && u()));
+
+  // Initial UI state
+  setActiveSection('dashboard');
+
+  // NOTE: Firestore Security Rules (example)
+  // In your Firebase console -> Firestore -> Rules, ensure you have something like:
+  /*
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /{document=**} {
+          allow read, write: if request.auth != null; // restrict more in production
+        }
+      }
+    }
+  */
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+  // ---------- Export all sessions to PDF ----------
+  document.getElementById('btnDownloadSessionsPdf').addEventListener('click', async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+
+    // Business title
+    const businessName = state.settings?.businessName || 'Gaming Centre';
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(businessName, 40, 40);
+
+    // Report title
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Sessions Report — ${new Date().toLocaleString()}`, 40, 60);
+
+    // Prepare table data
+    const sessionsArr = Object.values(state.sessions || {}).sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    const tableBody = sessionsArr.map(s => [
+      s.id,
+      s.playerName,
+      state.games[s.gameId]?.name || '-',
+      state.stations[s.stationId]?.name || '-',
+      fmtDate(s.startTime),
+      s.endTime ? fmtDate(s.endTime) : '-',
+      s.status,
+      `KSh ${s.price || 0}`
+    ]);
+
+    // AutoTable
+    doc.autoTable({
+      startY: 80,
+      head: [['ID', 'Player', 'Game', 'Station', 'Start Time', 'End Time', 'Status', 'Price']],
+      body: tableBody,
+      styles: { fontSize: 10, cellPadding: 4 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 40, right: 40 },
+      didDrawPage: (data) => {
+        const page = doc.internal.getNumberOfPages();
+        doc.setFontSize(10);
+        doc.text(`Page ${page}`, data.settings.margin.left, doc.internal.pageSize.height - 10);
+      }
+    });
+
+    doc.save('sessions-report.pdf');
+  });
+
+  // Helper: format date (reuse your existing function)
+  function fmtDate(ts) {
+    if(!ts) return '-';
+    const d = new Date(ts);
+    return d.toLocaleString();
+  }
+</script>
+
+</body>
+</html>
