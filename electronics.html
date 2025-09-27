@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ElectroAdmin Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/el.jpg">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--brand:#0d6efd;--accent:#0dcaf0;--card-bg:#fff;--bg-light:#f7f9fc;}
+body{background:var(--bg-light);font-family:'Segoe UI',sans-serif;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:250px;background:linear-gradient(180deg,var(--brand),#0b5ed7);color:#fff;padding:1rem;overflow-y:auto;}
+.sidebar h3{text-align:center;margin-bottom:1.5rem;}
+.sidebar .nav-link{color:rgba(255,255,255,0.9);cursor:pointer;}
+.sidebar .nav-link.active{background:rgba(255,255,255,0.1);border-radius:0.5rem;}
+.sidebar .submenu{display:none;margin-left:0.5rem;}
+.sidebar .submenu .nav-link{font-size:0.9rem;padding-left:2rem;}
+.main-content{margin-left:250px;padding:2rem;}
+.page{display:none;}
+.page.active{display:block;}
+.card-header{font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h3>ElectroAdmin</h3>
+  <ul class="flex-column gap-1 nav">
+    <li><a class="nav-link active" data-target="dashboard"><i class="me-2 bi bi-speedometer2"></i> Dashboard</a></li>
+    <li>
+      <a class="nav-link" data-toggle="submenu"><i class="me-2 bi bi-box-seam"></i> Products <i class="float-end bi bi-chevron-down"></i></a>
+      <ul class="flex-column nav submenu">
+        <li><a class="nav-link" data-target="allProducts">All Products</a></li>
+        <li><a class="nav-link" data-target="phones">Phones</a></li>
+        <li><a class="nav-link" data-target="tvs">TVs</a></li>
+        <li><a class="nav-link" data-target="kitchen">Kitchen Appliances</a></li>
+        <li><a class="nav-link" data-target="accessories">Accessories</a></li>
+      </ul>
+    </li>
+    <li><a class="nav-link" data-target="orders"><i class="me-2 bi bi-cart-check"></i> Orders</a></li>
+    <li><a class="nav-link" data-target="customers"><i class="me-2 bi bi-people"></i> Customers</a></li>
+    <li><a class="nav-link" data-target="finance"><i class="me-2 bi bi-cash-stack"></i> Finance</a></li>
+    <li class="text-danger nav-link"><a class="text-danger nav-link" href="#"><i class="bi-box-arrow-right me-2 bi"></i> Logout</a></li>
+  </ul>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+
+<!-- Global Search -->
+<div class="mb-3">
+  <input type="text" class="form-control" id="globalSearch" placeholder="Search across all tables...">
+</div>
+
+<!-- Dashboard -->
+<section id="dashboard" class="page active">
+  <h3 class="mb-4">Dashboard Overview</h3>
+  <div class="row g-3">
+    <div class="col-md-3"><div class="shadow-sm card"><div class="card-body"><h6>Total Products</h6><h3 id="totalProducts">0</h3></div></div></div>
+    <div class="col-md-3"><div class="shadow-sm card"><div class="card-body"><h6>Total Orders</h6><h3 id="totalOrders">0</h3></div></div></div>
+    <div class="col-md-3"><div class="shadow-sm card"><div class="card-body"><h6>Revenue</h6><h3 id="totalRevenue">KSh 0</h3></div></div></div>
+    <div class="col-md-3"><div class="shadow-sm card"><div class="card-body"><h6>Customers</h6><h3 id="totalCustomers">0</h3></div></div></div>
+  </div>
+</section>
+
+<!-- Products Sections -->
+<section id="allProducts" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3>All Products</h3>
+    <div>
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addProductModal"><i class="bi bi-plus-circle"></i> Add Product</button>
+      <button class="btn-outline-primary btn btn-sm" id="exportProductsPdf">Download PDF</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="p-0 card-body">
+      <table class="table table-hover table-striped mb-0" id="allProductsTable">
+        <thead class="table-dark"><tr><th>Name</th><th>Category</th><th>Brand/Type</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="phones" class="page">
+  <h3>Phones</h3>
+  <button class="mb-2 btn-outline-primary btn btn-sm" id="exportPhonesPdf">Download PDF</button>
+  <div class="card"><div class="p-0 card-body"><table class="table table-hover table-striped mb-0" id="phonesTable"><thead class="table-dark"><tr><th>Name</th><th>Brand/Type</th><th>Price</th><th>Stock</th></tr></thead><tbody></tbody></table></div></div>
+</section>
+
+<section id="tvs" class="page">
+  <h3>TVs</h3>
+  <button class="mb-2 btn-outline-primary btn btn-sm" id="exportTvsPdf">Download PDF</button>
+  <div class="card"><div class="p-0 card-body"><table class="table table-hover table-striped mb-0" id="tvsTable"><thead class="table-dark"><tr><th>Name</th><th>Brand/Type</th><th>Price</th><th>Stock</th></tr></thead><tbody></tbody></table></div></div>
+</section>
+
+<section id="kitchen" class="page">
+  <h3>Kitchen Appliances</h3>
+  <button class="mb-2 btn-outline-primary btn btn-sm" id="exportKitchenPdf">Download PDF</button>
+  <div class="card"><div class="p-0 card-body"><table class="table table-hover table-striped mb-0" id="kitchenTable"><thead class="table-dark"><tr><th>Name</th><th>Brand/Type</th><th>Price</th><th>Stock</th></tr></thead><tbody></tbody></table></div></div>
+</section>
+
+<section id="accessories" class="page">
+  <h3>Accessories</h3>
+  <button class="mb-2 btn-outline-primary btn btn-sm" id="exportAccessoriesPdf">Download PDF</button>
+  <div class="card"><div class="p-0 card-body"><table class="table table-hover table-striped mb-0" id="accessoriesTable"><thead class="table-dark"><tr><th>Name</th><th>Brand/Type</th><th>Price</th><th>Stock</th></tr></thead><tbody></tbody></table></div></div>
+</section>
+
+<!-- Orders Section -->
+<section id="orders" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3>Orders</h3>
+    <div>
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addOrderModal"><i class="bi bi-plus-circle"></i> Add Order</button>
+      <button class="btn-outline-primary btn btn-sm" id="exportOrdersPdf">Download PDF</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="p-0 card-body">
+      <table class="table table-hover table-striped mb-0" id="ordersTable">
+        <thead class="table-dark"><tr><th>Customer</th><th>Product</th><th>Quantity</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Customers Section -->
+<section id="customers" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3>Customers</h3>
+    <div>
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addCustomerModal"><i class="bi bi-plus-circle"></i> Add Customer</button>
+      <button class="btn-outline-primary btn btn-sm" id="exportCustomersPdf">Download PDF</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="p-0 card-body">
+      <table class="table table-hover table-striped mb-0" id="customersTable">
+        <thead class="table-dark"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Finance Section -->
+<section id="finance" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3>Finance</h3>
+    <div>
+      <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addFinanceModal"><i class="bi bi-plus-circle"></i> Add Record</button>
+      <button class="btn-outline-primary btn btn-sm" id="exportFinancePdf">Download PDF</button>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="bg-danger text-white card-header">Expenses</div>
+        <div class="p-0 card-body">
+          <table class="table table-hover table-striped mb-0" id="expensesTable">
+            <thead class="table-dark"><tr><th>Description</th><th>Amount</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="bg-success text-white card-header">Income</div>
+        <div class="p-0 card-body">
+          <table class="table table-hover table-striped mb-0" id="incomeTable">
+            <thead class="table-dark"><tr><th>Description</th><th>Amount</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Modals -->
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+<form id="productForm"><div class="modal-header"><h5 class="modal-title">Add Product</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div class="mb-3"><label>Category</label><select class="form-control" id="productCategory" required>
+<option value="">Select Category</option>
+<option value="phones">Phones</option>
+<option value="tvs">TVs</option>
+<option value="kitchen">Kitchen Appliances</option>
+<option value="accessories">Accessories</option>
+</select></div>
+<div class="mb-3"><label>Name</label><input type="text" class="form-control" id="productName" required></div>
+<div class="mb-3"><label>Brand / Type</label><input type="text" class="form-control" id="productBrand" required></div>
+<div class="mb-3"><label>Price (KSh)</label><input type="number" class="form-control" id="productPrice" required></div>
+<div class="mb-3"><label>Stock</label><input type="number" class="form-control" id="productStock" required></div>
+</div><div class="modal-footer"><button type="submit" class="btn btn-success">Save Product</button></div></form></div></div></div>
+
+<!-- Add Order Modal -->
+<div class="modal fade" id="addOrderModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+<form id="orderForm"><div class="modal-title"><h5 class="modal-title">Add Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div class="mb-3"><label>Customer</label><input type="text" class="form-control" id="orderCustomer" required></div>
+<div class="mb-3"><label>Product</label><input type="text" class="form-control" id="orderProduct" required></div>
+<div class="mb-3"><label>Quantity</label><input type="number" class="form-control" id="orderQuantity" required></div>
+<div class="mb-3"><label>Status</label><select class="form-control" id="orderStatus" required><option>Pending</option><option>Completed</option><option>Cancelled</option></select></div>
+</div><div class="modal-footer"><button type="submit" class="btn btn-success">Save Order</button></div></form></div></div></div>
+
+<!-- Add Customer Modal -->
+<div class="modal fade" id="addCustomerModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+<form id="customerForm"><div class="modal-header"><h5 class="modal-title">Add Customer</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div class="mb-3"><label>Name</label><input type="text" class="form-control" id="customerName" required></div>
+<div class="mb-3"><label>Email</label><input type="email" class="form-control" id="customerEmail" required></div>
+<div class="mb-3"><label>Phone</label><input type="text" class="form-control" id="customerPhone" required></div>
+</div><div class="modal-footer"><button type="submit" class="btn btn-success">Save Customer</button></div></form></div></div></div>
+
+<!-- Add Finance Modal -->
+<div class="modal fade" id="addFinanceModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+<form id="financeForm"><div class="modal-title"><h5 class="modal-title">Add Finance Record</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div class="mb-3"><label>Type</label><select class="form-control" id="financeType" required><option value="">Select Type</option><option value="income">Income</option><option value="expense">Expense</option></select></div>
+<div class="mb-3"><label>Description</label><input type="text" class="form-control" id="financeDescription" required></div>
+<div class="mb-3"><label>Amount</label><input type="number" class="form-control" id="financeAmount" required></div>
+</div><div class="modal-footer"><button type="submit" class="btn btn-success">Save Record</button></div></form></div></div></div>
+
+</div>
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ===== FULL FIREBASE + CRUD + PDF + SEARCH SCRIPT ===== -->
+<script>
+// ===== FIREBASE CONFIG =====
+const firebaseConfig = {
+  apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
+  authDomain: "gamers-65b44.firebaseapp.com",
+  projectId: "gamers-65b44",
+  storageBucket: "gamers-65b44.firebasestorage.app",
+  messagingSenderId: "97331968745",
+  appId: "1:97331968745:web:fd4848ca7dbe6029dcce78",
+  measurementId: "G-K05YH3LL23"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ===== SIDEBAR NAVIGATION =====
+document.querySelectorAll('.sidebar .nav-link[data-target]').forEach(link=>{
+  link.addEventListener('click', e=>{
+    e.preventDefault();
+    const target=link.dataset.target;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById(target).classList.add('active');
+    document.querySelectorAll('.sidebar .nav-link').forEach(l=>l.classList.remove('active'));
+    link.classList.add('active');
+  });
+});
+document.querySelectorAll('.sidebar [data-toggle="submenu"]').forEach(btn=>{
+  btn.addEventListener('click', e=>{
+    e.preventDefault();
+    const submenu=btn.nextElementSibling;
+    submenu.style.display = (submenu.style.display==='block') ? 'none' : 'block';
+  });
+});
+
+// ===== TABLE REFERENCES =====
+const productsTables = {
+  all: document.querySelector('#allProductsTable tbody'),
+  phones: document.querySelector('#phonesTable tbody'),
+  tvs: document.querySelector('#tvsTable tbody'),
+  kitchen: document.querySelector('#kitchenTable tbody'),
+  accessories: document.querySelector('#accessoriesTable tbody')
+};
+const totalProductsEl = document.getElementById('totalProducts');
+const categoryTotals = {phones:0,tvs:0,kitchen:0,accessories:0};
+const ordersTableBody = document.querySelector('#ordersTable tbody');
+const totalOrdersEl = document.getElementById('totalOrders');
+const totalRevenueEl = document.getElementById('totalRevenue');
+const customersTableBody = document.querySelector('#customersTable tbody');
+const totalCustomersEl = document.getElementById('totalCustomers');
+const expensesTableBody = document.querySelector('#expensesTable tbody');
+const incomeTableBody = document.querySelector('#incomeTable tbody');
+
+// ===== PRODUCTS =====
+function renderProduct(doc) {
+  const d = doc.data();
+  const tr = document.createElement('tr'); 
+  tr.setAttribute('data-id', doc.id);
+  tr.innerHTML = `
+    <td>${d.name}</td>
+    <td>${d.category}</td>
+    <td>${d.brand}</td>
+    <td>${d.price}</td>
+    <td>${d.stock}</td>
+    <td>
+      <button class="btn btn-sm btn-primary editProductBtn"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-danger deleteProductBtn"><i class="bi bi-trash"></i></button>
+    </td>`;
+  
+  productsTables.all.appendChild(tr);
+
+  if(d.category==='phones'){ productsTables.phones.appendChild(tr.cloneNode(true)); categoryTotals.phones++; }
+  if(d.category==='tvs'){ productsTables.tvs.appendChild(tr.cloneNode(true)); categoryTotals.tvs++; }
+  if(d.category==='kitchen'){ productsTables.kitchen.appendChild(tr.cloneNode(true)); categoryTotals.kitchen++; }
+  if(d.category==='accessories'){ productsTables.accessories.appendChild(tr.cloneNode(true)); categoryTotals.accessories++; }
+}
+
+// Add / Update Product
+document.getElementById('productForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const name = document.getElementById('productName').value.trim();
+  const category = document.getElementById('productCategory').value;
+  const brand = document.getElementById('productBrand').value.trim();
+  const price = parseFloat(document.getElementById('productPrice').value);
+  const stock = parseInt(document.getElementById('productStock').value);
+  const docId = document.getElementById('productForm').getAttribute('data-id'); // check if editing
+
+  if(!name || !category || !brand || isNaN(price) || isNaN(stock)) 
+    return alert('Fill all fields correctly');
+
+  if(docId){
+    // Update existing product
+    await db.collection('products').doc(docId).update({name, category, brand, price, stock});
+    document.getElementById('productForm').removeAttribute('data-id');
+  } else {
+    // Add new product
+    await db.collection('products').add({name, category, brand, price, stock});
+  }
+
+  bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide();
+  e.target.reset();
+});
+
+// Products Real-Time
+db.collection('products').onSnapshot(snapshot=>{
+  Object.values(productsTables).forEach(t=>t.innerHTML='');
+  Object.keys(categoryTotals).forEach(k=>categoryTotals[k]=0);
+  let count=0;
+  snapshot.forEach(doc=>{ renderProduct(doc); count++; });
+  totalProductsEl.textContent = count;
+});
+
+// Delete / Edit Product
+document.body.addEventListener('click', async e=>{
+  const tr = e.target.closest('tr');
+  if(!tr) return;
+  const id = tr.dataset.id;
+
+  // Delete
+  if(e.target.closest('.deleteProductBtn')){
+    if(confirm('Delete this product?')) 
+      await db.collection('products').doc(id).delete();
+  }
+
+  // Edit
+  if(e.target.closest('.editProductBtn')){
+    const docSnap = await db.collection('products').doc(id).get();
+    if(docSnap.exists){
+      const d = docSnap.data();
+      document.getElementById('productName').value = d.name;
+      document.getElementById('productCategory').value = d.category;
+      document.getElementById('productBrand').value = d.brand;
+      document.getElementById('productPrice').value = d.price;
+      document.getElementById('productStock').value = d.stock;
+      document.getElementById('productForm').setAttribute('data-id', id);
+      new bootstrap.Modal(document.getElementById('addProductModal')).show();
+    }
+  }
+});
+
+// ===== ORDERS =====
+let editingOrderId = null; // Track if editing
+
+document.getElementById('orderForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const customer = document.getElementById('orderCustomer').value.trim();
+  const product = document.getElementById('orderProduct').value.trim();
+  const quantity = parseInt(document.getElementById('orderQuantity').value);
+  const status = document.getElementById('orderStatus').value;
+  if (!customer || !product || isNaN(quantity)) return alert('Fill all fields correctly');
+  const total = quantity * 100; // Or dynamically set price if needed
+
+  if (editingOrderId) {
+    // Update existing order
+    await db.collection('orders').doc(editingOrderId).update({
+      customer,
+      product,
+      quantity,
+      total,
+      status
+    });
+    editingOrderId = null;
+  } else {
+    // Add new order
+    await db.collection('orders').add({
+      customer,
+      product,
+      quantity,
+      total,
+      status,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
+  e.target.reset();
+});
+
+db.collection('orders').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+  ordersTableBody.innerHTML = '';
+  let count = 0;
+  let revenue = 0;
+
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    revenue += d.total;
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-id', doc.id);
+
+    tr.innerHTML = `
+      <td>${d.customer}</td>
+      <td>${d.product}</td>
+      <td>${d.quantity}</td>
+      <td>${d.total}</td>
+      <td>${d.status}</td>
+      <td>
+        <button class="btn btn-sm btn-primary editOrderBtn"><i class="bi bi-pencil-square"></i></button>
+        <button class="btn btn-sm btn-success completeOrderBtn"><i class="bi bi-check2-circle"></i></button>
+        <button class="btn btn-sm btn-danger deleteOrderBtn"><i class="bi bi-trash"></i></button>
+      </td>
+    `;
+
+    ordersTableBody.appendChild(tr);
+    count++;
+  });
+
+  totalOrdersEl.textContent = count;
+  totalRevenueEl.textContent = `KSh ${revenue}`;
+});
+
+document.body.addEventListener('click', async e => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const id = tr.dataset.id;
+
+  // Delete
+  if (e.target.closest('.deleteOrderBtn')) {
+    if (confirm('Delete this order?')) {
+      await db.collection('orders').doc(id).delete();
+    }
+  }
+
+  // Complete
+  if (e.target.closest('.completeOrderBtn')) {
+    await db.collection('orders').doc(id).update({ status: 'Completed' });
+  }
+
+  // Edit
+  if (e.target.closest('.editOrderBtn')) {
+    const cells = tr.cells;
+    editingOrderId = id;
+
+    // Pre-fill modal form with existing values
+    document.getElementById('orderCustomer').value = cells[0].innerText;
+    document.getElementById('orderProduct').value = cells[1].innerText;
+    document.getElementById('orderQuantity').value = cells[2].innerText;
+    document.getElementById('orderStatus').value = cells[4].innerText;
+
+    // Open the modal
+    const modal = new bootstrap.Modal(document.getElementById('addOrderModal'));
+    modal.show();
+  }
+});
+
+// ===== CUSTOMERS =====
+let editingCustomerId = null; // Track if editing
+
+document.getElementById('customerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = document.getElementById('customerName').value.trim();
+  const email = document.getElementById('customerEmail').value.trim();
+  const phone = document.getElementById('customerPhone').value.trim();
+  if (!name || !email || !phone) return alert('Fill all fields correctly');
+
+  if (editingCustomerId) {
+    // Update existing customer
+    await db.collection('customers').doc(editingCustomerId).update({ name, email, phone });
+    editingCustomerId = null;
+  } else {
+    // Add new customer
+    await db.collection('customers').add({ name, email, phone });
+  }
+
+  bootstrap.Modal.getInstance(document.getElementById('addCustomerModal')).hide();
+  e.target.reset();
+});
+
+db.collection('customers').onSnapshot(snapshot => {
+  customersTableBody.innerHTML = '';
+  let count = 0;
+
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-id', doc.id);
+
+    tr.innerHTML = `
+      <td>${d.name}</td>
+      <td>${d.email}</td>
+      <td>${d.phone}</td>
+      <td>
+        <button class="btn btn-sm btn-primary editCustomerBtn"><i class="bi bi-pencil-square"></i></button>
+        <button class="btn btn-sm btn-danger deleteCustomerBtn"><i class="bi bi-trash"></i></button>
+      </td>
+    `;
+
+    customersTableBody.appendChild(tr);
+    count++;
+  });
+
+  totalCustomersEl.textContent = count;
+});
+
+document.body.addEventListener('click', async e => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const id = tr.dataset.id;
+
+  // Delete
+  if (e.target.closest('.deleteCustomerBtn')) {
+    if (confirm('Delete this customer?')) {
+      await db.collection('customers').doc(id).delete();
+    }
+  }
+
+  // Edit
+  if (e.target.closest('.editCustomerBtn')) {
+    const cells = tr.cells;
+    editingCustomerId = id;
+
+    // Pre-fill modal form with existing values
+    document.getElementById('customerName').value = cells[0].innerText;
+    document.getElementById('customerEmail').value = cells[1].innerText;
+    document.getElementById('customerPhone').value = cells[2].innerText;
+
+    // Open the modal
+    const modal = new bootstrap.Modal(document.getElementById('addCustomerModal'));
+    modal.show();
+  }
+});
+
+
+// ===== FINANCE =====
+document.getElementById('financeForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const type = document.getElementById('financeType').value;
+  const description = document.getElementById('financeDescription').value.trim();
+  const amount = parseFloat(document.getElementById('financeAmount').value);
+  const docId = document.getElementById('financeForm').getAttribute('data-id'); // check if editing
+
+  if(!description || isNaN(amount)) return alert('Fill all fields correctly');
+
+  if(docId){  
+    // Update existing record
+    await db.collection('finance').doc(docId).update({type, description, amount});
+    document.getElementById('financeForm').removeAttribute('data-id'); // reset
+  } else {
+    // Add new record
+    await db.collection('finance').add({
+      type, description, amount,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  bootstrap.Modal.getInstance(document.getElementById('addFinanceModal')).hide();
+  e.target.reset();
+});
+
+db.collection('finance').orderBy('timestamp','desc').onSnapshot(snapshot=>{
+  expensesTableBody.innerHTML = '';
+  incomeTableBody.innerHTML = '';
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+    const tr = document.createElement('tr'); 
+    tr.setAttribute('data-id', doc.id);
+    tr.innerHTML = `
+      <td>${d.description}</td>
+      <td>${d.amount}</td>
+      <td>
+        <button class="btn btn-sm btn-primary editFinanceBtn"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-danger deleteFinanceBtn"><i class="bi bi-trash"></i></button>
+      </td>`;
+    if(d.type === 'expense'){ expensesTableBody.appendChild(tr); }
+    else { incomeTableBody.appendChild(tr); }
+  });
+});
+
+document.body.addEventListener('click', async e=>{
+  const tr = e.target.closest('tr');
+  if(!tr) return;
+  const id = tr.dataset.id;
+
+  // Delete
+  if(e.target.closest('.deleteFinanceBtn')){
+    if(confirm('Delete this record?')) await db.collection('finance').doc(id).delete();
+  }
+
+  // Edit
+  if(e.target.closest('.editFinanceBtn')){
+    const docSnap = await db.collection('finance').doc(id).get();
+    if(docSnap.exists){
+      const d = docSnap.data();
+      document.getElementById('financeType').value = d.type;
+      document.getElementById('financeDescription').value = d.description;
+      document.getElementById('financeAmount').value = d.amount;
+      document.getElementById('financeForm').setAttribute('data-id', id);
+      new bootstrap.Modal(document.getElementById('addFinanceModal')).show();
+    }
+  }
+});
+
+// ===== GLOBAL SEARCH =====
+document.getElementById('globalSearch').addEventListener('input', e=>{
+  const term = e.target.value.toLowerCase();
+  document.querySelectorAll('table tbody tr').forEach(tr=>{
+    const text = tr.textContent.toLowerCase();
+    tr.style.display = text.includes(term) ? '' : 'none';
+  });
+});
+
+// ===== PDF EXPORT =====
+function exportTableToPDF(title,tableId){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.text(title,14,15);
+  doc.autoTable({html:'#'+tableId,startY:20});
+  doc.save(title+'.pdf');
+}
+document.getElementById('exportProductsPdf').addEventListener('click',()=>exportTableToPDF('All Products','allProductsTable'));
+document.getElementById('exportPhonesPdf').addEventListener('click',()=>exportTableToPDF('Phones','phonesTable'));
+document.getElementById('exportTvsPdf').addEventListener('click',()=>exportTableToPDF('TVs','tvsTable'));
+document.getElementById('exportKitchenPdf').addEventListener('click',()=>exportTableToPDF('Kitchen Appliances','kitchenTable'));
+document.getElementById('exportAccessoriesPdf').addEventListener('click',()=>exportTableToPDF('Accessories','accessoriesTable'));
+document.getElementById('exportOrdersPdf').addEventListener('click',()=>exportTableToPDF('Orders','ordersTable'));
+document.getElementById('exportCustomersPdf').addEventListener('click',()=>exportTableToPDF('Customers','customersTable'));
+document.getElementById('exportFinancePdf').addEventListener('click',()=>{
+  exportTableToPDF('Expenses','expensesTable');
+  exportTableToPDF('Income','incomeTable');
+});
+</script>
+
+
+</body>
+</html>
