@@ -96,6 +96,7 @@
 
       
     </aside>
+    
 
     <main class="main">
       <div class="d-flex align-items-center justify-content-between mb-3">
@@ -223,7 +224,10 @@
           <div>
             <input type="date" id="reportFrom" class="rounded-input" /> to
             <input type="date" id="reportTo" class="rounded-input" />
-            <button class="btn btn-accent" id="btnGenerateReport">Generate PDF</button>
+           <!-- Button -->
+<button id="downloadAllBtn" class="btn-outline-light btn">
+  <i class="bi bi-download"></i> Download Report PDF
+</button>
           </div>
         </div>
         <div id="reportPreview"></div>
@@ -1819,5 +1823,120 @@ $('#btnExportMembersPdf').onclick = () => {
   }
 </script>
 
+<script>
+document.getElementById("downloadAllBtn").addEventListener("click", () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Gaming Centre Admin Report", 14, 20);
+
+  doc.setFontSize(11);
+  doc.setTextColor(100);
+  doc.text("Generated on: " + new Date().toLocaleString(), 14, 28);
+  doc.setTextColor(0);
+
+  let yPos = 40;
+
+  // --- Define all sections dynamically ---
+  const sections = [
+    {
+      title: " Sessions",
+      head: [["Player", "Game", "Station", "Status", "Start Time"]],
+      body: Object.values(state.sessions || {}).map(s => [
+        s.playerName,
+        state.games?.[s.gameId]?.name || "-",
+        state.stations?.[s.stationId]?.name || "-",
+        s.status || "-",
+        s.startTime ? new Date(s.startTime).toLocaleString() : "-"
+      ])
+    },
+    {
+      title: " Stations",
+      head: [["Station Name", "Status", "Current Session"]],
+      body: Object.values(state.stations || {}).map(st => [
+        st.name || "-",
+        st.status || "-",
+        st.currentSessionId ? "Occupied" : "Free"
+      ])
+    },
+    {
+      title: " Games",
+      head: [["Game Name", "Category", "Price"]],
+      body: Object.values(state.games || {}).map(g => [
+        g.name || "-",
+        g.category || "-",
+        g.price ? "KSh " + g.price : "-"
+      ])
+    },
+    {
+      title: " Tournaments",
+      head: [["Name", "Date", "Players"]],
+      body: Object.values(state.tournaments || {}).map(t => [
+        t.name || "-",
+        t.date || "-",
+        (t.participants || []).length + " players"
+      ])
+    },
+    {
+      title: " Memberships",
+      head: [["Name", "Price"]],
+      body: Object.values(state.memberships || {}).map(m => [
+        m.name || "-",
+        m.price ? "KSh " + m.price : "-"
+      ])
+    },
+    {
+      title: " Birthdays",
+      head: [["Name", "Date of Birth", "Phone"]],
+      body: Object.values(state.birthdays || {}).map(b => [
+        b.name || "-",
+        b.dob || "-",
+        b.phone || "-"
+      ])
+    },
+    {
+      title: " Offers",
+      head: [["Game", "Description", "Discount"]],
+      body: Object.values(state.offers || {}).map(o => [
+        o.game || "All",
+        o.desc || "-",
+        (o.discount || 0) + "%"
+      ])
+    }
+  ];
+
+  // --- Render each section ---
+  sections.forEach(sec => {
+    // Add section header
+    doc.setFontSize(14);
+    doc.text(sec.title, 14, yPos);
+    yPos += 8;
+
+    // Render table
+    doc.autoTable({
+      startY: yPos,
+      head: sec.head,
+      body: sec.body.length ? sec.body : [["No data available"]],
+      theme: "grid",
+      styles: { fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: [40, 40, 40], textColor: 255 },
+    });
+
+    yPos = doc.lastAutoTable.finalY + 12;
+
+    // Add new page if needed
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+  });
+
+  // Save PDF
+  doc.save("gaming-centre-report.pdf");
+});
+</script>
 </body>
 </html>
