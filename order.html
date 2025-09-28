@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="icon" type="image/png" href="img/ice.jpg">
+<title>Customer Order Interface</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--accent:#2b6cb0;--muted:#555;--danger:#dc3545;--success:#28a745;}
+*{box-sizing:border-box;font-family:Arial,sans-serif;margin:0;padding:0;}
+body{background:var(--bg);}
+header{background:var(--accent);color:#fff;padding:15px;text-align:center;font-size:20px;font-weight:700;}
+.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;padding:15px;}
+.product-card{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 4px 8px rgba(0,0,0,0.1);display:flex;flex-direction:column;height:300px;}
+.product-card img{width:100%;height:150px;object-fit:cover;}
+.product-info{padding:10px;flex:1;display:flex;flex-direction:column;justify-content:space-between;}
+.product-info h4{margin-bottom:6px;color:var(--muted);font-size:14px;}
+.product-info p{margin-bottom:10px;font-weight:600;font-size:14px;}
+.product-info .qty-container{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.product-info .qty-container button{width:28px;height:28px;border:none;background:#eee;font-size:16px;border-radius:6px;cursor:pointer;}
+.product-info .qty-container span{min-width:20px;text-align:center;display:inline-block;}
+.product-info button.add-cart{background:var(--accent);color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;}
+
+.cart-summary-btn{position:fixed;bottom:15px;right:15px;background:var(--accent);color:#fff;padding:12px 18px;border:none;border-radius:50px;font-weight:700;box-shadow:0 4px 8px rgba(0,0,0,0.2);cursor:pointer;display:flex;align-items:center;gap:8px;}
+.cart-count{background:#fff;color:var(--accent);padding:2px 6px;border-radius:50%;font-size:12px;}
+
+#orderModal,#checkoutModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:1000;}
+.modal-content{background:#fff;width:90%;max-width:500px;border-radius:12px;overflow:hidden;max-height:90vh;}
+.modal-header{background:var(--accent);color:#fff;padding:12px;font-weight:700;}
+.modal-body{padding:12px;max-height:60vh;overflow-y:auto;}
+.modal-body table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+.modal-body th,td{padding:8px;text-align:left;border-bottom:1px solid #eee;font-size:14px;}
+.modal-footer{padding:12px;text-align:right;border-top:1px solid #eee;}
+.modal-footer button{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-weight:600;}
+.qty-edit{display:flex;align-items:center;gap:4px;}
+.qty-edit button{width:24px;height:24px;border:none;background:#eee;font-size:14px;border-radius:4px;cursor:pointer;}
+input,select{padding:6px;border-radius:6px;border:1px solid #ddd;width:100%;margin-bottom:8px;}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .modal-content { width:95%; }
+  .modal-body table th, .modal-body table td { font-size:12px; padding:6px; }
+  .product-card { height:auto; }
+  .product-card img { height:140px; }
+}
+</style>
+</head>
+<body>
+
+<header>Our Products</header>
+
+<div class="products" id="productsGrid"></div>
+
+<button class="cart-summary-btn" id="viewCartBtn">Cart (<span class="cart-count" id="cartCount">0</span>)</button>
+
+<!-- Cart Order Modal -->
+<div id="orderModal">
+<div class="modal-content">
+  <div class="modal-header">Your Order</div>
+  <div class="modal-body">
+    <table id="orderTable">
+      <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Remove</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p style="text-align:right;font-weight:700;">Total: KSh <span id="orderTotal">0.00</span></p>
+  </div>
+  <div class="modal-footer">
+    <button id="proceedCheckoutBtn">Proceed to Checkout</button>
+    <button id="closeModalBtn" style="background:#6c757d;margin-left:8px;">Close</button>
+  </div>
+</div>
+</div>
+
+<!-- Checkout Details Modal -->
+<div id="checkoutModal">
+<div class="modal-content">
+  <div class="modal-header">Checkout Details</div>
+  <div class="modal-body">
+    <label>Name</label><input type="text" id="customerName" placeholder="Enter your name">
+    <label>Phone</label><input type="text" id="customerPhone" placeholder="Enter phone number">
+    <label>Delivery Method</label>
+    <select id="deliveryMethod">
+      <option value="pickup">Pickup (No Fee)</option>
+      <option value="delivery">Delivery (+KSh 200)</option>
+    </select>
+    <div id="deliveryAddressContainer" style="display:none;">
+      <label>Delivery Address</label>
+      <input type="text" id="deliveryAddress" placeholder="Enter your location">
+    </div>
+    <p style="font-weight:700;">Total: KSh <span id="checkoutTotal">0.00</span></p>
+  </div>
+  <div class="modal-footer">
+    <button id="placeOrderBtn">Place Order</button>
+    <button id="closeCheckoutBtn" style="background:#6c757d;margin-left:8px;">Cancel</button>
+  </div>
+  
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:2e4fce15f2ba1192b98139"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let cart = [];
+
+const productsGrid = document.getElementById("productsGrid");
+const cartCount = document.getElementById("cartCount");
+const viewCartBtn = document.getElementById("viewCartBtn");
+const orderModal = document.getElementById("orderModal");
+const orderTableBody = document.querySelector("#orderTable tbody");
+const orderTotal = document.getElementById("orderTotal");
+const closeModalBtn = document.getElementById("closeModalBtn");
+const proceedCheckoutBtn = document.getElementById("proceedCheckoutBtn");
+
+const checkoutModal = document.getElementById("checkoutModal");
+const customerName = document.getElementById("customerName");
+const customerPhone = document.getElementById("customerPhone");
+const deliveryMethod = document.getElementById("deliveryMethod");
+const deliveryAddressContainer = document.getElementById("deliveryAddressContainer");
+const deliveryAddress = document.getElementById("deliveryAddress");
+const checkoutTotal = document.getElementById("checkoutTotal");
+const placeOrderBtn = document.getElementById("placeOrderBtn");
+const closeCheckoutBtn = document.getElementById("closeCheckoutBtn");
+
+function updateCartCount(){ cartCount.textContent = cart.length; }
+
+function renderCart(){
+  orderTableBody.innerHTML = "";
+  let total = 0;
+  cart.forEach((item,index)=>{
+    total += item.price * item.qty;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.title}</td>
+      <td>
+        <div class="qty-edit">
+          <button onclick="decreaseQty(${index})">-</button>
+          <span>${item.qty}</span>
+          <button onclick="increaseQty(${index})">+</button>
+        </div>
+      </td>
+      <td>KSh ${(item.price*item.qty).toFixed(2)}</td>
+      <td><button style="background:var(--danger);color:#fff;padding:2px 6px;border:none;border-radius:4px;cursor:pointer;" onclick="removeItem(${index})">X</button></td>
+    `;
+    orderTableBody.appendChild(tr);
+  });
+  orderTotal.textContent = total.toFixed(2);
+  updateCartCount();
+}
+
+// Quantity edit functions
+window.increaseQty = function(i){ cart[i].qty++; renderCart(); }
+window.decreaseQty = function(i){ if(cart[i].qty>1){cart[i].qty--; renderCart();} }
+window.removeItem = function(i){ cart.splice(i,1); renderCart(); }
+
+// Load products
+onSnapshot(collection(db,"products"), snapshot=>{
+  productsGrid.innerHTML = "";
+  snapshot.forEach(docSnap=>{
+    const p = docSnap.data();
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.innerHTML = `
+      <img src="${p.image}" alt="${p.title}">
+      <div class="product-info">
+        <h4>${p.title}</h4>
+        <p>KSh ${p.price}</p>
+        <div class="qty-container">
+          <button onclick="decreaseQtyCard(this)">-</button>
+          <span>1</span>
+          <button onclick="increaseQtyCard(this)">+</button>
+        </div>
+        <button class="add-cart">Add to Cart</button>
+      </div>
+    `;
+    let qtySpan = card.querySelector(".qty-container span");
+    card.querySelector(".add-cart").addEventListener("click", ()=>{
+      const qty = parseInt(qtySpan.textContent);
+      const existing = cart.find(i=>i.id===docSnap.id);
+      if(existing){ existing.qty += qty; } else { cart.push({id:docSnap.id,title:p.title,price:p.price,qty}); }
+      renderCart();
+      alert("✅ Added to cart!");
+    });
+    productsGrid.appendChild(card);
+  });
+});
+
+// Quantity buttons inside card
+window.increaseQtyCard = function(btn){ let span = btn.parentElement.querySelector("span"); span.textContent = parseInt(span.textContent)+1; }
+window.decreaseQtyCard = function(btn){ let span = btn.parentElement.querySelector("span"); if(parseInt(span.textContent)>1) span.textContent = parseInt(span.textContent)-1; }
+
+viewCartBtn.addEventListener("click", ()=>{ orderModal.style.display="flex"; renderCart(); });
+closeModalBtn.addEventListener("click", ()=>{ orderModal.style.display="none"; });
+proceedCheckoutBtn.addEventListener("click", ()=>{
+  if(cart.length===0){ alert("Cart is empty!"); return; }
+  orderModal.style.display="none";
+  checkoutModal.style.display="flex";
+  updateCheckoutTotal();
+});
+
+// Show/hide delivery address
+deliveryMethod.addEventListener("change", ()=>{
+  if(deliveryMethod.value==="delivery"){ deliveryAddressContainer.style.display="block"; } 
+  else { deliveryAddressContainer.style.display="none"; }
+  updateCheckoutTotal();
+});
+
+function updateCheckoutTotal(){
+  let total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+  if(deliveryMethod.value==="delivery"){ total += 200; }
+  checkoutTotal.textContent = total.toFixed(2);
+}
+
+// Close checkout
+closeCheckoutBtn.addEventListener("click", ()=>{ checkoutModal.style.display="none"; });
+
+// Place order
+placeOrderBtn.addEventListener("click", async ()=>{
+  if(!customerName.value || !customerPhone.value || (deliveryMethod.value==="delivery" && !deliveryAddress.value)){
+    alert("Please fill all required fields!");
+    return;
+  }
+  const orderData = {
+    items:cart,
+    total:cart.reduce((s,i)=>s+i.price*i.qty,0) + (deliveryMethod.value==="delivery"?200:0),
+    customer:{name:customerName.value,phone:customerPhone.value,delivery:deliveryMethod.value,address:deliveryAddress.value||""},
+    status:"Pending",
+    date:new Date()
+  };
+  await addDoc(collection(db,"orders"),orderData);
+  alert("✅ Order submitted!");
+  cart=[]; renderCart(); checkoutModal.style.display="none";
+  customerName.value=""; customerPhone.value=""; deliveryAddress.value="";
+});
+</script>
+
+</body>
+</html>
