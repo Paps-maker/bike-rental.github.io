@@ -1259,19 +1259,45 @@ document.getElementById('tournamentForm').onsubmit = async e=>{
 };
 
 // Register player form
-document.getElementById('registerPlayerForm').onsubmit = async e=>{
+document.getElementById('registerPlayerForm').onsubmit = async e => {
   e.preventDefault();
+  
   const tid = $('#regTournamentId').value;
+  const name = $('#regPlayerName').value.trim();
+  const contact = $('#regPlayerContact').value.trim();
+  const paid = $('#regPlayerPaid').checked;
+  
+  const tournamentRef = db.collection('tournaments').doc(tid);
+  const tournamentSnap = await tournamentRef.get();
+  
+  if (!tournamentSnap.exists) {
+    alert('Tournament not found!');
+    return;
+  }
+
+  const tournament = tournamentSnap.data();
+  const participants = tournament.participants || [];
+
+  // Check if phone number already exists
+  if (participants.some(p => p.contact === contact)) {
+    alert('A player with this phone number is already registered!');
+    return;
+  }
+
+  // Create new participant
   const participant = {
     id: uid(),
-    name: $('#regPlayerName').value,
-    contact: $('#regPlayerContact').value,
-    paid: $('#regPlayerPaid').checked,
+    name,
+    contact,
+    paid,
     timestamp: Date.now()
   };
-  await db.collection('tournaments').doc(tid).update({
+
+  // Add participant
+  await tournamentRef.update({
     participants: firebase.firestore.FieldValue.arrayUnion(participant)
   });
+
   bootstrap.Modal.getInstance(document.getElementById('registerPlayerModal')).hide();
   alert('Player / Team registered successfully!');
   renderTournamentsAdmin();
