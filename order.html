@@ -281,7 +281,7 @@ placeOrderBtn.addEventListener("click",async()=>{
 
   // PDF
   const doc=new jsPDF();
-  doc.setFontSize(18); doc.text("🍔 Fast Food & Ice Cream",14,20);
+  doc.setFontSize(18); doc.text(" Fast Food & Ice Cream",14,20);
   doc.setFontSize(12); doc.text(`Order Receipt`,14,30);
   doc.text(`Order Code: ${orderCode}`,14,38);
   doc.text(`Name: ${customerName.value}`,14,46);
