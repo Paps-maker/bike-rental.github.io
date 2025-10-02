@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="icon" type="image/png" href="img/ice.jpg">
+<title>Fast Food & Ice Cream POS</title>
+<!-- jsPDF CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg:#fff7f0; --card:#fff; --accent:#ff4d4d; --accent-light:#ffd633; --muted:#333; --danger:#dc3545; --success:#28a745;
+}
+*{box-sizing:border-box;font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:0;}
+body{background:var(--bg);}
+header{background:linear-gradient(90deg,#ff4d4d,#ffd633);color:#fff;font-weight:700;font-size:22px;padding:20px;text-align:center;border-bottom-left-radius:12px;border-bottom-right-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.15);position:relative;}
+header::after{content:"";background:url('https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80') no-repeat center/cover;opacity:0.15;position:absolute;top:0;left:0;width:100%;height:100%;border-bottom-left-radius:12px;border-bottom-right-radius:12px;z-index:0;}
+.top-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:15px;}
+.top-controls input, .top-controls select{padding:8px;border-radius:8px;border:1px solid #ddd;width:200px;}
+.top-buttons{display:flex;gap:10px;justify-content:center;margin:10px;}
+.top-buttons button{background:var(--accent);color:#fff;padding:10px 18px;border:none;border-radius:50px;font-weight:700;cursor:pointer;transition:0.2s;}
+.top-buttons button:hover{background:#e63946;}
+.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;padding:15px;}
+.product-card{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 6px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;transition: transform 0.2s, box-shadow 0.2s;}
+.product-card:hover{transform:translateY(-4px);box-shadow:0 10px 20px rgba(0,0,0,0.15);}
+.product-card img{width:100%;height:auto;object-fit:contain;background:#fff7f0;padding:10px;border-radius:12px;}
+.product-info{padding:12px;flex:1;display:flex;flex-direction:column;justify-content:space-between;}
+.product-info h4{margin-bottom:6px;color:var(--muted);font-size:16px;font-weight:600;}
+.product-info p{margin-bottom:10px;color:var(--accent);font-weight:700;font-size:15px;}
+.product-info .qty-container{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.product-info .qty-container button{width:28px;height:28px;border:none;background:#ffd633;font-size:16px;border-radius:50%;cursor:pointer;font-weight:700;color:#333;transition:0.2s;}
+.product-info .qty-container button:hover{background:var(--accent);color:#fff;}
+.product-info .qty-container span{min-width:20px;text-align:center;display:inline-block;}
+.product-info button.add-cart{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:12px;cursor:pointer;font-weight:700;font-size:14px;transition:0.2s;}
+.product-info button.add-cart:hover{background:#e63946;}
+.cart-summary-btn{position:fixed;bottom:15px;right:15px;background:var(--accent);color:#fff;padding:12px 18px;border:none;border-radius:50px;font-weight:700;box-shadow:0 6px 12px rgba(0,0,0,0.2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:0.2s;}
+.cart-summary-btn:hover{background:#e63946;}
+.cart-count{background:#fff;color:var(--accent);padding:2px 6px;border-radius:50%;font-size:12px;}
+#orderModal,#checkoutModal,#favoritesModal,#myOrdersModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:1000;}
+.modal-content{background:#fff;width:90%;max-width:500px;border-radius:16px;overflow:hidden;max-height:90vh;}
+.modal-header{background:var(--accent);color:#fff;padding:14px;font-weight:700;font-size:18px;}
+.modal-body{padding:14px;max-height:60vh;overflow-y:auto;}
+.modal-body table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+.modal-body th,td{padding:8px;text-align:left;border-bottom:1px solid #eee;font-size:14px;}
+.modal-footer{padding:12px;text-align:right;border-top:1px solid #eee;}
+.modal-footer button{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;transition:0.2s;}
+.modal-footer button:hover{background:#e63946;}
+.qty-edit{display:flex;align-items:center;gap:4px;}
+.qty-edit button{width:28px;height:28px;border:none;background:#ffd633;font-size:14px;border-radius:50%;cursor:pointer;font-weight:700;transition:0.2s;}
+.qty-edit button:hover{background:var(--accent);color:#fff;}
+input,select,textarea{padding:8px;border-radius:8px;border:1px solid #ddd;width:100%;margin-bottom:10px;}
+@media(max-width:480px){.modal-content{width:95%;}.modal-body table th,.modal-body table td{font-size:12px;padding:6px;}.product-card img{height:auto;object-fit:contain;}}
+</style>
+</head>
+<body>
+
+<header>🍔 Fast Food & Ice Cream Menu 🍦</header>
+
+<!-- Search & Category Filter -->
+<div class="top-controls">
+  <input type="text" id="searchInput" placeholder="Search products...">
+  <select id="categoryFilter">
+    <option value="all">All Categories</option>
+    <option value="Burgers">Burgers</option>
+    <option value="Ice Cream">Ice Cream</option>
+    <option value="Drinks">Drinks</option>
+    <option value="Sides">Sides</option>
+  </select>
+</div>
+
+<div class="top-buttons">
+  <button id="viewCartBtn">🛒 Cart (<span id="cartCount">0</span>)</button>
+  <button id="viewFavoritesBtn">⭐ Favorites</button>
+  <button id="viewOrdersBtn">📦 My Orders</button>
+</div>
+
+<div class="products" id="productsGrid"></div>
+
+<!-- Cart Modal -->
+<div id="orderModal">
+<div class="modal-content">
+  <div class="modal-header">Your Cart</div>
+  <div class="modal-body">
+    <table id="orderTable">
+      <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Remove</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p style="text-align:right;font-weight:700;">Total: KSh <span id="orderTotal">0.00</span></p>
+  </div>
+  <div class="modal-footer">
+    <button id="proceedCheckoutBtn">Proceed to Checkout</button>
+    <button id="closeModalBtn" style="background:#6c757d;margin-left:8px;">Close</button>
+  </div>
+</div>
+</div>
+
+<!-- Checkout Modal -->
+<div id="checkoutModal">
+<div class="modal-content">
+  <div class="modal-header">Checkout Details</div>
+  <div class="modal-body">
+    <label>Name</label><input type="text" id="customerName" placeholder="Enter your name">
+    <label>Phone</label><input type="text" id="customerPhone" placeholder="Enter phone number">
+    <label>Delivery Method</label>
+    <select id="deliveryMethod">
+      <option value="pickup">Pickup (No Fee)</option>
+      <option value="delivery">Delivery (+KSh 200)</option>
+    </select>
+    <div id="deliveryAddressContainer" style="display:none;">
+      <label>Delivery Address</label>
+      <input type="text" id="deliveryAddress" placeholder="Enter your location">
+    </div>
+    <label>Order Notes / Customization</label>
+    <textarea id="orderNotes" placeholder="Add any notes here..."></textarea>
+    <p style="font-weight:700;">Total: KSh <span id="checkoutTotal">0.00</span></p>
+  </div>
+  <div class="modal-footer">
+    <button id="placeOrderBtn">Place Order</button>
+    <button id="closeCheckoutBtn" style="background:#6c757d;margin-left:8px;">Cancel</button>
+  </div>
+</div>
+</div>
+
+<!-- Favorites Modal -->
+<div id="favoritesModal">
+<div class="modal-content">
+  <div class="modal-header">Your Favorites</div>
+  <div class="modal-body" id="favoritesBody"></div>
+  <div class="modal-footer">
+    <button onclick="favoritesModal.style.display='none'" style="background:#6c757d;">Close</button>
+  </div>
+</div>
+</div>
+
+<!-- My Orders Modal -->
+<div id="myOrdersModal">
+<div class="modal-content">
+  <div class="modal-header">My Orders</div>
+  <div class="modal-body" id="myOrdersBody"></div>
+  <div class="modal-footer">
+    <button onclick="myOrdersModal.style.display='none'" style="background:#6c757d;">Close</button>
+  </div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, addDoc, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const { jsPDF } = window.jspdf;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:2e4fce15f2ba1192b98139"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let cart=[], favorites=JSON.parse(localStorage.getItem("favorites")||"[]");
+let allProducts=[];
+
+const productsGrid=document.getElementById("productsGrid");
+const cartCount=document.getElementById("cartCount");
+const viewCartBtn=document.getElementById("viewCartBtn");
+const orderModal=document.getElementById("orderModal");
+const orderTableBody=document.querySelector("#orderTable tbody");
+const orderTotal=document.getElementById("orderTotal");
+const closeModalBtn=document.getElementById("closeModalBtn");
+const proceedCheckoutBtn=document.getElementById("proceedCheckoutBtn");
+
+const checkoutModal=document.getElementById("checkoutModal");
+const customerName=document.getElementById("customerName");
+const customerPhone=document.getElementById("customerPhone");
+const deliveryMethod=document.getElementById("deliveryMethod");
+const deliveryAddressContainer=document.getElementById("deliveryAddressContainer");
+const deliveryAddress=document.getElementById("deliveryAddress");
+const checkoutTotal=document.getElementById("checkoutTotal");
+const orderNotes=document.getElementById("orderNotes");
+const placeOrderBtn=document.getElementById("placeOrderBtn");
+const closeCheckoutBtn=document.getElementById("closeCheckoutBtn");
+
+const viewFavoritesBtn=document.getElementById("viewFavoritesBtn");
+const favoritesModal=document.getElementById("favoritesModal");
+const favoritesBody=document.getElementById("favoritesBody");
+
+const viewOrdersBtn=document.getElementById("viewOrdersBtn");
+const myOrdersModal=document.getElementById("myOrdersModal");
+const myOrdersBody=document.getElementById("myOrdersBody");
+
+const searchInput = document.getElementById("searchInput");
+const categoryFilter = document.getElementById("categoryFilter");
+
+// -- Cart Functions --
+function updateCartCount(){ cartCount.textContent=cart.length; }
+function renderCart(){
+  orderTableBody.innerHTML="";
+  let total=0;
+  cart.forEach((item,index)=>{
+    total+=item.price*item.qty;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${item.title}</td>
+      <td><div class="qty-edit"><button onclick="decreaseQty(${index})">-</button><span>${item.qty}</span><button onclick="increaseQty(${index})">+</button></div></td>
+      <td>KSh ${(item.price*item.qty).toFixed(2)}</td>
+      <td><button style="background:var(--danger);color:#fff;padding:2px 6px;border:none;border-radius:4px;cursor:pointer;" onclick="removeItem(${index})">X</button></td>`;
+    orderTableBody.appendChild(tr);
+  });
+  orderTotal.textContent=total.toFixed(2);
+  updateCartCount();
+}
+window.increaseQty=i=>{ cart[i].qty++; renderCart(); }
+window.decreaseQty=i=>{ if(cart[i].qty>1){cart[i].qty--; renderCart();} }
+window.removeItem=i=>{ cart.splice(i,1); renderCart(); }
+
+// -- Load Products --
+onSnapshot(collection(db,"products"), snapshot=>{
+  allProducts = [];
+  snapshot.forEach(docSnap=>{
+    const p = {...docSnap.data(), id: docSnap.id};
+    allProducts.push(p);
+  });
+  renderProducts(allProducts);
+});
+
+// -- Render Products --
+function renderProducts(products){
+  productsGrid.innerHTML="";
+  products.forEach(p=>{
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.innerHTML = `
+      <img src="${p.image}" alt="${p.title}">
+      <div class="product-info">
+        <h4>${p.title}</h4>
+        <p>KSh ${p.price}</p>
+        <div class="qty-container"><button onclick="decreaseQtyCard(this)">-</button><span>1</span><button onclick="increaseQtyCard(this)">+</button></div>
+        <button class="add-cart">Add to Cart</button>
+        <button class="add-fav" style="margin-top:6px;background:#ffd633;color:#333;border:none;padding:6px 12px;border-radius:10px;font-weight:700;cursor:pointer;">⭐ Favorite</button>
+      </div>
+    `;
+    let qtySpan = card.querySelector(".qty-container span");
+    card.querySelector(".add-cart").addEventListener("click",()=>{
+      const qty = parseInt(qtySpan.textContent);
+      const existing = cart.find(i=>i.id===p.id);
+      if(existing){ existing.qty += qty; } else { cart.push({id:p.id,title:p.title,price:p.price,qty,image:p.image}); }
+      renderCart();
+      alert("✅ Added to cart!");
+    });
+    card.querySelector(".add-fav").addEventListener("click",()=>{
+      if(!favorites.find(f=>f.id===p.id)){ favorites.push({id:p.id,title:p.title,price:p.price,image:p.image}); localStorage.setItem("favorites",JSON.stringify(favorites)); alert("⭐ Added to favorites!"); } else { alert("Already in favorites!"); }
+    });
+    productsGrid.appendChild(card);
+  });
+}
+
+// Card qty buttons
+window.increaseQtyCard=btn=>{ let span=btn.parentElement.querySelector("span"); span.textContent=parseInt(span.textContent)+1; }
+window.decreaseQtyCard=btn=>{ let span=btn.parentElement.querySelector("span"); if(parseInt(span.textContent)>1) span.textContent=parseInt(span.textContent)-1; }
+
+// -- Cart Modal --
+viewCartBtn.addEventListener("click",()=>{ orderModal.style.display="flex"; renderCart(); });
+closeModalBtn.addEventListener("click",()=>{ orderModal.style.display="none"; });
+proceedCheckoutBtn.addEventListener("click",()=>{ orderModal.style.display="none"; checkoutModal.style.display="flex"; checkoutTotal.textContent=cart.reduce((s,i)=>s+i.price*i.qty,0).toFixed(2); });
+
+// -- Checkout Modal --
+closeCheckoutBtn.addEventListener("click",()=>{ checkoutModal.style.display="none"; });
+deliveryMethod.addEventListener("change",()=>{
+  deliveryAddressContainer.style.display = deliveryMethod.value==="delivery"?"block":"none";
+});
+
+// -- Place Order & Generate PDF --
+placeOrderBtn.addEventListener("click",async()=>{
+  if(!customerName.value || !customerPhone.value || (deliveryMethod.value==="delivery"&&!deliveryAddress.value)){ alert("Please fill all required fields!"); return; }
+  const orderCode = "ORD-"+Date.now();
+  const totalValue = cart.reduce((s,i)=>s+i.price*i.qty,0)+(deliveryMethod.value==="delivery"?200:0);
+  const orderData = { code: orderCode, items:cart, total:totalValue, customer:{name:customerName.value,phone:customerPhone.value,delivery:deliveryMethod.value,address:deliveryAddress.value||""}, notes:orderNotes.value||"",status:"Pending",date:new Date()};
+  await addDoc(collection(db,"orders"),orderData);
+  alert("✅ Order submitted!");
+
+  // PDF
+  const doc=new jsPDF();
+  doc.setFontSize(18); doc.text("🍔 Fast Food & Ice Cream",14,20);
+  doc.setFontSize(12); doc.text(`Order Receipt`,14,30);
+  doc.text(`Order Code: ${orderCode}`,14,38);
+  doc.text(`Name: ${customerName.value}`,14,46);
+  doc.text(`Phone: ${customerPhone.value}`,14,54);
+  doc.text(`Delivery: ${deliveryMethod.value}`,14,62);
+  if(deliveryMethod.value==="delivery") doc.text(`Address: ${deliveryAddress.value}`,14,70);
+  doc.text(`Notes: ${orderNotes.value||"N/A"}`,14,78);
+  let y=86; doc.text("Items:",14,y);
+  cart.forEach(item=>{ y+=8; doc.text(`- ${item.title} x ${item.qty} = KSh ${(item.price*item.qty).toFixed(2)}`,18,y); });
+  y+=10; doc.text(`Total: KSh ${totalValue.toFixed(2)}`,14,y); y+=8; doc.text("Thank you for your order!",14,y);
+  doc.save(`${orderCode}.pdf`);
+
+  // Reset
+  cart=[]; renderCart();
+  checkoutModal.style.display="none";
+  customerName.value=""; customerPhone.value=""; deliveryAddress.value=""; orderNotes.value="";
+});
+
+// -- Favorites Modal --
+viewFavoritesBtn.addEventListener("click", () => {
+  favoritesBody.innerHTML = "";
+  if(favorites.length === 0){
+    favoritesBody.innerHTML = "<p>No favorites yet.</p>";
+    return;
+  }
+
+  favorites.forEach((f, i) => {
+    const div = document.createElement("div");
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.marginBottom = "10px";
+
+    div.innerHTML = `
+      <img src="${f.image}" style="width:60px;height:60px;border-radius:10px;margin-right:10px;">
+      <span style="flex:1;">${f.title}</span>
+      <button onclick="addFavToCart(${i})" style="background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;margin-right:6px;">Add to Cart</button>
+      <button onclick="removeFavorite(${i})" style="background:#dc3545;color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;">Remove</button>
+    `;
+    favoritesBody.appendChild(div);
+  });
+
+  favoritesModal.style.display = "flex";
+});
+
+// -- Add favorite item to cart --
+window.addFavToCart = i => {
+  const f = favorites[i];
+  const existing = cart.find(c => c.id === f.id);
+  if(existing){ existing.qty++; }
+  else { cart.push({id: f.id, title: f.title, price: f.price, qty: 1, image: f.image}); }
+  renderCart();
+  alert("✅ Added from favorites!");
+}
+
+// -- Remove favorite --
+window.removeFavorite = i => {
+  if(confirm("Remove this item from favorites?")){
+    favorites.splice(i, 1);
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+    viewFavoritesBtn.click(); // Refresh modal
+  }
+}
+
+// -- My Orders Modal --
+viewOrdersBtn.addEventListener("click", ()=>{
+  const phone = prompt("Enter your phone number to view your orders:"); // or get from logged-in user
+  if(!phone) return;
+
+  myOrdersBody.innerHTML = "";
+  const q = query(collection(db,"orders"), orderBy("date","desc"));
+  onSnapshot(q, snapshot => {
+    myOrdersBody.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const o = docSnap.data();
+      if(o.customer.phone !== phone) return; // Only show this user's orders
+
+      const div = document.createElement("div");
+      div.style.border = "1px solid #ddd";
+      div.style.padding = "10px";
+      div.style.marginBottom = "8px";
+      div.style.borderRadius = "12px";
+
+      // Include images for each item
+      let itemsHtml = o.items.map(i => `
+        <div style="display:flex;align-items:center;margin-bottom:4px;">
+          <img src="${i.image}" style="width:50px;height:50px;border-radius:8px;margin-right:8px;">
+          <span>${i.title} x ${i.qty}</span>
+        </div>
+      `).join("");
+
+      div.innerHTML = `<p><strong>Code:</strong> ${o.code}</p>
+        <div><strong>Items:</strong>${itemsHtml}</div>
+        <p><strong>Total:</strong> KSh ${o.total.toFixed(2)}</p>
+        <p><strong>Status:</strong> ${o.status}</p>
+        <button onclick="downloadOrder('${o.code}',${JSON.stringify(o.items)},${o.total},'${o.customer.name}','${o.customer.phone}','${o.customer.delivery}','${o.customer.address}','${o.notes}')"
+        style="background:var(--accent);color:#fff;border:none;padding:6px 10px;border-radius:6px;margin-right:6px;">Download PDF</button>
+        <button onclick="cancelOrder('${docSnap.id}')" style="background:var(--danger);color:#fff;border:none;padding:6px 10px;border-radius:6px;">Cancel</button>`;
+      myOrdersBody.appendChild(div);
+    });
+  });
+  myOrdersModal.style.display = "flex";
+});
+
+// -- Download PDF --
+window.downloadOrder = (code, items, total, name, phone, delivery, address, notes) => {
+  const doc = new jsPDF();
+  doc.setFontSize(18); doc.text("🍔 Fast Food & Ice Cream", 14, 20);
+  doc.setFontSize(12); doc.text("Order Receipt", 14, 30);
+  doc.text(`Order Code: ${code}`, 14, 38);
+  doc.text(`Name: ${name}`, 14, 46);
+  doc.text(`Phone: ${phone}`, 14, 54);
+  doc.text(`Delivery: ${delivery}`, 14, 62);
+  if(delivery === "delivery") doc.text(`Address: ${address}`, 14, 70);
+  doc.text(`Notes: ${notes || "N/A"}`, 14, 78);
+
+  let y = 86;
+  doc.text("Items:", 14, y);
+  items.forEach(item => {
+    y += 8;
+    doc.text(`- ${item.title} x ${item.qty}`, 18, y);
+  });
+
+  y += 10;
+  doc.text(`Total: KSh ${total.toFixed(2)}`, 14, y);
+  y += 8;
+  doc.text("Thank you for your order!", 14, y);
+
+  // Only download when user clicks Download button
+  doc.save(`${code}.pdf`);
+};
+
+// -- Cancel Order --
+window.cancelOrder = async id => {
+  if(confirm("Are you sure you want to cancel this order?")){
+    await deleteDoc(doc(db,"orders",id));
+    alert("Order canceled.");
+  }
+};
+
+// -- Search & Category Filter --
+searchInput.addEventListener("input",()=>{ filterProducts(); });
+categoryFilter.addEventListener("change",()=>{ filterProducts(); });
+function filterProducts(){
+  const search=searchInput.value.toLowerCase();
+  const category=categoryFilter.value;
+  let filtered=allProducts.filter(p=>p.title.toLowerCase().includes(search));
+  if(category!=="all") filtered=filtered.filter(p=>p.category===category);
+  renderProducts(filtered);
+}
+</script>
+</body>
+</html>

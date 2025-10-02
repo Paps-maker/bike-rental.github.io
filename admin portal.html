@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>POS + Admin Dashboard</title>
+<style>
+:root{--bg:#e9ecef;--panel:#f7f7f9;--accent:#2b6cb0;--muted:#6c757d;--card:#fff;--danger:#dc3545;}
+*{box-sizing:border-box;font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif}
+body{margin:0;background:var(--bg);color:#222}
+.app{max-width:1200px;margin:18px auto;padding:12px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+header h1{font-size:20px;margin:0}
+.layout{display:grid;grid-template-columns:290px 1fr 360px;gap:12px}
+@media(max-width:1000px){.layout{grid-template-columns:1fr;}}
+.left,.center,.right{background:var(--panel);padding:12px;border-radius:6px}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.key{background:var(--card);padding:18px;border-radius:8px;text-align:center;font-size:20px;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,0.05);}
+.key:active{transform:translateY(1px);}
+.cart{margin-top:12px;background:#fff;border-radius:6px;padding:8px;height:320px;overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:6px;text-align:left;border-bottom:1px solid #eee;font-size:13px}
+.total-banner{background:#fff;padding:10px;border-radius:6px;margin-top:8px;font-weight:700}
+.products-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:1200px){.products-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:700px){.products-grid{grid-template-columns:repeat(2,1fr);}}
+.product{background:var(--card);padding:8px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 2px 4px rgba(0,0,0,0.04)}
+.product img{width:100%;height:100px;object-fit:cover;border-radius:6px}
+.p-title{font-size:13px;color:var(--muted);text-align:center}
+.box{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px}
+.field{display:flex;flex-direction:column;margin-bottom:8px}
+label{font-size:13px;color:var(--muted);margin-bottom:6px}
+input,select{padding:8px;border-radius:6px;border:1px solid #ddd}
+button{padding:8px 12px;border-radius:6px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer;margin-right:4px}
+button.secondary{background:#6c757d}
+button.ghost{background:#fff;color:var(--accent);border:1px solid #ddd}
+footer{margin-top:12px;text-align:center;color:var(--muted);font-size:13px}
+#adminPanel{margin-top:30px;background:#fff;padding:20px;border-radius:8px;display:none}
+#productList p{margin:4px 0;padding:6px;background:#f8f9fa;border-radius:4px}
+#loginPanel{margin-top:30px;background:#fff;padding:20px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<h1>WPOS</h1>
+<div class="muted">Click a product to add. Use keypad to enter quantity or cash.</div>
+<div style="margin-left:auto"><button id="logoutBtn" style="display:none">Logout</button></div>
+</header>
+
+<div class="layout">
+<!-- POS Left -->
+<div class="left">
+<div style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+<div style="font-weight:700">Calculator / Qty</div>
+<div class="muted">Qty: <span id="qtyDisplay">1</span></div>
+</div>
+<div class="numpad">
+<div class="key" data-key="7">7</div><div class="key" data-key="8">8</div><div class="key" data-key="9">9</div>
+<div class="key" data-key="4">4</div><div class="key" data-key="5">5</div><div class="key" data-key="6">6</div>
+<div class="key" data-key="1">1</div><div class="key" data-key="2">2</div><div class="key" data-key="3">3</div>
+<div class="key" data-key="0">0</div><div class="key" data-key=".">.</div><div class="key" data-key="C">C</div>
+</div>
+<div class="cart">
+<table id="cartTable">
+<thead>
+<tr><th>Item</th><th style="width:60px">Qty</th><th style="width:80px;text-align:right">Amount</th><th>Action</th></tr>
+</thead>
+<tbody id="cartBody"></tbody>
+</table>
+</div>
+<div class="total-banner" id="miniTotal">Total is Ksh 0.00</div>
+</div>
+
+<!-- POS Center -->
+<div class="center">
+<div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+<div style="font-weight:700">Products</div>
+<div class="muted">Tap to add</div>
+</div>
+<div class="products-grid" id="productsGrid"></div>
+</div>
+
+<!-- POS Right -->
+<div class="right">
+<div class="box">
+<div style="font-weight:800;margin-bottom:6px">Receipt Summary</div>
+<div class="field"><label>Sub Total</label><input type="text" id="subTotal" readonly></div>
+<div class="field"><label>Tax (5%)</label><input type="text" id="taxAmount" readonly></div>
+<div class="field"><label>Total</label><input type="text" id="grandTotal" readonly></div>
+</div>
+<div class="box">
+<div style="font-weight:800;margin-bottom:6px">Payment</div>
+<div class="field"><label>Method</label>
+<select id="paymentMethod">
+<option value="cash">Cash</option>
+<option value="card">Card</option>
+<option value="mpesa">M-Pesa</option>
+</select></div>
+<div class="field"><label>Cash Received</label><input type="text" id="cashInput"></div>
+<div class="field"><label>Change</label><input type="text" id="changeOut" readonly></div>
+<div style="display:flex;gap:8px;margin-top:10px">
+<button id="payBtn">Pay</button>
+<button class="secondary" id="resetBtn">Reset</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Customer Details Modal -->
+<div id="customerModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:1000;">
+  <div style="background:#fff;padding:20px;border-radius:8px;width:300px;position:relative">
+    <h3>Customer Details</h3>
+    <div class="field"><label>Name</label><input type="text" id="custName"></div>
+    <div class="field"><label>Phone</label><input type="text" id="custPhone"></div>
+    <div class="field"><label>Delivery</label>
+      <select id="custDelivery">
+        <option value="Pickup">Pickup</option>
+        <option value="Delivery">Delivery</option>
+      </select>
+    </div>
+    <div class="field"><label>Address</label><input type="text" id="custAddress"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+      <button id="cancelCust">Cancel</button>
+      <button id="submitCust">Submit</button>
+    </div>
+  </div>
+</div>
+
+<h3>Orders</h3>
+<div id="ordersContainer">
+<table style="width:100%;border-collapse:collapse;">
+<thead>
+<tr style="background:#2b6cb0;color:#fff;text-align:left;">
+<th>Name</th>
+<th>Phone</th>
+<th>Delivery</th>
+<th>Address</th>
+<th>Items</th>
+<th>Qty</th>
+<th>Amount</th>
+<th>Payment</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="ordersList"></tbody>
+</table>
+</div>
+
+<!-- Login -->
+<div id="loginPanel">
+<h2>Admin Login</h2>
+<div class="field"><label>Email</label><input id="loginEmail" type="text"></div>
+<div class="field"><label>Password</label><input id="loginPass" type="password"></div>
+<button id="loginBtn">Login</button>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel" style="display:none">
+  <h2>Admin Dashboard</h2>
+  <div class="field"><label>Title</label><input id="title" type="text"></div>
+  <div class="field"><label>Price</label><input id="price" type="number"></div>
+  <div class="field"><label>Image</label><input id="imageFile" type="file" accept="image/*"></div>
+  <div style="margin-top:8px;">
+    <button id="addBtn">Add Product</button>
+    <button id="updateBtn" class="secondary" style="display:none">Update Product</button>
+  </div>
+  <h3>Products</h3>
+  <div id="productList"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:2e4fce15f2ba1192b98139",
+  measurementId: "G-9HLN59N6G4"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
+
+// Elements
+const loginPanel = document.getElementById("loginPanel");
+const adminPanel = document.getElementById("adminPanel");
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const productsGrid = document.getElementById("productsGrid");
+const productList = document.getElementById("productList");
+let editingProductId = null;
+let cart = [];
+let currentQty = 1;
+
+// --- AUTH ---
+loginBtn.addEventListener("click", () => {
+  signInWithEmailAndPassword(auth, document.getElementById("loginEmail").value, document.getElementById("loginPass").value)
+    .catch(err => alert(err.message));
+});
+
+logoutBtn.addEventListener("click", () => signOut(auth));
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    loginPanel.style.display = "none";
+    adminPanel.style.display = "block";
+    logoutBtn.style.display = "inline-block";
+    loadProducts();
+    loadOrders();
+  } else {
+    loginPanel.style.display = "block";
+    adminPanel.style.display = "none";
+    logoutBtn.style.display = "none";
+  }
+});
+
+// --- PRODUCTS ---
+function loadProducts() {
+  onSnapshot(collection(db,"products"), snapshot => {
+    productsGrid.innerHTML = "";
+    productList.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const p = docSnap.data();
+      const div = document.createElement("div");
+      div.className = "product";
+      div.innerHTML = `<img src="${p.image}"><div class="p-title">${p.title} Ksh ${p.price}</div>`;
+      div.addEventListener("click", () => addToCart({id: docSnap.id, title: p.title, price: p.price, qty: currentQty}));
+      productsGrid.appendChild(div);
+      const row = document.createElement("p");
+      row.innerHTML = `${p.title} - Ksh ${p.price} <button class="editBtn">Edit</button> <button class="deleteBtn">Delete</button>`;
+      productList.appendChild(row);
+      row.querySelector(".editBtn").addEventListener("click", () => editProduct(docSnap.id, p.title, p.price, p.image));
+      row.querySelector(".deleteBtn").addEventListener("click", () => deleteProduct(docSnap.id));
+    });
+  });
+}
+
+async function addProduct() {
+  const title = document.getElementById("title").value;
+  const price = parseFloat(document.getElementById("price").value);
+  const file = document.getElementById("imageFile").files[0];
+  if (!title || !price || !file) { alert("Fill all fields"); return; }
+  const fileRef = ref(storage, "products/" + Date.now() + "_" + file.name);
+  await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(fileRef);
+  await addDoc(collection(db,"products"), { title, price, image: url });
+  alert("Product added!");
+  resetForm();
+}
+
+function editProduct(id, title, price, image) {
+  document.getElementById("title").value = title;
+  document.getElementById("price").value = price;
+  editingProductId = id;
+  document.getElementById("addBtn").style.display = "none";
+  document.getElementById("updateBtn").style.display = "inline-block";
+}
+
+async function updateProduct() {
+  if(!editingProductId) return;
+  const title = document.getElementById("title").value;
+  const price = parseFloat(document.getElementById("price").value);
+  const file = document.getElementById("imageFile").files[0];
+  let updatedData = { title, price };
+  if(file){
+    const fileRef = ref(storage, "products/" + Date.now() + "_" + file.name);
+    await uploadBytes(fileRef, file);
+    updatedData.image = await getDownloadURL(fileRef);
+  }
+  await updateDoc(doc(db,"products",editingProductId), updatedData);
+  alert("Product updated!");
+  editingProductId = null;
+  resetForm();
+}
+
+function resetForm() {
+  document.getElementById("title").value = "";
+  document.getElementById("price").value = "";
+  document.getElementById("imageFile").value = "";
+  document.getElementById("addBtn").style.display = "inline-block";
+  document.getElementById("updateBtn").style.display = "none";
+}
+
+async function deleteProduct(id) {
+  if(confirm("Delete product?")) await deleteDoc(doc(db,"products",id));
+}
+
+// --- ORDERS ---
+function loadOrders() {
+  const list = document.getElementById("ordersList");
+  if(!list) return;
+  onSnapshot(collection(db,"orders"), snapshot => {
+    list.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const o = docSnap.data();
+      const itemsStr = (o.items||[]).map(i=>i.title).join(", ");
+      const qtyStr = (o.items||[]).map(i=>i.qty).join(", ");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${o.customer?.name||'N/A'}</td>
+        <td>${o.customer?.phone||'N/A'}</td>
+        <td>${o.customer?.delivery||'Pickup'}</td>
+        <td>${o.customer?.address||'-'}</td>
+        <td>${itemsStr}</td>
+        <td>${qtyStr}</td>
+        <td>KSh ${o.total}</td>
+        <td>${o.paymentMethod||'N/A'}</td>
+        <td id="status-${docSnap.id}">${o.status||'Pending'}</td>
+        <td>${o.status==='Pending'?`<button class="completeBtn">Complete</button><button class="cancelBtn">Cancel</button>`:''} <button class="deleteOrderBtn">Delete</button></td>`;
+      if(o.status==='Pending'){
+        tr.querySelector(".completeBtn")?.addEventListener("click",()=> updateDoc(doc(db,"orders",docSnap.id),{status:"Completed"}));
+        tr.querySelector(".cancelBtn")?.addEventListener("click",()=> updateDoc(doc(db,"orders",docSnap.id),{status:"Cancelled"}));
+      }
+      tr.querySelector(".deleteOrderBtn").addEventListener("click",()=> deleteDoc(doc(db,"orders",docSnap.id)));
+      list.appendChild(tr);
+    });
+  });
+}
+
+// --- CART ---
+function addToCart(product){
+  const existing = cart.find(i=>i.id===product.id);
+  if(existing){ existing.qty += currentQty; } else { cart.push({...product, qty: currentQty}); }
+  currentQty = 1; document.getElementById("qtyDisplay").textContent = currentQty;
+  renderCart();
+}
+
+function renderCart(){
+  const cartBody = document.getElementById("cartBody");
+  cartBody.innerHTML = "";
+  let subtotal = 0;
+  cart.forEach((item,index) => {
+    const tr = document.createElement("tr");
+    const amount = item.price * item.qty;
+    subtotal += amount;
+    tr.innerHTML = `<td>${item.title}</td><td>${item.qty}</td><td style="text-align:right">${amount.toFixed(2)}</td><td><button class="removeItemBtn">Remove</button></td>`;
+    tr.querySelector(".removeItemBtn").addEventListener("click",()=>{ cart.splice(index,1); renderCart(); });
+    cartBody.appendChild(tr);
+  });
+  document.getElementById("miniTotal").textContent = `Total is Ksh ${subtotal.toFixed(2)}`;
+  document.getElementById("subTotal").value = subtotal.toFixed(2);
+  const tax = subtotal * 0.05;
+  document.getElementById("taxAmount").value = tax.toFixed(2);
+  const total = subtotal + tax;
+  document.getElementById("grandTotal").value = total.toFixed(2);
+}
+
+// --- KEYPAD ---
+document.querySelectorAll(".key").forEach(k=>{
+  k.addEventListener("click",()=>{
+    let val = k.dataset.key;
+    if(val==="C"){ currentQty=1; }
+    else{
+      currentQty = (currentQty===1?val:currentQty+val);
+      if(currentQty.includes(".")) currentQty = parseFloat(currentQty);
+      else currentQty = parseInt(currentQty);
+    }
+    document.getElementById("qtyDisplay").textContent = currentQty;
+  });
+});
+
+// --- CASH & PAYMENT ---
+document.getElementById("cashInput").addEventListener("input",()=>{
+  const cash = parseFloat(document.getElementById("cashInput").value)||0;
+  const total = parseFloat(document.getElementById("grandTotal").value)||0;
+  document.getElementById("changeOut").value = (cash - total >=0 ? (cash - total).toFixed(2) : 0);
+});
+document.getElementById("payBtn").addEventListener("click", () => {
+  if(cart.length===0){ alert("Cart empty"); return; }
+  document.getElementById("customerModal").style.display = "flex";
+});
+document.getElementById("cancelCust").addEventListener("click", ()=>{
+  document.getElementById("customerModal").style.display = "none";
+});
+
+document.getElementById("submitCust").addEventListener("click", async ()=>{
+  const name = document.getElementById("custName").value.trim();
+  const phone = document.getElementById("custPhone").value.trim();
+  const delivery = document.getElementById("custDelivery").value;
+  const address = document.getElementById("custAddress").value.trim();
+  if(!name || !phone || (delivery==="Delivery" && !address)){ 
+    alert("Please fill all required fields"); 
+    return; 
+  }
+
+  const total = parseFloat(document.getElementById("grandTotal").value)||0;
+  const paymentMethod = document.getElementById("paymentMethod").value;
+  const cashReceived = parseFloat(document.getElementById("cashInput").value)||0;
+  const change = parseFloat(document.getElementById("changeOut").value)||0;
+
+  // Save to Firebase
+  try {
+    await addDoc(collection(db,"orders"),{
+      customer: {name, phone, delivery, address},
+      items: cart,
+      subtotal: parseFloat(document.getElementById("subTotal").value),
+      tax: parseFloat(document.getElementById("taxAmount").value),
+      total,
+      paymentMethod,
+      cashReceived,
+      change,
+      status: "Pending",
+      timestamp: new Date()
+    });
+    alert("Order successfully saved!");
+    cart = []; renderCart();
+    document.getElementById("cashInput").value = "";
+    document.getElementById("changeOut").value = "";
+    document.getElementById("customerModal").style.display = "none";
+
+    // Reset modal fields
+    document.getElementById("custName").value="";
+    document.getElementById("custPhone").value="";
+    document.getElementById("custDelivery").value="Pickup";
+    document.getElementById("custAddress").value="";
+
+  } catch(err){
+    alert("Error saving order: " + err.message);
+  }
+});
+
+document.getElementById("payBtn").addEventListener("click",()=>{
+  if(cart.length===0){ alert("Cart empty"); return; }
+  const paymentMethod = document.getElementById("paymentMethod").value;
+  alert(`Payment of Ksh ${document.getElementById("grandTotal").value} received via ${paymentMethod}`);
+  cart=[]; renderCart(); document.getElementById("cashInput").value=""; document.getElementById("changeOut").value="";
+});
+
+document.getElementById("resetBtn").addEventListener("click",()=>{
+  cart=[]; renderCart(); currentQty=1; document.getElementById("qtyDisplay").textContent = currentQty;
+});
+
+// --- BUTTON EVENTS ---
+document.getElementById("addBtn").addEventListener("click", addProduct);
+document.getElementById("updateBtn").addEventListener("click", updateProduct);
+</script>
+</body>
+</html>
