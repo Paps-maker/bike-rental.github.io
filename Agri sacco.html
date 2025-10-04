@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crop Farmers SACCO Admin</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:0f3ab8798d0d7606b98139",
+  measurementId: "G-T9T1QB6ZDB"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// --- Login ---
+const loginForm = document.getElementById('loginForm');
+const loginError = document.getElementById('loginError');
+const loginPage = document.getElementById('loginPage');
+const dashboardContainer = document.getElementById('dashboardContainer');
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    loginPage.style.display = 'none';
+    dashboardContainer.style.display = 'flex';
+    loadAllData(); // Load farmers/projects/loans
+  } else {
+    loginPage.style.display = 'flex';
+    dashboardContainer.style.display = 'none';
+  }
+});
+
+loginForm.addEventListener('submit', async e=>{
+  e.preventDefault();
+  const email = loginForm.email.value.trim();
+  const password = loginForm.password.value.trim();
+  if(!email || !password){ loginError.textContent="Enter email and password"; return; }
+  try{
+    await signInWithEmailAndPassword(auth,email,password);
+    loginError.textContent='';
+  }catch(err){
+    loginError.textContent="Login failed: "+err.message;
+  }
+});
+
+// Logout
+document.getElementById('logoutBtn').addEventListener('click',()=>signOut(auth));
+
+// Navigation with auto-load on page show
+const pages = document.querySelectorAll('.page');
+document.querySelectorAll('.menu-link').forEach(link=>{
+  link.addEventListener('click', async e=>{
+    e.preventDefault();
+    pages.forEach(p=>p.style.display='none');
+    const targetPage = document.getElementById(link.dataset.page);
+    targetPage.style.display='block';
+
+    // Reload table data when navigating
+    if(link.dataset.page === 'farmers') await loadFarmers();
+    if(link.dataset.page === 'projects') await loadProjects();
+    if(link.dataset.page === 'loans') await loadLoans();
+  });
+});
+
+
+// --- Helper functions ---
+function parseMPESA(csv){
+  const lines = csv.split('\n').filter(l=>l.trim()!=='');
+  let net=0;
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(',');
+    const type = cols[3].toLowerCase();
+    const amount = parseFloat(cols[4]);
+    if(type.includes('credit')) net+=amount;
+    else if(type.includes('debit')) net-=amount;
+  }
+  return net;
+}
+
+function calculateLoanEligibility(netCashflow,cost){
+  return Math.min(cost*0.8,netCashflow*3);
+}
+
+function calculateRepaymentSchedule(amount,interest,duration){
+  const monthlyInterest = interest/100/duration;
+  const monthlyPayment = amount*(1+monthlyInterest)/duration;
+  let schedule=[];
+  for(let i=1;i<=duration;i++) schedule.push({month:i,amount:Math.round(monthlyPayment)});
+  return schedule;
+}
+
+// --- Farmers ---
+document.getElementById('addFarmerForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const name = e.target.name.value;
+  const phone = e.target.phone.value;
+  const crop = e.target.crop.value;
+  const file = e.target.statement.files[0];
+  let statementUrl='', netCashflow=0;
+  if(file){
+    const storageRef = ref(storage,'statements/'+file.name);
+    await uploadBytes(storageRef,file);
+    statementUrl = await getDownloadURL(storageRef);
+    if(file.name.endsWith('.csv')) netCashflow = parseMPESA(await file.text());
+  }
+  await addDoc(collection(db,'farmers'),{name,phone,crop,statementUrl,netCashflow});
+  e.target.reset();
+  bootstrap.Modal.getInstance(document.getElementById('addFarmerModal')).hide();
+  loadFarmers(); loadProjectFarmers(); loadLoanDropdowns();
+});
+
+async function loadFarmers(){
+  const tableBody = document.querySelector('#farmersTable tbody');
+  tableBody.innerHTML='';
+  const snapshot = await getDocs(collection(db,'farmers'));
+  document.getElementById('totalFarmers').textContent=snapshot.size;
+  snapshot.forEach(docSnap=>{
+    const data=docSnap.data();
+    const row = document.createElement('tr');
+    row.innerHTML=`
+      <td>${docSnap.id}</td>
+      <td>${data.name}</td>
+      <td>${data.phone}</td>
+      <td>${data.crop}</td>
+      <td>${data.netCashflow||0}</td>
+      <td>${data.statementUrl ? `<a href="${data.statementUrl}" target="_blank" class="btn btn-sm btn-info"><i class="bi bi-eye"></i> View</a>`:'N/A'}</td>
+      <td>
+        <button class="btn btn-sm btn-warning editFarmerBtn"><i class="bi bi-pencil-square"></i> Edit</button>
+        <button class="btn btn-sm btn-danger deleteFarmerBtn"><i class="bi bi-trash"></i> Delete</button>
+      </td>
+    `;
+    row.querySelector('.deleteFarmerBtn').addEventListener('click', async ()=>{
+      if(confirm('Delete this farmer?')){
+        await deleteDoc(doc(db,'farmers',docSnap.id));
+        loadFarmers(); loadProjectFarmers(); loadLoanDropdowns();
+      }
+    });
+    tableBody.appendChild(row);
+  });
+}
+
+async function loadProjectFarmers(){
+  const select = document.getElementById('projectFarmers');
+  select.innerHTML='';
+  const snapshot = await getDocs(collection(db,'farmers'));
+  snapshot.forEach(d=>{
+    select.innerHTML += `<option value="${d.id}">${d.data().name} (${d.data().crop})</option>`;
+  });
+}
+
+// --- Projects ---
+document.getElementById('addProjectForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const name = e.target.name.value;
+  const farmers = Array.from(e.target.farmers.selectedOptions).map(o=>o.value);
+  const description = e.target.description.value;
+  const duration = parseInt(e.target.duration.value);
+  const cost = parseFloat(e.target.cost.value);
+  const interest = parseFloat(e.target.interest.value);
+  let proposalUrl='';
+  const file = e.target.proposal.files[0];
+  if(file){
+    const storageRef = ref(storage,'proposals/'+file.name);
+    await uploadBytes(storageRef,file);
+    proposalUrl = await getDownloadURL(storageRef);
+  }
+  await addDoc(collection(db,'projects'),{name,farmers,description,duration,cost,interest,proposalUrl});
+  e.target.reset();
+  bootstrap.Modal.getInstance(document.getElementById('addProjectModal')).hide();
+  loadProjects(); loadLoanDropdowns();
+});
+
+async function loadProjects(){
+  const tableBody = document.querySelector('#projectsTable tbody');
+  tableBody.innerHTML='';
+  const snapshot = await getDocs(collection(db,'projects'));
+  document.getElementById('activeProjects').textContent=snapshot.size;
+  snapshot.forEach(docSnap=>{
+    const data = docSnap.data();
+    const row = document.createElement('tr');
+    row.innerHTML=`
+      <td>${docSnap.id}</td>
+      <td>${data.name}</td>
+      <td>${data.farmers.length}</td>
+      <td>${data.duration}</td>
+      <td>${data.cost}</td>
+      <td>${data.interest}</td>
+      <td>${data.proposalUrl ? `<a href="${data.proposalUrl}" target="_blank" class="btn btn-sm btn-info"><i class="bi bi-eye"></i> View</a>`:'N/A'}</td>
+      <td>
+        <button class="btn btn-sm btn-warning editProjectBtn"><i class="bi bi-pencil-square"></i> Edit</button>
+        <button class="btn btn-sm btn-danger deleteProjectBtn"><i class="bi bi-trash"></i> Delete</button>
+      </td>
+    `;
+    row.querySelector('.deleteProjectBtn').addEventListener('click', async ()=>{
+      if(confirm('Delete this project?')){
+        await deleteDoc(doc(db,'projects',docSnap.id));
+        loadProjects(); loadLoanDropdowns();
+      }
+    });
+    tableBody.appendChild(row);
+  });
+}
+
+// --- Loans ---
+document.getElementById('loanForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const farmerId = e.target.farmer.value;
+  const projectId = e.target.project.value;
+  const loanAmount = parseFloat(e.target.amount.value);
+  const interest = parseFloat(e.target.interest.value);
+  const duration = parseInt(e.target.duration.value);
+  await addDoc(collection(db,'loans'),{farmerId,projectId,loanAmount,interest,duration,status:'Pending'});
+  e.target.reset();
+  bootstrap.Modal.getInstance(document.getElementById('loanModal')).hide();
+  loadLoans();
+});
+
+async function loadLoanDropdowns(){
+  const farmerSelect = document.getElementById('loanFarmer');
+  const projectSelect = document.getElementById('loanProject');
+  farmerSelect.innerHTML=''; projectSelect.innerHTML='';
+  const farmersSnap = await getDocs(collection(db,'farmers'));
+  farmersSnap.forEach(d=>{ farmerSelect.innerHTML+=`<option value="${d.id}">${d.data().name}</option>`; });
+  const projectsSnap = await getDocs(collection(db,'projects'));
+  projectsSnap.forEach(d=>{ projectSelect.innerHTML+=`<option value="${d.id}">${d.data().name}</option>`; });
+}
+
+async function loadLoans(){
+  const tableBody = document.querySelector('#loansTable tbody');
+  tableBody.innerHTML='';
+  const snapshot = await getDocs(collection(db,'loans'));
+  document.getElementById('activeLoans').textContent=snapshot.size;
+  let totalDisbursed=0;
+  for(const docSnap of snapshot.docs){
+    const data=docSnap.data();
+    const fDoc = await getDoc(doc(db,'farmers',data.farmerId));
+    const pDoc = await getDoc(doc(db,'projects',data.projectId));
+    const row = document.createElement('tr');
+    row.innerHTML=`
+      <td>${docSnap.id}</td>
+      <td>${fDoc.exists()?fDoc.data().name:'Unknown'}</td>
+      <td>${pDoc.exists()?pDoc.data().name:'Unknown'}</td>
+      <td>${data.loanAmount}</td>
+      <td>${data.interest}</td>
+      <td>${data.status}</td>
+      <td>
+        <button class="btn btn-sm btn-success approveLoanBtn"><i class="bi bi-check2-circle"></i> Approve</button>
+        <button class="btn btn-sm btn-info viewScheduleBtn"><i class="bi bi-calendar-check"></i> Schedule</button>
+        <button class="btn btn-sm btn-danger deleteLoanBtn"><i class="bi bi-trash"></i> Delete</button>
+      </td>
+    `;
+    row.querySelector('.approveLoanBtn').addEventListener('click', async ()=>{
+      await updateDoc(doc(db,'loans',docSnap.id),{status:'Approved'});
+      loadLoans();
+    });
+    row.querySelector('.deleteLoanBtn').addEventListener('click', async ()=>{
+      if(confirm('Delete this loan?')){
+        await deleteDoc(doc(db,'loans',docSnap.id));
+        loadLoans();
+      }
+    });
+    row.querySelector('.viewScheduleBtn').addEventListener('click', ()=>{
+      showRepaymentSchedule(data.loanAmount,data.interest,data.duration);
+    });
+    tableBody.appendChild(row);
+    totalDisbursed+=data.loanAmount;
+  }
+  document.getElementById('totalDisbursed').textContent='KSh '+totalDisbursed;
+}
+
+function showRepaymentSchedule(amount,interest,duration){
+  const tbody=document.querySelector('#repaymentTable tbody');
+  tbody.innerHTML='';
+  const schedule = calculateRepaymentSchedule(amount,interest,duration);
+  schedule.forEach(s=>{
+    const row=document.createElement('tr');
+    row.innerHTML=`<td>${s.month}</td><td>KSh ${s.amount}</td><td>Pending</td>`;
+    tbody.appendChild(row);
+  });
+  new bootstrap.Modal(document.getElementById('repaymentModal')).show();
+}
+
+// Load all
+async function loadAllData(){
+  await loadFarmers();
+  await loadProjectFarmers();
+  await loadProjects();
+  await loadLoans();
+  await loadLoanDropdowns();
+}
+
+// --- Edit Project ---
+async function enableProjectEdit() {
+  const rows = document.querySelectorAll('#projectsTable tbody tr');
+  rows.forEach(row => {
+    const editBtn = row.querySelector('.editProjectBtn');
+    if(editBtn){
+      editBtn.addEventListener('click', async () => {
+        const projectId = row.children[0].textContent;
+        const docSnap = await getDoc(doc(db,'projects',projectId));
+        if(!docSnap.exists()) return alert('Project not found');
+        const data = docSnap.data();
+        const modal = new bootstrap.Modal(document.getElementById('addProjectModal'));
+        document.querySelector('#addProjectForm [name="name"]').value = data.name;
+        document.querySelector('#addProjectForm [name="description"]').value = data.description;
+        document.querySelector('#addProjectForm [name="duration"]').value = data.duration;
+        document.querySelector('#addProjectForm [name="cost"]').value = data.cost;
+        document.querySelector('#addProjectForm [name="interest"]').value = data.interest;
+        // Select farmers
+        const options = document.querySelectorAll('#projectFarmers option');
+        options.forEach(opt => opt.selected = data.farmers.includes(opt.value));
+        modal.show();
+
+        const form = document.getElementById('addProjectForm');
+        form.onsubmit = async e => {
+          e.preventDefault();
+          await updateDoc(doc(db,'projects',projectId),{
+            name: form.name.value,
+            description: form.description.value,
+            duration: parseInt(form.duration.value),
+            cost: parseFloat(form.cost.value),
+            interest: parseFloat(form.interest.value),
+            farmers: Array.from(form.farmers.selectedOptions).map(o=>o.value)
+          });
+          modal.hide();
+          form.reset();
+          form.onsubmit = originalProjectSubmit;
+          loadProjects(); loadLoanDropdowns();
+        };
+      });
+    }
+  });
+}
+const originalProjectSubmit = document.getElementById('addProjectForm').onsubmit;
+setInterval(enableProjectEdit, 500);
+
+
+</script>
+
+<style>
+body{font-family: 'Segoe UI', sans-serif; background:#f4f6f8;}
+#loginPage{display:flex;justify-content:center;align-items:center;height:100vh;background:#e9ecef;}
+.sidebar{width:250px;background:#343a40;color:white;min-height:100vh;position:fixed;transition:all 0.3s;}
+.sidebar a{color:white;text-decoration:none;padding:12px;display:flex;align-items:center;border-radius:5px;margin-bottom:2px;}
+.sidebar a:hover{background:#495057;}
+.content{margin-left:250px;padding:20px;width:100%;}
+.card{border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.table thead{background:#0d6efd;color:white;}
+@media(max-width:768px){.sidebar{position:relative;width:100%;height:auto;}.content{margin-left:0;}}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginPage">
+  <div class="shadow p-4 card" style="width:320px;">
+    <h4 class="mb-3 text-center">Admin Login</h4>
+    <form id="loginForm">
+      <input type="email" class="mb-2 form-control" placeholder="Email" name="email" required>
+      <input type="password" class="mb-2 form-control" placeholder="Password" name="password" required>
+      <button class="w-100 btn btn-primary">Login</button>
+    </form>
+    <div id="loginError" class="mt-2 text-danger"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboardContainer" class="d-flex" style="display:none;">
+  <div class="p-3 sidebar">
+    <h3 class="mb-4 text-center">Loan  Admin</h3>
+    <a href="#" data-page="dashboard" class="menu-link"><i class="me-2 bi bi-speedometer2"></i>Dashboard</a>
+    <a href="#" data-page="farmers" class="menu-link"><i class="me-2 bi bi-people"></i>Farmers</a>
+    <a href="#" data-page="projects" class="menu-link"><i class="me-2 bi bi-folder2-open"></i>Projects</a>
+    <a href="#" data-page="loans" class="menu-link"><i class="me-2 bi bi-cash-stack"></i>Loans</a>
+    <button class="mt-4 w-100 btn btn-danger" id="logoutBtn"><i class="bi-box-arrow-right me-2"></i>Logout</button>
+  </div>
+  <div class="flex-grow-1 content">
+    <!-- Dashboard Page -->
+    <section id="dashboard" class="page">
+      <h2 class="mb-4">Dashboard Overview</h2>
+      <div class="row g-3">
+        <div class="col-md-3"><div class="bg-primary p-3 text-white text-center card"><h5>Total Farmers</h5><h3 id="totalFarmers">0</h3></div></div>
+        <div class="col-md-3"><div class="bg-success p-3 text-white text-center card"><h5>Active Projects</h5><h3 id="activeProjects">0</h3></div></div>
+        <div class="col-md-3"><div class="bg-warning p-3 text-dark text-center card"><h5>Active Loans</h5><h3 id="activeLoans">0</h3></div></div>
+        <div class="col-md-3"><div class="bg-danger p-3 text-white text-center card"><h5>Total Disbursed</h5><h3 id="totalDisbursed">KSh 0</h3></div></div>
+      </div>
+     
+    </section>
+
+    <!-- Farmers Section -->
+    <section id="farmers" class="page">
+      <div class="d-flex justify-content-between mb-3">
+        <h2>Farmers</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFarmerModal"><i class="bi bi-person-plus"></i> Add Farmer</button>
+      </div>
+      <table id="farmersTable" class="table table-bordered table-hover table-striped text-center align-middle">
+        <thead class="table-primary"><tr><th>ID</th><th>Name</th><th>Phone</th><th>Crop</th><th>Net Cashflow</th><th>Statement</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="page">
+      <div class="d-flex justify-content-between mb-3">
+        <h2>Projects</h2>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addProjectModal"><i class="bi bi-folder-plus"></i> Add Project</button>
+      </div>
+      <table id="projectsTable" class="table table-bordered table-hover table-striped text-center align-middle">
+        <thead class="table-success"><tr><th>ID</th><th>Name</th><th>Farmers</th><th>Duration</th><th>Cost</th><th>Interest</th><th>Proposal</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Loans Section -->
+    <section id="loans" class="page">
+      <div class="d-flex justify-content-between mb-3">
+        <h2>Loans</h2>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#loanModal"><i class="bi bi-cash-stack"></i> Add Loan</button>
+      </div>
+      <table id="loansTable" class="table table-bordered table-hover table-striped text-center align-middle">
+        <thead class="table-warning"><tr><th>ID</th><th>Farmer</th><th>Project</th><th>Amount</th><th>Interest</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+       <!-- Cashflow Section -->
+   <!-- Button to Open Modal -->
+<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#cashflowModal">
+  Upload Cashflow & Check Loan
+</button>
+
+<!-- Cashflow Modal -->
+<div class="modal fade" id="cashflowModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <!-- Header -->
+      <div class="bg-primary text-white modal-header">
+        <h5 class="modal-title">Cashflow & Loan Eligibility</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="cashflowFile" class="form-label">Upload Cashflow CSV</label>
+          <input type="file" id="cashflowFile" class="form-control">
+        </div>
+
+        <!-- Cashflow Table -->
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Income</th>
+                <th>Expense</th>
+              </tr>
+            </thead>
+            <tbody id="cashflowTableBody"></tbody>
+            <tfoot class="table-light fw-bold">
+              <tr>
+                <td colspan="2">Total Income</td>
+                <td id="totalIncome">0</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td colspan="3">Total Expenses</td>
+                <td id="totalExpenses">0</td>
+              </tr>
+              <tr class="table-success">
+                <td colspan="2">Net Cashflow</td>
+                <td colspan="2" id="netCashflow">0</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+<!-- Maximum Loan Display -->
+<div class="mt-2 text-info fw-bold" id="maxLoanDisplay">
+  Maximum Loan You Can Get: KSh 0
+</div>
+
+
+        <!-- Loan Calculator -->
+        <div class="bg-light mt-4 p-3 border rounded">
+          <h6>Loan Eligibility Calculator</h6>
+          <div class="mb-2">
+            <label for="loanRequest" class="form-label">Enter Loan Amount Requested</label>
+            <input type="number" id="loanRequest" class="form-control" placeholder="e.g. 50,000">
+          </div>
+          <button id="checkLoanBtn" class="btn btn-success">Check Eligibility</button>
+          <div id="loanResult" class="mt-3 text-primary fw-bold"></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  const fileInput = document.getElementById("cashflowFile");
+  const cashflowBody = document.getElementById("cashflowTableBody");
+  const totalIncomeEl = document.getElementById("totalIncome");
+  const totalExpensesEl = document.getElementById("totalExpenses");
+  const netCashflowEl = document.getElementById("netCashflow");
+  const checkLoanBtn = document.getElementById("checkLoanBtn");
+  const loanRequestEl = document.getElementById("loanRequest");
+  const loanResultEl = document.getElementById("loanResult");
+  const maxLoanDisplayEl = document.getElementById("maxLoanDisplay");
+
+  let netCashflow = 0;
+
+  // Upload & process CSV
+  fileInput.addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const csv = event.target.result;
+      const rows = csv.split("\n").map(r => r.trim()).filter(r => r);
+
+      cashflowBody.innerHTML = "";
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      rows.forEach((row, i) => {
+        if (i === 0) return; // skip header
+        const cols = row.split(",").map(c => c.trim());
+        if (cols.length < 4) return;
+
+        // Only show date & description if valid, else leave blank
+        const date = isNaN(Date.parse(cols[0])) ? "" : cols[0];
+        const description = /^[a-zA-Z0-9\s.,-]*$/.test(cols[1]) ? cols[1] : "";
+
+        const income = parseFloat(cols[2].replace(/[^0-9.-]/g, "")) || 0;
+        const expense = parseFloat(cols[3].replace(/[^0-9.-]/g, "")) || 0;
+
+        totalIncome += income;
+        totalExpenses += expense;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${date}</td>
+          <td>${description}</td>
+          <td>${income.toLocaleString()}</td>
+          <td>${expense.toLocaleString()}</td>
+        `;
+        cashflowBody.appendChild(tr);
+      });
+
+      totalIncomeEl.textContent = totalIncome.toLocaleString();
+      totalExpensesEl.textContent = totalExpenses.toLocaleString();
+      netCashflow = totalIncome - totalExpenses;
+      netCashflowEl.textContent = netCashflow.toLocaleString();
+
+      // Show maximum loan
+      const maxLoan = netCashflow * 3; // 3x net cashflow policy
+      maxLoanDisplayEl.textContent = `Maximum Loan You Can Get: KSh ${maxLoan.toLocaleString()}`;
+    };
+    reader.readAsText(file);
+  });
+
+  // Loan Eligibility Checker
+  checkLoanBtn.addEventListener("click", () => {
+    const requested = parseFloat(loanRequestEl.value) || 0;
+    const maxLoan = netCashflow * 3;
+
+    if (requested <= 0) {
+      loanResultEl.textContent = "Please enter a valid loan amount.";
+      loanResultEl.className = "mt-3 fw-bold text-danger";
+      return;
+    }
+
+    if (netCashflow <= 0) {
+      loanResultEl.textContent = "You are not eligible for a loan (negative or zero net cashflow).";
+      loanResultEl.className = "mt-3 fw-bold text-danger";
+      return;
+    }
+
+    if (requested <= maxLoan) {
+      loanResultEl.textContent = `✅ Approved! You qualify for up to KSh ${maxLoan.toLocaleString()}. Your request of KSh ${requested.toLocaleString()} is within the limit.`;
+      loanResultEl.className = "mt-3 fw-bold text-success";
+    } else {
+      loanResultEl.textContent = `❌ Not Approved. Based on your cashflow, the maximum loan you qualify for is KSh ${maxLoan.toLocaleString()}, but you requested KSh ${requested.toLocaleString()}.`;
+      loanResultEl.className = "mt-3 fw-bold text-danger";
+    }
+  });
+</script>
+
+
+    </section>
+    
+  </div>
+</div>
+
+<!-- Add Farmer Modal -->
+<div class="modal fade" id="addFarmerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="addFarmerForm" class="p-3">
+        <h5 class="mb-3">Add Farmer</h5>
+        <input type="text" name="name" placeholder="Name" class="mb-2 form-control" required>
+        <input type="text" name="phone" placeholder="Phone" class="mb-2 form-control" required>
+        <input type="text" name="crop" placeholder="Crop" class="mb-2 form-control" required>
+        <input type="file" name="statement" class="mb-2 form-control">
+        <button class="w-100 btn btn-primary">Save</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Project Modal -->
+<div class="modal fade" id="addProjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="addProjectForm" class="p-3">
+        <h5 class="mb-3">Add Project</h5>
+        <input type="text" name="name" placeholder="Project Name" class="mb-2 form-control" required>
+        <select multiple id="projectFarmers" name="farmers" class="mb-2 form-select" required></select>
+        <textarea name="description" placeholder="Description" class="mb-2 form-control" required></textarea>
+        <input type="number" name="duration" placeholder="Duration (months)" class="mb-2 form-control" required>
+        <input type="number" name="cost" placeholder="Cost" class="mb-2 form-control" required>
+        <input type="number" name="interest" placeholder="Interest (%)" class="mb-2 form-control" required>
+        <input type="file" name="proposal" class="mb-2 form-control">
+        <button class="w-100 btn btn-success">Save</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Loan Modal -->
+<div class="modal fade" id="loanModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="loanForm" class="p-3">
+        <h5 class="mb-3">Add Loan</h5>
+        <select id="loanFarmer" name="farmer" class="mb-2 form-select" required></select>
+        <select id="loanProject" name="project" class="mb-2 form-select" required></select>
+        <input type="number" name="amount" placeholder="Loan Amount" class="mb-2 form-control" required>
+        <input type="number" name="interest" placeholder="Interest (%)" class="mb-2 form-control" required>
+        <input type="number" name="duration" placeholder="Duration (months)" class="mb-2 form-control" required>
+        <button class="w-100 btn btn-warning">Save</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Repayment Schedule Modal -->
+<div class="modal fade" id="repaymentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="p-3 modal-content">
+      <h5 class="mb-3">Repayment Schedule</h5>
+      <table class="table table-bordered text-center align-middle" id="repaymentTable">
+        <thead class="table-info"><tr><th>Month</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button class="w-100 btn btn-secondary" data-bs-dismiss="modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
