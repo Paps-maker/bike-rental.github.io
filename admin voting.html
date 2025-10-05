@@ -234,7 +234,7 @@
               <input id="rememberMe" class="form-check-input" type="checkbox" />
               <label class="form-check-label">Remember me</label>
             </div>
-            <div class="small-muted">Use an admin account (Firebase Auth)</div>
+           
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
@@ -782,6 +782,92 @@ async function renderResults(voteDocs){
   </script>
   <!-- Add this in your HTML <head> or before </body> -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+// Auto Logout Settings
+let inactivityTime = 60 * 5; // 5 minutes
+let countdown; 
+let warningTime = 60; // 1 minute before logout show warning
+let timer;
+
+// Create logout modal
+const logoutModal = document.createElement("div");
+logoutModal.className = "modal fade";
+logoutModal.id = "logoutModal";
+logoutModal.innerHTML = `
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-warning modal-header">
+        <h5 class="modal-title">Session Timeout Warning</h5>
+      </div>
+      <div class="text-center modal-body">
+        <p>You have been inactive. You will be logged out in <span id="countdown">60</span> seconds.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="stayLoggedIn">Stay Logged In</button>
+      </div>
+    </div>
+  </div>
+`;
+document.body.appendChild(logoutModal);
+
+// Bootstrap Modal
+let logoutModalInstance = new bootstrap.Modal(document.getElementById("logoutModal"));
+
+// Reset timer on activity
+function resetTimer() {
+  clearInterval(timer);
+  inactivityTime = 60 * 5; // reset to 5 min
+  timer = setInterval(checkInactivity, 1000);
+}
+window.onload = resetTimer;
+document.onmousemove = resetTimer;
+document.onkeypress = resetTimer;
+document.onclick = resetTimer;
+
+// Check inactivity countdown
+function checkInactivity() {
+  inactivityTime--;
+  if (inactivityTime === warningTime) {
+    startCountdown();
+    logoutModalInstance.show();
+  }
+  if (inactivityTime <= 0) {
+    logout();
+  }
+}
+
+// Show countdown in modal
+function startCountdown() {
+  let timeLeft = warningTime;
+  countdown = setInterval(() => {
+    document.getElementById("countdown").textContent = timeLeft;
+    timeLeft--;
+    if (timeLeft < 0) {
+      clearInterval(countdown);
+    }
+  }, 1000);
+}
+
+// Logout function
+function logout() {
+  clearInterval(timer);
+  clearInterval(countdown);
+  logoutModalInstance.hide();
+  
+  // Hide dashboard and show login modal again
+  document.getElementById("dashboard").style.display = "none";
+  let loginModal = new bootstrap.Modal(document.getElementById("loginModal"));
+  loginModal.show();
+}
+
+// Stay logged in button
+document.getElementById("stayLoggedIn").addEventListener("click", () => {
+  clearInterval(countdown);
+  resetTimer();
+});
+
+</script>
+
 
 </body>
 </html>
