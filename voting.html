@@ -3,644 +3,1215 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>National Voting Portal — Voter</title>
+  <title>Admin Dashboard — National Voting System</title>
 
-  <!-- Bootstrap & Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Bootstrap + icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet"/>
   <link rel="icon" type="image/png" href="img/vot1.jpg">
 
   <style>
     :root{
-      --primary:#0d6efd;
-      --accent:#6610f2;
+      --sidebar-bg:#05263b;
+      --accent:#0d6efd;
       --muted:#6c757d;
-      --card-bg: #ffffff;
-      --glass: rgba(255,255,255,0.85);
+      --card-radius:12px;
     }
-
-    body{
-      font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      background: linear-gradient(180deg,#f4f6f9 0%, #e9eef8 100%);
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
-      color: #1f2937;
-    }
-
-    .topbar{
-      background: linear-gradient(90deg,var(--primary),var(--accent));
-      color: #fff;
-      box-shadow: 0 6px 18px rgba(13,110,253,0.12);
-    }
-    .topbar .brand{
-      font-weight: 700;
-      letter-spacing: .2px;
-    }
-    .hero{
-      margin-top: -28px;
-      padding: 60px 20px;
-      border-radius: 12px;
-      color: white;
-      background-image: linear-gradient(135deg, rgba(13,110,253,0.95), rgba(102,16,242,0.88));
-      box-shadow: 0 12px 30px rgba(13,110,253,0.12);
-      text-align:center;
-    }
-    .hero h1{ font-size: clamp(20px, 3vw, 34px); font-weight:800; margin-bottom:8px; }
-    .hero p { opacity: .95; margin-bottom:0; }
-
-    .card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 6px 18px rgba(17,24,39,0.06); }
-
-    .countdown { font-weight: 700; color: #b91c1c; font-size: 1.1rem; }
-
-    .candidate-img { width:100%; height:160px; object-fit:cover; border-radius:8px; background: linear-gradient(180deg,#f3f4f6,#e5e7eb); }
-
-    .candidate-card { border-radius:12px; overflow:hidden; }
-    .candidate-meta { font-size: .95rem; color:var(--muted); }
-
-    .btn-pill { border-radius: 999px; padding-left:18px; padding-right:18px; }
-
-    footer { margin-top:40px; padding:20px 0; text-align:center; color:#6b7280; }
-
-    @media (max-width:767px){
-      .hero { padding:28px 12px; }
-      .candidate-img { height:140px; }
-    }
-
-    .active-select { border: 2px solid var(--primary); }
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f4f7fb; }
+    .sidebar { width:220px; background:var(--sidebar-bg); color:#fff; min-height:100vh; position:fixed; padding-top:18px; }
+    .sidebar .nav-link { color:#cfe8ff; }
+    .sidebar .nav-link.active, .sidebar .nav-link:hover { background: rgba(255,255,255,0.04); color:#fff; border-radius:6px; }
+    main { margin-left:220px; padding:20px; }
+    .card { border-radius:var(--card-radius); box-shadow:0 8px 24px rgba(12,14,20,0.06); }
+    .page { display:none; }
+    .page.active { display:block; }
+    .preview-img { width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid #eee; }
+    footer { text-align:center; color:#6b7280; margin-top:28px; }
+    .small-muted { color:var(--muted); font-size:.9rem; }
   </style>
 </head>
 <body>
-  <!-- Topbar -->
-  <nav class="topbar py-3">
-    <div class="d-flex align-items-center justify-content-between container">
-      <div class="d-flex align-items-center gap-3">
-        <div class="brand fs-5"><i class="bi bi-shield-check"></i> National Voting Portal</div>
-        <div class="text-white-50 small">Secure • Transparent • Accountable</div>
-      </div>
-      <div class="text-white small">Need help? <a href="mailto:support@example.com" class="text-white fw-semibold">support@example.com</a></div>
+  <!-- Sidebar -->
+  <aside class="d-flex flex-column sidebar">
+    <div class="mb-3 px-3">
+      <div class="mb-0 h5"><i class="bi bi-shield-lock"></i> Voting Admin</div>
+      <div class="text-white-50 small">Administration panel</div>
     </div>
-  </nav>
 
-  <!-- Hero -->
-  <header class="hero">
-    <div class="container">
-      <h1>Participate in a fair & transparent election</h1>
-      <p>Register, verify, then log in with your ID & phone to cast one secure vote. Live results are published here.</p>
+    <nav class="flex-column px-2 nav">
+      <a class="nav-link active" href="#" data-page="dashboard"><i class="me-2 bi bi-speedometer2"></i>Dashboard</a>
+      <a class="nav-link" href="#" data-page="categories"><i class="me-2 bi-list-task bi"></i>Positions</a>
+      <a class="nav-link" href="#" data-page="candidates"><i class="me-2 bi bi-people-fill"></i>Candidates</a>
+      <a class="nav-link" href="#" data-page="voters"><i class="me-2 bi bi-person-badge-fill"></i>Voters</a>
+      <a class="nav-link" href="#" data-page="results"><i class="me-2 bi bi-bar-chart-fill"></i>Results</a>
+      <a class="nav-link" href="#" data-page="settings"><i class="me-2 bi bi-gear"></i>Settings</a>
+    </nav>
+
+    <div class="mt-auto px-3 py-3 small-muted">
+      Signed in as: <div id="adminEmail" class="mt-1 text-white fw-semibold">not signed in</div>
+      <div class="mt-2">
+        <button id="btnSignOut" class="btn-outline-light btn btn-sm d-none"><i class="bi-box-arrow-right bi"></i> Sign out</button>
+      </div>
     </div>
-  </header>
+  </aside>
 
   <!-- Main -->
-  <main class="my-5 container">
-    <div class="row g-4">
-      <!-- Registration -->
-      <section class="col-lg-5">
-        <div class="mb-4 p-4 card">
-          <h5 class="mb-2">Register as a Voter</h5>
-          <p class="mb-3 text-muted small">Upload your ID/passport — admin will verify the document. Use the exact phone and ID you will use to vote.</p>
-
-          <form id="voterRegisterForm" class="needs-validation" novalidate>
-            
-
-           
-
-           
-
-            
-
-            
-
-            <div id="regStatus" class="mt-3 text-muted small"></div>
-          </form>
-        </div>
-
-        <!-- Voting Countdown -->
-        <div class="p-4 card">
-          <h6 class="mb-2">Voting Countdown</h6>
-          <div class="d-flex align-items-center justify-content-between">
-            <div>
-              <div id="countdownText" class="countdown">Loading...</div>
-              <div class="text-muted small">Voting start time is set by the administrator.</div>
-            </div>
-            <div class="text-end small"><div id="electionRange">—</div></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Login & Candidates -->
-      <section class="col-lg-7">
-        <div class="mb-4 p-4 card">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <div>
-              <h5 class="mb-0">Voter Login (Required to vote)</h5>
-              <div class="text-muted small">Once voting opens enter your ID & phone to start voting.</div>
-            </div>
-            <div>
-              <span id="votingStateBadge" class="bg-secondary badge">Checking...</span>
-            </div>
-          </div>
-
-          <!-- login form -->
-          <form id="voterLoginForm" class="align-items-end row g-3" style="display:none;">
-            <div class="col-md-6">
-              <label class="form-label">ID / Passport</label>
-              <input id="login_id" class="form-control" required />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Phone</label>
-              <input id="login_phone" class="form-control" required />
-            </div>
-            <div class="col-12">
-              <div class="d-flex gap-2">
-                <button id="btnLogin" type="submit" class="btn btn-success btn-pill">Verify & Start Voting</button>
-                <button id="btnLogout" type="button" class="btn-outline-secondary btn btn-pill" style="display:none;">Logout</button>
-              </div>
-            </div>
-            <div class="col-12">
-              <div id="loginMessage" class="text-muted small"></div>
-            </div>
-          </form>
-        </div>
-
-        <!-- Candidates -->
-        <div id="candidatesArea" class="p-3 card" style="display:none;">
-          <h5 class="mb-3">Candidates</h5>
-          <div id="candidatesContainer" class="row g-3"></div>
-        </div>
-
-        <!-- Ballot notice -->
-        <div id="ballotNotice" class="mt-3 p-3 card" style="display:none;">
-          <div class="d-flex align-items-start gap-3">
-            <div><i class="text-success bi bi-check-circle fs-2"></i></div>
-            <div>
-              <h6 class="mb-1">You are verified</h6>
-              <div class="text-muted small">Choose one candidate per position. Once you submit your vote, it is final and cannot be changed.</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Live Results -->
-      <section class="col-12">
-        <div class="p-4 card">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h5 class="mb-0">Live Results</h5>
-            <div class="text-muted small">Updated in real-time</div>
-          </div>
-          <div id="resultsArea" class="row gy-3"></div>
-        </div>
-      </section>
+  <main>
+    <!-- Topbar -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <h4 class="mb-0">Admin Dashboard</h4>
+        <div class="small-muted">Manage election, candidates, voters and results</div>
+      </div>
+      <div>
+        <button id="btnShowLogin" class="btn btn-primary btn-sm d-none" data-bs-toggle="modal" data-bs-target="#loginModal"><i class="bi bi-person-circle"></i> Admin login</button>
+      </div>
     </div>
+
+    <!-- Pages -->
+    <section id="dashboard" class="page active">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="p-3 card">
+            <div class="small-muted">Positions</div>
+            <h3 id="statPositions">0</h3>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 card">
+            <div class="small-muted">Candidates</div>
+            <h3 id="statCandidates">0</h3>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 card">
+            <div class="small-muted">Voters</div>
+            <h3 id="statVoters">0</h3>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="categories" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h5>Positions / Categories</h5>
+  </div>
+  <div class="mb-3 p-3 card">
+    <form id="categoryForm" class="row g-2">
+      <div class="col-md-4">
+        <input id="categoryName" class="form-control" placeholder="e.g. President, Governor" required>
+      </div>
+      <div class="col-md-3">
+        <select id="categoryCounty" class="form-select" required>
+          <option value="">Select County</option>
+          <option value="Mombasa">Mombasa</option>
+          <option value="Kwale">Kwale</option>
+          <option value="Kilifi">Kilifi</option>
+          <option value="Tana River">Tana River</option>
+          <option value="Lamu">Lamu</option>
+          <option value="Taita Taveta">Taita Taveta</option>
+          <option value="Garissa">Garissa</option>
+          <option value="Wajir">Wajir</option>
+          <option value="Mandera">Mandera</option>
+          <option value="Marsabit">Marsabit</option>
+          <option value="Isiolo">Isiolo</option>
+          <option value="Meru">Meru</option>
+          <option value="Tharaka Nithi">Tharaka Nithi</option>
+          <option value="Embu">Embu</option>
+          <option value="Kitui">Kitui</option>
+          <option value="Machakos">Machakos</option>
+          <option value="Makueni">Makueni</option>
+          <option value="Nyandarua">Nyandarua</option>
+          <option value="Nyeri">Nyeri</option>
+          <option value="Kirinyaga">Kirinyaga</option>
+          <option value="Murang'a">Murang'a</option>
+          <option value="Kiambu">Kiambu</option>
+          <option value="Turkana">Turkana</option>
+          <option value="West Pokot">West Pokot</option>
+          <option value="Samburu">Samburu</option>
+          <option value="Trans Nzoia">Trans Nzoia</option>
+          <option value="Uasin Gishu">Uasin Gishu</option>
+          <option value="Elgeyo Marakwet">Elgeyo Marakwet</option>
+          <option value="Nandi">Nandi</option>
+          <option value="Baringo">Baringo</option>
+          <option value="Laikipia">Laikipia</option>
+          <option value="Nakuru">Nakuru</option>
+          <option value="Narok">Narok</option>
+          <option value="Kajiado">Kajiado</option>
+          <option value="Kericho">Kericho</option>
+          <option value="Bomet">Bomet</option>
+          <option value="Kakamega">Kakamega</option>
+          <option value="Vihiga">Vihiga</option>
+          <option value="Bungoma">Bungoma</option>
+          <option value="Busia">Busia</option>
+          <option value="Siaya">Siaya</option>
+          <option value="Kisumu">Kisumu</option>
+          <option value="Homa Bay">Homa Bay</option>
+          <option value="Migori">Migori</option>
+          <option value="Kisii">Kisii</option>
+          <option value="Nyamira">Nyamira</option>
+          <option value="Nairobi">Nairobi</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select id="categoryWard" class="form-select" required>
+          <option value="">Select Ward</option>
+          <!-- Wards will populate dynamically based on selected county -->
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="w-100 btn btn-primary">Add Position</button>
+      </div>
+    </form>
+  </div>
+
+  <ul id="categoriesList" class="list-group"></ul>
+</section>
+
+   <section id="candidates" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h5>Manage Candidates</h5>
+  </div>
+
+  <div class="mb-3 p-3 card">
+    <form id="candidateForm" class="row g-3">
+      <div class="col-md-3"><input id="candName" class="form-control" placeholder="Full name" required></div>
+      <div class="col-md-2">
+        <select id="candPosition" class="form-select" required>
+          <option value="">Select position</option>
+        </select>
+      </div>
+      <div class="col-md-2"><input id="candParty" class="form-control" placeholder="Party"></div>
+      <div class="col-md-2">
+        <select id="candCounty" class="form-select" required>
+           <option value="">Select County</option>
+        <option value="Mombasa">Mombasa</option>
+        <option value="Kwale">Kwale</option>
+        <option value="Kilifi">Kilifi</option>
+        <option value="Tana River">Tana River</option>
+        <option value="Lamu">Lamu</option>
+        <option value="Taita Taveta">Taita Taveta</option>
+        <option value="Garissa">Garissa</option>
+        <option value="Wajir">Wajir</option>
+        <option value="Mandera">Mandera</option>
+        <option value="Marsabit">Marsabit</option>
+        <option value="Isiolo">Isiolo</option>
+        <option value="Meru">Meru</option>
+        <option value="Tharaka Nithi">Tharaka Nithi</option>
+        <option value="Embu">Embu</option>
+        <option value="Kitui">Kitui</option>
+        <option value="Machakos">Machakos</option>
+        <option value="Makueni">Makueni</option>
+        <option value="Nyandarua">Nyandarua</option>
+        <option value="Nyeri">Nyeri</option>
+        <option value="Kirinyaga">Kirinyaga</option>
+        <option value="Murang'a">Murang'a</option>
+        <option value="Kiambu">Kiambu</option>
+        <option value="Turkana">Turkana</option>
+        <option value="West Pokot">West Pokot</option>
+        <option value="Samburu">Samburu</option>
+        <option value="Trans Nzoia">Trans Nzoia</option>
+        <option value="Uasin Gishu">Uasin Gishu</option>
+        <option value="Elgeyo Marakwet">Elgeyo Marakwet</option>
+        <option value="Nandi">Nandi</option>
+        <option value="Baringo">Baringo</option>
+        <option value="Laikipia">Laikipia</option>
+        <option value="Nakuru">Nakuru</option>
+        <option value="Narok">Narok</option>
+        <option value="Kajiado">Kajiado</option>
+        <option value="Kericho">Kericho</option>
+        <option value="Bomet">Bomet</option>
+        <option value="Kakamega">Kakamega</option>
+        <option value="Vihiga">Vihiga</option>
+        <option value="Bungoma">Bungoma</option>
+        <option value="Busia">Busia</option>
+        <option value="Siaya">Siaya</option>
+        <option value="Kisumu">Kisumu</option>
+        <option value="Homa Bay">Homa Bay</option>
+        <option value="Migori">Migori</option>
+        <option value="Kisii">Kisii</option>
+        <option value="Nyamira">Nyamira</option>
+        <option value="Nairobi">Nairobi</option>
+          <!-- Add all 47 counties here -->
+        </select>
+      </div>
+      <div class="col-md-2">
+      <select id="candWard" class="form-select" required>
+  <option value="">Select Ward</option>
+</select>
+
+    </div>
+      <div class="form-control"><input id="candImage" type="file" accept="image/*" class="form-control" required></div>
+
+      <div class="col-12">
+        <label class="form-label small-muted">Candidate Documents (ID, party cert) — optional</label>
+        <input id="candDocs" type="file" accept=".pdf,.jpg,.png" class="form-control" multiple>
+      </div>
+
+      <div class="btn btn-success"><button class="btn btn-success">Add Candidate</button></div>
+    </form>
+  </div>
+
+  <div class="p-3 card">
+    <table class="table table-striped mb-0 align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Photo</th>
+          <th>Name</th>
+          <th>Position</th>
+          <th>Party</th>
+          <th>County</th>
+          <th>Ward</th>
+          <th>Docs</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="candidatesTable"></tbody>
+    </table>
+  </div>
+</section>
+
+    <section id="voters" class="page">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5>Voter Registrations</h5>
+        <small class="small-muted">Approve or deny registered voters</small>
+      </div>
+   <div class="mb-3 p-3 card">
+  <h6 class="mb-3">Add Voter (Admin)</h6>
+  <form id="addVoterForm" class="row g-3">
+    <div class="col-md-3">
+      <input id="voterName" type="text" class="form-control" placeholder="Full name" required>
+    </div>
+    <div class="col-md-2">
+      <input id="voterId" type="text" class="form-control" placeholder="ID / Passport Number" required>
+    </div>
+    <div class="col-md-2">
+      <input id="voterPhone" type="text" class="form-control" placeholder="Phone number" required>
+    </div>
+    <div class="col-md-2">
+      <select id="voterCounty" class="form-select" required>
+        <option value="">Select County</option>
+        <option value="Nairobi">Nairobi</option>
+        <option value="Mombasa">Mombasa</option>
+        <option value="Kwale">Kwale</option>
+        <option value="Kilifi">Kilifi</option>
+        <option value="Tana River">Tana River</option>
+        <option value="Lamu">Lamu</option>
+        <option value="Taita Taveta">Taita Taveta</option>
+        <option value="Garissa">Garissa</option>
+        <option value="Wajir">Wajir</option>
+        <option value="Mandera">Mandera</option>
+        <option value="Marsabit">Marsabit</option>
+        <option value="Isiolo">Isiolo</option>
+        <option value="Meru">Meru</option>
+        <option value="Tharaka Nithi">Tharaka Nithi</option>
+        <option value="Embu">Embu</option>
+        <option value="Kitui">Kitui</option>
+        <option value="Machakos">Machakos</option>
+        <option value="Makueni">Makueni</option>
+        <option value="Nyandarua">Nyandarua</option>
+        <option value="Nyeri">Nyeri</option>
+        <option value="Kirinyaga">Kirinyaga</option>
+        <option value="Murang'a">Murang'a</option>
+        <option value="Kiambu">Kiambu</option>
+        <option value="Turkana">Turkana</option>
+        <option value="West Pokot">West Pokot</option>
+        <option value="Samburu">Samburu</option>
+        <option value="Trans Nzoia">Trans Nzoia</option>
+        <option value="Uasin Gishu">Uasin Gishu</option>
+        <option value="Elgeyo Marakwet">Elgeyo Marakwet</option>
+        <option value="Nandi">Nandi</option>
+        <option value="Baringo">Baringo</option>
+        <option value="Laikipia">Laikipia</option>
+        <option value="Nakuru">Nakuru</option>
+        <option value="Narok">Narok</option>
+        <option value="Kajiado">Kajiado</option>
+        <option value="Kericho">Kericho</option>
+        <option value="Bomet">Bomet</option>
+        <option value="Kakamega">Kakamega</option>
+        <option value="Vihiga">Vihiga</option>
+        <option value="Bungoma">Bungoma</option>
+        <option value="Busia">Busia</option>
+        <option value="Siaya">Siaya</option>
+        <option value="Kisumu">Kisumu</option>
+        <option value="Homa Bay">Homa Bay</option>
+        <option value="Migori">Migori</option>
+        <option value="Kisii">Kisii</option>
+        <option value="Nyamira">Nyamira</option>
+        <option value="Nairobi">Nairobi</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select id="voterWard" class="form-select" required>
+        <option value="">Select Ward</option>
+        <!-- wards dynamically populated based on county -->
+      </select>
+    </div>
+    <div class="col-md-1">
+      <input id="voterDoc" type="file" accept=".pdf,.jpg,.png" class="form-control">
+    </div>
+    <div class="col-md-1">
+      <button class="w-100 btn btn-primary">Add</button>
+    </div>
+  </form>
+</div>
+
+<!-- Voters Table -->
+<div class="mb-3 p-3 card">
+  <table class="table table-hover mb-0 align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>County</th>
+        <th>Ward</th>
+        <th>Document</th>
+        <th>Registered</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="votersTable"></tbody>
+  </table>
+</div>
+
+    </section>
+
+    <section id="results" class="page">
+      <h5>Live Results</h5>
+      <div id="resultsContainer" class="row g-3"></div>
+    </section>
+
+    <section id="settings" class="page">
+      <h5>Election Settings</h5>
+      <div class="p-3 card">
+        <form id="settingsForm" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Voting Start</label>
+            <input id="startTime" type="datetime-local" class="form-control" required />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Voting End</label>
+            <input id="endTime" type="datetime-local" class="form-control" required />
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary">Save Settings</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <footer>
+      <div class="small-muted">National Voting System • Admin Panel</div>
+    </footer>
   </main>
 
-  <footer>
-    <div class="container small">
-      © National Voting Portal — Transparency & Security. For demonstration only.
+  <!-- Login Modal -->
+  <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="loginForm" class="p-3">
+          <div class="modal-header">
+            <h5 class="modal-title">Admin Login</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="loginError" class="mb-2 text-danger small"></div>
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input id="loginEmail" type="email" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input id="loginPassword" type="password" class="form-control" required />
+            </div>
+            <div class="mb-2 form-check">
+              <input id="rememberMe" class="form-check-input" type="checkbox" />
+              <label class="form-check-label">Remember me</label>
+            </div>
+            <div class="small-muted">Use an admin account (Firebase Auth)</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" type="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
     </div>
-  </footer>
+  </div>
 
-  <!-- Firebase -->
+  <!-- Firebase compat libs (simpler code for front-end demo) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
-      authDomain: "moviedrift-fcc93.firebaseapp.com",
-      projectId: "moviedrift-fcc93",
-      storageBucket: "moviedrift-fcc93.appspot.com",
-      messagingSenderId: "794171988540",
-      appId: "1:794171988540:web:4cd63d9aa3214b2cb98139"
-    };
+  <!-- Bootstrap bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+  <script>
+    /***** Replace with your Firebase project config *****/
+    const firebaseConfig = {
+       apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:4cd63d9aa3214b2cb98139",
+  measurementId: "G-LR52710HK8"
+    };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
     const storage = firebase.storage();
 
-    // State
-    let election = null;
-    let currentVoterId = null;
-    let currentVoterDoc = null;
-    let candidates = {};            // candidate docs keyed by id
-    let votesSnapshotUnsub = null;
-    let candidatesUnsub = null;
+    /* UI elements */
+    const pages = document.querySelectorAll('[data-page], .page');
+    const navLinks = document.querySelectorAll('.sidebar .nav-link');
+    const adminEmailEl = document.getElementById('adminEmail');
+    const btnSignOut = document.getElementById('btnSignOut');
+    const btnShowLogin = document.getElementById('btnShowLogin');
 
-    // UI
-    const btnRegister = document.getElementById('btnRegister');
-    const regStatus = document.getElementById('regStatus');
-    const countdownText = document.getElementById('countdownText');
-    const electionRange = document.getElementById('electionRange');
-    const votingStateBadge = document.getElementById('votingStateBadge');
-    const voterLoginForm = document.getElementById('voterLoginForm');
-    const loginMessage = document.getElementById('loginMessage');
-    const candidatesArea = document.getElementById('candidatesArea');
-    const candidatesContainer = document.getElementById('candidatesContainer');
-    const ballotNotice = document.getElementById('ballotNotice');
-    const resultsArea = document.getElementById('resultsArea');
-    const btnLogout = document.getElementById('btnLogout');
-
-    // --- Listen election settings (admin writes `start` & `end` timestamps) ---
-    db.collection('settings').doc('election').onSnapshot(doc => {
-      if (!doc.exists) {
-        election = null;
-        votingStateBadge.textContent = 'Not configured';
-        votingStateBadge.className = 'badge bg-secondary';
-        countdownText.textContent = 'Election date not set';
-        electionRange.textContent = '—';
-        return;
-      }
-      const data = doc.data();
-      // admin stores start/end as Firestore timestamps named `start` and `end`
-      const start = (data.start && data.start.toDate) ? data.start.toDate() : new Date(data.start);
-      const end = (data.end && data.end.toDate) ? data.end.toDate() : new Date(data.end);
-      election = { ...data, _start: start, _end: end };
-      electionRange.textContent = `${start.toLocaleString()} — ${end.toLocaleString()}`;
-      updateCountdown();
+    // page switching
+    document.querySelectorAll('.sidebar .nav-link').forEach(link=>{
+      link.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const page = link.dataset.page;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(page).classList.add('active');
+        navLinks.forEach(n => n.classList.remove('active'));
+        link.classList.add('active');
+      });
     });
 
-    function updateCountdown(){
-      if(!election || !election._start){
-        countdownText.textContent = 'Election date not set';
-        return;
-      }
-      const now = new Date();
-      const start = election._start;
-      const end = election._end;
-      if(now < start){
-        countdownText.textContent = formatDuration(start - now) + ' until voting opens';
-        votingStateBadge.textContent = 'Upcoming';
-        votingStateBadge.className = 'badge bg-info';
-        voterLoginForm.style.display = 'none';
-        candidatesArea.style.display = 'none';
-        ballotNotice.style.display = 'none';
-      } else if(now >= start && now <= end){
-        countdownText.textContent = 'Voting open • ' + formatDuration(end - now) + ' remaining';
-        votingStateBadge.textContent = 'Open';
-        votingStateBadge.className = 'badge bg-success';
-        voterLoginForm.style.display = 'flex';
+    // show login modal if not signed in
+    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+    function requireAuth() {
+      auth.currentUser ? initUIForAdmin() : loginModal.show();
+    }
+
+    // auth state changes
+    auth.onAuthStateChanged(user => {
+      if(user){
+        // show admin UI
+        adminEmailEl.textContent = user.email;
+        btnSignOut.classList.remove('d-none');
+        btnShowLogin.classList.add('d-none');
+        // start listeners
+        startRealtimeListeners();
       } else {
-        countdownText.textContent = 'Voting closed';
-        votingStateBadge.textContent = 'Closed';
-        votingStateBadge.className = 'badge bg-secondary';
-        voterLoginForm.style.display = 'none';
-        candidatesArea.style.display = 'none';
-        ballotNotice.style.display = 'none';
+        adminEmailEl.textContent = 'not signed in';
+        btnSignOut.classList.add('d-none');
+        btnShowLogin.classList.remove('d-none');
+        stopRealtimeListeners();
+        // show login modal
+        loginModal.show();
       }
-    }
-    setInterval(updateCountdown, 1000);
+    });
 
-    function formatDuration(ms){
-      if(ms <= 0) return '0s';
-      const s = Math.floor(ms / 1000);
-      const days = Math.floor(s / (3600*24));
-      const hrs = Math.floor((s % (3600*24)) / 3600);
-      const mins = Math.floor((s % 3600) / 60);
-      if(days>0) return `${days}d ${hrs}h ${mins}m`;
-      if(hrs>0) return `${hrs}h ${mins}m`;
-      return `${mins}m ${s%60}s`;
-    }
-
-     // Make sure Firebase is initialized above this script:
-  // const firebaseConfig = { ... };
-  // firebase.initializeApp(firebaseConfig);
- 
-
-  // --- Voter Registration ---
-  document.getElementById('voterRegisterForm').addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-
-    const name = document.getElementById('reg_name').value.trim();
-    const idNum = document.getElementById('reg_id').value.trim();
-    const phone = document.getElementById('reg_phone').value.trim();
-    const fileInput = document.getElementById('reg_doc');
-    const regStatus = document.getElementById('regStatus');
-    const btnRegister = document.getElementById('btnRegister');
-
-    if (!name || !idNum || !phone || !fileInput.files.length) {
-      regStatus.textContent = '⚠️ Please complete all fields.';
-      regStatus.className = 'text-danger small mt-2';
-      return;
-    }
-
-    btnRegister.disabled = true;
-    regStatus.textContent = '⏳ Uploading document and saving registration...';
-    regStatus.className = 'text-muted small mt-2';
-
-    try {
-      const voterRef = db.collection('voters').doc(idNum);
-      const existing = await voterRef.get();
-      if (existing.exists) {
-        regStatus.textContent = '❌ This ID is already registered.';
-        regStatus.className = 'text-danger small mt-2';
-        btnRegister.disabled = false;
-        return;
-      }
-
-      // Upload the document to Firebase Storage
-      const file = fileInput.files[0];
-      const ext = (file.name || '').split('.').pop();
-      const storagePath = `voter_docs/${idNum}_${Date.now()}.${ext}`;
-      const storageRef = storage.ref().child(storagePath);
-
-      await storageRef.put(file);   // upload
-      const fileURL = await storageRef.getDownloadURL(); // get URL
-
-      // Save voter record in Firestore
-      await voterRef.set({
-        name,
-        id: idNum,   // use same field name as admin side
-        phone,
-        docURL: fileURL,
-        approved: false,
-        denied: false,
-        voted: false,
-        registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
-        addedByAdmin: false
-      });
-
-      regStatus.textContent = '✅ Registration submitted. Admin will verify your document.';
-      regStatus.className = 'text-success small mt-2';
-      document.getElementById('voterRegisterForm').reset();
-
-    } catch (err) {
-      console.error('Registration error:', err);
-      regStatus.textContent = '❌ Registration failed. Please try again later.';
-      regStatus.className = 'text-danger small mt-2';
-    } finally {
-      btnRegister.disabled = false;
-    }
-  });
-
-    // --- Login (voter verifies ID + phone) ---
-    document.getElementById('voterLoginForm').addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const id = document.getElementById('login_id').value.trim();
-      const phone = document.getElementById('login_phone').value.trim();
-      if(!id || !phone){
-        loginMessage.textContent = 'Enter both ID and phone.';
-        loginMessage.className = 'text-danger small';
-        return;
-      }
-
+    // login form
+    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const pw = document.getElementById('loginPassword').value;
+      const remember = document.getElementById('rememberMe').checked;
+      document.getElementById('loginError').textContent = '';
       try {
-        const doc = await db.collection('voters').doc(id).get();
-        if(!doc.exists){
-          loginMessage.textContent = 'No registration found for this ID.';
-          loginMessage.className = 'text-danger small';
-          return;
+        if(remember) {
+          await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        } else {
+          await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
         }
-        const data = doc.data();
-        if(String(data.phone).trim() !== phone.trim()){
-          loginMessage.textContent = 'Phone number does not match registration.';
-          loginMessage.className = 'text-danger small';
-          return;
-        }
-        if(data.denied){
-          loginMessage.textContent = 'Your registration was denied by admin.';
-          loginMessage.className = 'text-danger small';
-          return;
-        }
-        if(!data.approved){
-          loginMessage.textContent = 'Your registration is not yet approved by admin.';
-          loginMessage.className = 'text-warning small';
-          return;
-        }
-        if(data.voted){
-          loginMessage.textContent = 'You have already voted. Thank you.';
-          loginMessage.className = 'text-info small';
-          // still allow viewing results but no voting
-          showResultsOnly();
-          return;
-        }
-
-        // verified
-        currentVoterId = id;
-        currentVoterDoc = data;
-        loginMessage.textContent = 'Verified — you can now select a candidate and cast your vote.';
-        loginMessage.className = 'text-success small';
-        btnLogout.style.display = 'inline-block';
-        voterLoginForm.style.display = 'none';
-        candidatesArea.style.display = 'block';
-        ballotNotice.style.display = 'block';
-        subscribeVotes();
-
-        // show candidates for voting
-        showCandidates();
-
+        await auth.signInWithEmailAndPassword(email, pw);
+        loginModal.hide();
       } catch(err){
         console.error(err);
-        loginMessage.textContent = 'Login failed, try again.';
-        loginMessage.className = 'text-danger small';
+        document.getElementById('loginError').textContent = err.message || 'Sign-in failed';
       }
     });
 
-    // Logout
-    btnLogout.addEventListener('click', () => {
-      currentVoterId = null;
-      currentVoterDoc = null;
-      loginMessage.textContent = '';
-      btnLogout.style.display = 'none';
-      voterLoginForm.style.display = 'flex';
-      candidatesArea.style.display = 'none';
-      ballotNotice.style.display = 'none';
-      if(votesSnapshotUnsub) votesSnapshotUnsub();
+    // sign out
+    btnSignOut.addEventListener('click', async ()=> {
+      await auth.signOut();
+      // clear UI
     });
 
-    // --- Candidates: subscribe + render (uses admin `candidates` collection) ---
-    function showCandidates(){
-      // create/refresh snapshot listener
-      if(candidatesUnsub) candidatesUnsub();
-      candidatesUnsub = db.collection('candidates').orderBy('positionName').onSnapshot(snapshot => {
-        candidates = {};
-        const grouped = {};
-        snapshot.forEach(doc => {
-          const c = doc.data();
-          c.id = doc.id;
-          // admin stores `positionName` & `imageURL`
-          const pos = c.positionName || c.position || 'Unspecified Position';
-          c.position = pos;
-          candidates[c.id] = c;
-          if(!grouped[pos]) grouped[pos] = [];
-          grouped[pos].push(c);
-        });
+    /*************** Firestore listeners and functions ***************/
+    let unsubscribeCategories = null;
+    let unsubscribeCandidates = null;
+    let unsubscribeVoters = null;
+    let unsubscribeVotes = null;
+    let unsubscribeSettings = null;
 
-        // render grouped candidates
-        candidatesContainer.innerHTML = '';
-        if(Object.keys(grouped).length === 0){
-          candidatesContainer.innerHTML = '<div class="text-muted">No candidates published yet.</div>';
-          return;
-        }
+    // start listeners
+    function startRealtimeListeners(){
+      // categories
+      unsubscribeCategories = db.collection('categories').orderBy('name').onSnapshot(snapshot=>{
+        renderCategories(snapshot.docs);
+        document.getElementById('statPositions').textContent = snapshot.size;
+        populatePositionSelect(snapshot.docs);
+      });
 
-        for(const position of Object.keys(grouped)){
-          const groupDiv = document.createElement('div');
-          groupDiv.className = 'mb-3';
-          groupDiv.innerHTML = `<h6 class="mb-2">${escapeHtml(position)}</h6>`;
-          const row = document.createElement('div');
-          row.className = 'row g-3';
-          grouped[position].forEach(c => {
-            const col = document.createElement('div');
-            col.className = 'col-md-4';
-            col.innerHTML = `
-              <div class="p-2 h-100 text-center candidate-card card">
-                <img src="${c.imageURL || 'https://via.placeholder.com/600x400?text=No+Image'}" class="mb-2 candidate-img" alt="${escapeHtml(c.name)}" />
-                <div class="fw-semibold">${escapeHtml(c.name)}</div>
-                <div class="candidate-meta">${escapeHtml(c.party || '')}</div>
-                <div class="text-muted small">${escapeHtml(c.position)}</div>
-                <button class="mt-2 w-100 btn btn-sm btn-primary btn-pill" onclick="castVote('${c.id}','${escapeJs(c.position)}')">Vote</button>
-              </div>
-            `;
-            row.appendChild(col);
-          });
-          groupDiv.appendChild(row);
-          candidatesContainer.appendChild(groupDiv);
+      // candidates
+      unsubscribeCandidates = db.collection('candidates').onSnapshot(snapshot=>{
+        renderCandidates(snapshot.docs);
+        document.getElementById('statCandidates').textContent = snapshot.size;
+      });
+
+      // voters
+      unsubscribeVoters = db.collection('voters').orderBy('registeredAt','desc').onSnapshot(snapshot=>{
+        renderVoters(snapshot.docs);
+        document.getElementById('statVoters').textContent = snapshot.size;
+      });
+
+      // votes
+      unsubscribeVotes = db.collection('votes').onSnapshot(snapshot=>{
+        renderResults(snapshot.docs);
+        document.getElementById('totalVotes')?.setAttribute('data-count', snapshot.size);
+      });
+
+      // settings
+      unsubscribeSettings = db.collection('settings').doc('election').onSnapshot(doc=>{
+        if(doc.exists){
+          const d = doc.data();
+          if(d.start) document.getElementById('startTime').value = toInputDateLocal(d.start.toDate ? d.start.toDate() : new Date(d.start));
+          if(d.end) document.getElementById('endTime').value = toInputDateLocal(d.end.toDate ? d.end.toDate() : new Date(d.end));
         }
       });
     }
 
-    // --- Cast vote (transaction: write vote doc & mark voter.voted true) ---
-    // --- Cast vote per position ---
-async function castVote(candidateId, position){
-  if(!currentVoterId){
-    alert('You must verify with your ID and phone first.');
-    return;
+    // stop listeners
+    function stopRealtimeListeners(){
+      if(unsubscribeCategories) unsubscribeCategories();
+      if(unsubscribeCandidates) unsubscribeCandidates();
+      if(unsubscribeVoters) unsubscribeVoters();
+      if(unsubscribeVotes) unsubscribeVotes();
+      if(unsubscribeSettings) unsubscribeSettings();
+      // clear UI lists (optional)
+      document.getElementById('categoriesList').innerHTML = '';
+      document.getElementById('candidatesTable').innerHTML = '';
+      document.getElementById('votersTable').innerHTML = '';
+      document.getElementById('resultsContainer').innerHTML = '';
+    }
+
+
+   /********** Categories (positions with location) **********/
+document.getElementById('categoryForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('categoryName').value.trim();
+  const county = document.getElementById('categoryCounty').value;
+  const ward = document.getElementById('categoryWard').value;
+
+  if(!name || !county || !ward){
+    return alert('Please enter position name, county, and ward.');
   }
 
-  const vref = db.collection('voters').doc(currentVoterId);
   try {
-    await db.runTransaction(async (tx) => {
-      const voterSnapshot = await tx.get(vref);
-      if(!voterSnapshot.exists) throw new Error('Voter not found');
-
-      const voterData = voterSnapshot.data();
-      const votedPositions = voterData.votedPositions || {};
-
-      if(votedPositions[position]) {
-        throw new Error(`You have already voted for ${position}.`);
-      }
-
-      // add vote record
-      const votesRef = db.collection('votes').doc();
-      tx.set(votesRef, {
-        candidateId,
-        voterId: currentVoterId,
-        position,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      // update votedPositions map
-      votedPositions[position] = true;
-      tx.update(vref, { 
-        votedPositions: votedPositions,
-        lastVotedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+    await db.collection('categories').add({
+      name,
+      county,
+      ward,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    document.getElementById('categoryName').value = '';
+    document.getElementById('categoryCounty').value = '';
+    document.getElementById('categoryWard').innerHTML = '<option value="">Select Ward</option>';
+    alert('Position added successfully!');
+  } catch(err){
+    console.error(err);
+    alert('Failed to add position: ' + err.message);
+  }
+});
 
-    alert(`✅ Your vote for ${position} has been recorded.`);
-    // update UI (per position)
-    const posNotice = document.getElementById(`notice_${position}`);
-    if(posNotice){
-      posNotice.innerHTML = `<div class="text-success"><i class="bi bi-check-circle"></i> You voted for ${position}.`;
+// --- Render Categories ---
+function renderCategories(docs){
+  const el = document.getElementById('categoriesList');
+  el.innerHTML = '';
+  docs.forEach(doc => {
+    const data = doc.data();
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.innerHTML = `<div>
+                      <strong>${escapeHtml(data.name)}</strong> 
+                      <small class="text-muted">(${escapeHtml(data.county)}, ${escapeHtml(data.ward)})</small>
+                    </div>
+                    <div>
+                      <button class="me-2 btn-outline-danger btn btn-sm" onclick="deleteCategory('${doc.id}')">Delete</button>
+                    </div>`;
+    el.appendChild(li);
+  });
+}
+
+// --- Delete Category ---
+async function deleteCategory(id){
+  if(!confirm('Delete this position?')) return;
+  await db.collection('categories').doc(id).delete();
+}
+
+// --- Populate Position Select (for candidates) ---
+function populatePositionSelect(docs){
+  const sel = document.getElementById('candPosition');
+  sel.innerHTML = '<option value="">Select position</option>';
+  docs.forEach(doc => {
+    const data = doc.data();
+    sel.innerHTML += `<option value="${doc.id}">
+                        ${escapeHtml(data.name)} (${escapeHtml(data.county)}, ${escapeHtml(data.ward)})
+                      </option>`;
+  });
+}
+
+// --- Dynamic Wards for Categories ---
+const categoryCountySelect = document.getElementById('categoryCounty');
+const categoryWardSelect = document.getElementById('categoryWard');
+
+categoryCountySelect.addEventListener('change', ()=>{
+  const selectedCounty = categoryCountySelect.value;
+  categoryWardSelect.innerHTML = '<option value="">Select Ward</option>';
+  if(selectedCounty && wardsByCounty[selectedCounty]){
+    wardsByCounty[selectedCounty].forEach(ward=>{
+      const option = document.createElement('option');
+      option.value = ward;
+      option.textContent = ward;
+      categoryWardSelect.appendChild(option);
+    });
+  }
+});
+
+/********** Candidates **********/
+
+// --- Wards per County ---
+const wardsByCounty = {
+  "Mombasa": ["Mvita", "Jomvu", "Kisauni", "Nyali", "Changamwe", "Likoni"],
+  "Kwale": ["Msambweni", "Matuga", "Lunga Lunga", "Kinango"],
+  "Kilifi": ["Kilifi North", "Kilifi South", "Rabai", "Ganze", "Kaloleni", "Malindi"],
+  "Tana River": ["Galole", "Garsen", "Bura"],
+  "Lamu": ["Lamu East", "Lamu West"],
+  "Taita Taveta": ["Voi", "Mwatate", "Wundanyi", "Mwatate"],
+  "Nairobi": ["Westlands", "Kasarani", "Lang'ata", "Embakasi North", "Embakasi South", "Dagoretti North", "Dagoretti South"]
+};
+
+// --- Populate Ward dropdown ---
+const countySelect = document.getElementById('candCounty');
+const wardSelect = document.getElementById('candWard');
+
+countySelect.addEventListener('change', () => {
+  const selectedCounty = countySelect.value;
+  wardSelect.innerHTML = '<option value="">Select Ward</option>'; // reset
+  if (selectedCounty && wardsByCounty[selectedCounty]) {
+    wardsByCounty[selectedCounty].forEach(ward => {
+      const option = document.createElement('option');
+      option.value = ward;
+      option.textContent = ward;
+      wardSelect.appendChild(option);
+    });
+  }
+});
+
+// --- Escape HTML Helper ---
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// --- Candidate Form Submit ---
+document.getElementById('candidateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById('candName').value.trim();
+  const positionId = document.getElementById('candPosition').value;
+  const party = document.getElementById('candParty').value.trim();
+  const county = countySelect.value;
+  const ward = wardSelect.value;
+  const imageFile = document.getElementById('candImage').files[0];
+  const docsFiles = document.getElementById('candDocs').files;
+
+  if (!name || !positionId || !imageFile || !county || !ward) {
+    return alert('Please complete all required fields (name, position, county, ward, image).');
+  }
+
+  try {
+    // Upload image
+    const imgRef = storage.ref().child(`candidates/images/${Date.now()}_${imageFile.name}`);
+    await imgRef.put(imageFile);
+    const imgURL = await imgRef.getDownloadURL();
+
+    // Upload docs
+    const docsURLs = [];
+    for (let i = 0; i < docsFiles.length; i++) {
+      const f = docsFiles[i];
+      const dRef = storage.ref().child(`candidates/docs/${Date.now()}_${f.name}`);
+      await dRef.put(f);
+      docsURLs.push(await dRef.getDownloadURL());
     }
 
-    // refresh live results
-    if(votesSnapshotUnsub) votesSnapshotUnsub();
-    subscribeVotes();
+    // Get position name
+    const posDoc = await db.collection('categories').doc(positionId).get();
+    const positionName = posDoc.exists ? posDoc.data().name : '';
+
+    // Save candidate
+    await db.collection('candidates').add({
+      name,
+      positionId,
+      positionName,
+      party,
+      county,
+      ward,
+      imageURL: imgURL,
+      docs: docsURLs,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    e.target.reset();
+    wardSelect.innerHTML = '<option value="">Select Ward</option>'; // reset ward
+    alert("Candidate added successfully!");
 
   } catch (err) {
     console.error(err);
-    alert('Vote failed: ' + (err.message || err));
+    alert('Error adding candidate: ' + err.message);
+  }
+});
+
+// --- Render Candidates Table ---
+async function renderCandidates(docs) {
+  const tbody = document.getElementById('candidatesTable');
+  tbody.innerHTML = '';
+  docs.forEach(doc => {
+    const c = doc.data();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><img src="${c.imageURL || ''}" class="preview-img" alt="" style="width:50px; height:50px; border-radius:4px;"></td>
+      <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.positionName || '')}</td>
+      <td>${escapeHtml(c.party || '')}</td>
+      <td>${escapeHtml(c.county || '')}</td>
+      <td>${escapeHtml(c.ward || '')}</td>
+      <td>${(c.docs && c.docs.length) ? c.docs.map(url => `<a href="${url}" target="_blank">doc</a>`).join(', ') : '—'}</td>
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="deleteCandidate('${doc.id}')"><i class="bi bi-trash"></i></button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// --- Delete Candidate ---
+async function deleteCandidate(id) {
+  if (!confirm('Delete candidate?')) return;
+  try {
+    await db.collection('candidates').doc(id).delete();
+    alert('Candidate deleted successfully.');
+  } catch (err) {
+    console.error(err);
+    alert('Error deleting candidate: ' + err.message);
   }
 }
 
-    
-  // 🔹 Load candidates once and cache
-  async function loadCandidates(){
-    const snap = await db.collection('candidates').get();
-    candidates = {};
-    snap.forEach(doc=>{
-      candidates[doc.id] = { id: doc.id, ...doc.data() };
+// --- Firestore Real-time Listener ---
+db.collection('candidates').orderBy('createdAt', 'desc')
+  .onSnapshot(snapshot => {
+    renderCandidates(snapshot.docs);
+  });
+
+    /********** Voters (approve/deny/delete) **********/
+// Add voter by admin
+/********** Add Voter Form **********/
+// County -> Ward mapping
+  const countyWards = {
+    "Nairobi": ["Starehe", "Kasarani", "Lang'ata", "Embakasi North", "Embakasi South", "Westlands", "Dagoretti North", "Dagoretti South", "Roysambu"],
+    "Mombasa": ["Mvita", "Changamwe", "Kisauni", "Jomvu", "Nyali"],
+    "Kwale": ["Lunga Lunga", "Msambweni", "Matuga", "Kinango"],
+    "Kilifi": ["Kilifi North", "Kilifi South", "Ganze", "Rabai", "Kaloleni", "Malindi", "Magarini"],
+    "Tana River": ["Galole", "Bura", "Garsen"],
+    "Lamu": ["Lamu East", "Lamu West"],
+    "Taita Taveta": ["Mwatate", "Voi", "Wundanyi", "Taveta"],
+    "Garissa": ["Garissa Township", "Balambala", "Dadaab", "Lagdera", "Fafi", "Ijara"],
+    "Wajir": ["Wajir North", "Wajir East", "Wajir West", "Wajir South", "Eldas", "Tarbaj", "Bute"],
+    "Mandera": ["Mandera East", "Mandera West", "Mandera North", "Banissa", "Mandera South", "Lafey"],
+    // ... add other counties and wards
+  };
+
+  // Populate ward dropdown based on county
+  document.getElementById('voterCounty').addEventListener('change', function(){
+    const wards = countyWards[this.value] || [];
+    const wardSelect = document.getElementById('voterWard');
+    wardSelect.innerHTML = '<option value="">Select Ward</option>';
+    wards.forEach(w => {
+      const option = document.createElement('option');
+      option.value = w;
+      option.textContent = w;
+      wardSelect.appendChild(option);
     });
-  }
+  });
 
-  // --- Live results subscription ---
-  function subscribeVotes(){
-    if(votesSnapshotUnsub) votesSnapshotUnsub();
-    votesSnapshotUnsub = db.collection('votes').onSnapshot((snap) => {
-      // aggregate counts by candidateId, grouped by position
-      const counts = {};
-      snap.forEach(d => {
-        const data = d.data();
-        if(!data || !data.candidateId) return;
-        const pos = data.position || 'Unspecified';
-        counts[pos] = counts[pos] || {};
-        counts[pos][data.candidateId] = (counts[pos][data.candidateId] || 0) + 1;
-      });
+  // Add Voter
+  document.getElementById('addVoterForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const name = document.getElementById('voterName').value.trim();
+    const id = document.getElementById('voterId').value.trim();
+    const phone = document.getElementById('voterPhone').value.trim();
+    const county = document.getElementById('voterCounty').value;
+    const ward = document.getElementById('voterWard').value;
+    const docFile = document.getElementById('voterDoc').files[0];
 
-      renderResults(counts);
-    });
-  }
-
-  // --- Render results ---
-  function renderResults(counts){
-    resultsArea.innerHTML = '';
-    for(const pos in counts){
-      const divPos = document.createElement('div');
-      divPos.className = 'mb-3';
-      divPos.innerHTML = `<h6 class="mb-2">${escapeHtml(pos)}</h6>`;
-      const row = document.createElement('div');
-      row.className = 'row g-3';
-
-      for(const cid in counts[pos]){
-        const c = candidates[cid] || {};   // use cached candidate data
-        const votes = counts[pos][cid] || 0;
-        const col = document.createElement('div');
-        col.className = 'col-md-4';
-        col.innerHTML = `
-          <div class="p-2 h-100 text-center card">
-            <img src="${(c.imageURL || 'https://via.placeholder.com/120x80?text=No')}" 
-                 style="width:84px;height:56px;object-fit:cover;border-radius:6px" 
-                 alt="${escapeHtml(c.name||'')}" />
-            <div class="fw-semibold">${escapeHtml(c.name || 'Unknown')}</div>
-            <div class="candidate-meta">${escapeHtml(c.position || '')}</div>
-            <div class="mt-2 fw-bold">${votes} votes</div>
-          </div>
-        `;
-        row.appendChild(col);
-      }
-
-      divPos.appendChild(row);
-      resultsArea.appendChild(divPos);
+    if(!name || !id || !phone || !county || !ward){
+      return alert('Please fill in all fields (Name, ID, Phone, County, Ward).');
     }
-  }
 
-  // show results only (no voting)
-  function showResultsOnly(){
-    candidatesArea.style.display = 'none';
-    ballotNotice.style.display = 'none';
-    if(!votesSnapshotUnsub) subscribeVotes();
-  }
+    let docURL = null;
+    if(docFile){
+      const dRef = storage.ref().child(`voters/docs/${id}_${Date.now()}_${docFile.name}`);
+      await dRef.put(docFile);
+      docURL = await dRef.getDownloadURL();
+    }
 
-  // --- Escape helpers ---
-  function escapeHtml(text){
-    if(!text) return '';
-    return String(text).replace(/[&<>"'`=\/]/g, function (c) {
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'}[c];
+    try {
+      await db.collection('voters').doc(id).set({
+        name,
+        id,
+        phone,
+        county,
+        ward,
+        docURL,
+        approved: true,
+        denied: false,
+        voted: false,
+        registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+        addedByAdmin: true
+      });
+      e.target.reset();
+      alert("Voter added successfully!");
+    } catch(err){
+      console.error(err);
+      alert("Failed to add voter: " + err.message);
+    }
+  });
+
+  // Render voters
+  function renderVoters(docs){
+    const tbody = document.getElementById('votersTable');
+    tbody.innerHTML = '';
+    docs.forEach(doc=>{
+      const v = doc.data();
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(doc.id)}</td>
+        <td>${escapeHtml(v.name || '—')}</td>
+        <td>${escapeHtml(v.phone || '—')}</td>
+        <td>${escapeHtml(v.county || '—')}</td>
+        <td>${escapeHtml(v.ward || '—')}</td>
+        <td>${v.docURL ? `<a href="${v.docURL}" target="_blank">View</a>` : '—'}</td>
+        <td>${v.registeredAt ? (v.registeredAt.toDate ? v.registeredAt.toDate().toLocaleString() : new Date(v.registeredAt).toLocaleString()) : '—'}</td>
+        <td>
+          ${v.approved ? '<span class="bg-success badge">Approved</span>' 
+                       : v.denied ? '<span class="bg-danger badge">Denied</span>' 
+                       : '<span class="bg-warning text-dark badge">Pending</span>'}
+        </td>
+        <td>
+          ${v.approved ? `
+              <button class="me-2 btn-outline-secondary btn btn-sm" onclick="setVoterApproved('${doc.id}', false)">Revoke</button>` 
+            : `
+              <button class="me-2 btn btn-sm btn-success" onclick="setVoterApproved('${doc.id}', true)">Approve</button>
+              <button class="me-2 btn btn-sm btn-warning" onclick="setVoterApproved('${doc.id}', false, true)">Deny</button>`}
+          <button class="btn btn-sm btn-danger" onclick="deleteVoter('${doc.id}')">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
     });
   }
-  function escapeJs(text){
-    if(!text) return '';
-    return String(text).replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g,'');
+
+  // Approve / Revoke / Deny
+  async function setVoterApproved(id, approved, deny=false){
+    if(deny && !confirm('Deny this voter registration? This will mark status as denied.')) return;
+    await db.collection('voters').doc(id).update({
+      approved: approved,
+      denied: deny ? true : (approved ? false : false),
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
   }
 
-  // --- Init: load candidates, then subscribe ---
-  loadCandidates().then(()=>{
-    subscribeVotes();
+  // Delete voter
+  async function deleteVoter(id){
+    if(!confirm('Are you sure you want to permanently delete this voter? This cannot be undone.')) return;
+    await db.collection('voters').doc(id).delete();
+    alert('Voter deleted successfully.');
+  }
+// Reference to your table body
+  const voterTableBody = document.getElementById('voterTableBody');
+
+  // --- Live Voter Listener ---
+  db.collection("voters").orderBy("registeredAt", "desc")
+    .onSnapshot((snapshot) => {
+      voterTableBody.innerHTML = ""; // clear table each update
+
+      snapshot.forEach((doc) => {
+        const voter = doc.data();
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${voter.name || "-"}</td>
+          <td>${voter.id || doc.id}</td>
+          <td>${voter.phone || "-"}</td>
+          <td>
+            ${voter.docURL ? `<a href="${voter.docURL}" target="_blank">View</a>` : "No Doc"}
+          </td>
+          <td>
+            ${voter.approved ? "✅ Approved" : voter.denied ? "❌ Denied" : "⏳ Pending"}
+          </td>
+        `;
+
+        voterTableBody.appendChild(row);
+      });
+    });
+    /********** Results (live) **********/
+async function renderResults(voteDocs){
+  // aggregate counts
+  const counts = {};
+  voteDocs.forEach(d => {
+    const v = d.data();
+    counts[v.candidateId] = (counts[v.candidateId] || 0) + 1;
   });
 
-  // ensure Enter on phone triggers login submit
-  document.getElementById('login_phone').addEventListener('keypress', (e)=>{
-    if(e.key === 'Enter') document.getElementById('btnLogin').click();
-  });
+  // load candidates map
+  const cSnap = await db.collection('candidates').get();
+  const candidatesMap = {};
+  cSnap.forEach(doc => candidatesMap[doc.id] = { id: doc.id, ...doc.data() });
+
+  // group per position
+  const groups = {};
+  for(const id in candidatesMap){
+    const c = candidatesMap[id];
+    groups[c.positionName || 'Unspecified'] = groups[c.positionName || 'Unspecified'] || [];
+    groups[c.positionName || 'Unspecified'].push({
+      id: c.id, name: c.name, party: c.party, imageURL: c.imageURL, votes: counts[c.id] || 0
+    });
+  }
+
+  const container = document.getElementById('resultsContainer');
+  container.innerHTML = '';
+
+  // --- Admin action buttons (Delete + PDF Export) ---
+  const actionBar = document.createElement('div');
+  actionBar.className = "mb-3 d-flex gap-2";
+  actionBar.innerHTML = `
+    <button class="btn btn-danger btn-sm" id="deleteVotesBtn">
+      <i class="bi bi-trash"></i> Delete All Votes
+    </button>
+    <button class="btn btn-success btn-sm" id="downloadPdfBtn">
+      <i class="bi bi-download"></i> Download PDF
+    </button>
+  `;
+  container.appendChild(actionBar);
+
+  // handle delete
+  document.getElementById('deleteVotesBtn').onclick = async ()=>{
+    if(confirm("Are you sure you want to delete ALL votes?")){
+      const snapshot = await db.collection("votes").get();
+      const batch = db.batch();
+      snapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      alert("All votes deleted. Election restarted.");
+    }
+  };
+
+  // handle PDF download
+  document.getElementById('downloadPdfBtn').onclick = ()=>{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Election Results", 14, 20);
+
+    let y = 30;
+    for(const pos in groups){
+      doc.setFontSize(14);
+      doc.text(pos, 14, y);
+      y += 6;
+      groups[pos].sort((a,b)=>b.votes - a.votes);
+      groups[pos].forEach(item=>{
+        doc.setFontSize(12);
+        doc.text(`${item.name} (${item.party||"Independent"}) - ${item.votes} votes`, 20, y);
+        y += 6;
+      });
+      y += 4;
+    }
+    doc.save("election_results.pdf");
+  };
+
+  // --- Render results grouped by position ---
+  for(const pos in groups){
+    const col = document.createElement('div');
+    col.className = 'col-12 mb-3';
+    let html = `<div class="p-3 card"><h6>${escapeHtml(pos)}</h6><div class="row g-2">`;
+    groups[pos].sort((a,b)=>b.votes - a.votes);
+    groups[pos].forEach(item => {
+      html += `<div class="col-md-4">
+                <div class="d-flex align-items-center gap-2">
+                  <img src="${item.imageURL || 'https://via.placeholder.com/120x80?text=No'}" style="width:72px;height:48px;object-fit:cover;border-radius:6px;" />
+                  <div>
+                    <div class="fw-semibold">${escapeHtml(item.name)}</div>
+                    <div class="small-muted">${escapeHtml(item.party || '')}</div>
+                  </div>
+                  <div class="ms-auto text-end">
+                    <div class="fw-bold">${item.votes}</div>
+                    <div class="small-muted">votes</div>
+                  </div>
+                </div></div>`;
+    });
+    html += `</div></div>`;
+    col.innerHTML = html;
+    container.appendChild(col);
+  }
+}
+
+
+    /********** Settings (election date) **********/
+    document.getElementById('settingsForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const start = new Date(document.getElementById('startTime').value);
+      const end = new Date(document.getElementById('endTime').value);
+      await db.collection('settings').doc('election').set({
+        start: firebase.firestore.Timestamp.fromDate(start),
+        end: firebase.firestore.Timestamp.fromDate(end)
+      });
+      alert('Election settings saved.');
+    });
+
+    /********** Utility helpers **********/
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'}[c])); }
+    function toInputDateLocal(d){
+      if(!(d instanceof Date)) d=new Date(d);
+      const tzoffset = d.getTimezoneOffset()*60000;
+      const localISOTime = (new Date(d - tzoffset)).toISOString().slice(0,16);
+      return localISOTime;
+    }
+
+    /********** Cleanup on unload **********/
+    window.addEventListener('beforeunload', ()=>{
+      stopRealtimeListeners();
+    });
+
+    // require sign-in on load
+    // show login button / modal
+    document.getElementById('btnShowLogin').addEventListener('click', ()=> loginModal.show());
+    // If not signed in, show login modal; else init
+    auth.onAuthStateChanged(user => {
+      if(!user){
+        // show login modal
+        loginModal.show();
+      } else {
+        // hide modal if open
+        try{ loginModal.hide(); }catch(e){}
+      }
+    });
+
+    // Small UX: allow direct show of login modal if admin not signed in
+    // Also show/hide signout button
+    auth.onAuthStateChanged(user=>{
+      if(user){
+        adminEmailEl.textContent = user.email;
+        btnSignOut.classList.remove('d-none');
+        btnShowLogin.classList.add('d-none');
+      } else {
+        adminEmailEl.textContent = 'not signed in';
+        btnSignOut.classList.add('d-none');
+        btnShowLogin.classList.remove('d-none');
+      }
+    });
+
+    // initial require auth call (show modal)
+    // We'll call requireAuth to show login when page opens
+    requireAuth();
+
   </script>
+  <!-- Add this in your HTML <head> or before </body> -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// Auto Logout Settings
+let inactivityTime = 60 * 5; // 5 minutes
+let countdown; 
+let warningTime = 60; // 1 minute before logout show warning
+let timer;
+
+// Create logout modal
+const logoutModal = document.createElement("div");
+logoutModal.className = "modal fade";
+logoutModal.id = "logoutModal";
+logoutModal.innerHTML = `
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="bg-warning modal-header">
+        <h5 class="modal-title">Session Timeout Warning</h5>
+      </div>
+      <div class="text-center modal-body">
+        <p>You have been inactive. You will be logged out in <span id="countdown">60</span> seconds.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="stayLoggedIn">Stay Logged In</button>
+      </div>
+    </div>
+  </div>
+`;
+document.body.appendChild(logoutModal);
+
+// Bootstrap Modal
+let logoutModalInstance = new bootstrap.Modal(document.getElementById("logoutModal"));
+
+// Reset timer on activity
+function resetTimer() {
+  clearInterval(timer);
+  inactivityTime = 60 * 5; // reset to 5 min
+  timer = setInterval(checkInactivity, 1000);
+}
+window.onload = resetTimer;
+document.onmousemove = resetTimer;
+document.onkeypress = resetTimer;
+document.onclick = resetTimer;
+
+// Check inactivity countdown
+function checkInactivity() {
+  inactivityTime--;
+  if (inactivityTime === warningTime) {
+    startCountdown();
+    logoutModalInstance.show();
+  }
+  if (inactivityTime <= 0) {
+    logout();
+  }
+}
+
+// Show countdown in modal
+function startCountdown() {
+  let timeLeft = warningTime;
+  countdown = setInterval(() => {
+    document.getElementById("countdown").textContent = timeLeft;
+    timeLeft--;
+    if (timeLeft < 0) {
+      clearInterval(countdown);
+    }
+  }, 1000);
+}
+
+// Logout function
+function logout() {
+  clearInterval(timer);
+  clearInterval(countdown);
+  logoutModalInstance.hide();
+  
+  // Hide dashboard and show login modal again
+  document.getElementById("dashboard").style.display = "none";
+  let loginModal = new bootstrap.Modal(document.getElementById("loginModal"));
+  loginModal.show();
+}
+
+// Stay logged in button
+document.getElementById("stayLoggedIn").addEventListener("click", () => {
+  clearInterval(countdown);
+  resetTimer();
+});
+
+</script>
+
 </body>
 </html>
