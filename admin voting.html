@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dashboard — National Voting System</title>
+
+  <!-- Bootstrap + icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link rel="icon" type="image/png" href="img/vot1.jpg">
+
+  <style>
+    :root{
+      --sidebar-bg:#05263b;
+      --accent:#0d6efd;
+      --muted:#6c757d;
+      --card-radius:12px;
+    }
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f4f7fb; }
+    .sidebar { width:220px; background:var(--sidebar-bg); color:#fff; min-height:100vh; position:fixed; padding-top:18px; }
+    .sidebar .nav-link { color:#cfe8ff; }
+    .sidebar .nav-link.active, .sidebar .nav-link:hover { background: rgba(255,255,255,0.04); color:#fff; border-radius:6px; }
+    main { margin-left:220px; padding:20px; }
+    .card { border-radius:var(--card-radius); box-shadow:0 8px 24px rgba(12,14,20,0.06); }
+    .page { display:none; }
+    .page.active { display:block; }
+    .preview-img { width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid #eee; }
+    footer { text-align:center; color:#6b7280; margin-top:28px; }
+    .small-muted { color:var(--muted); font-size:.9rem; }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="d-flex flex-column sidebar">
+    <div class="mb-3 px-3">
+      <div class="mb-0 h5"><i class="bi bi-shield-lock"></i> Voting Admin</div>
+      <div class="text-white-50 small">Administration panel</div>
+    </div>
+
+    <nav class="flex-column px-2 nav">
+      <a class="nav-link active" href="#" data-page="dashboard"><i class="me-2 bi bi-speedometer2"></i>Dashboard</a>
+      <a class="nav-link" href="#" data-page="categories"><i class="me-2 bi-list-task bi"></i>Positions</a>
+      <a class="nav-link" href="#" data-page="candidates"><i class="me-2 bi bi-people-fill"></i>Candidates</a>
+      <a class="nav-link" href="#" data-page="voters"><i class="me-2 bi bi-person-badge-fill"></i>Voters</a>
+      <a class="nav-link" href="#" data-page="results"><i class="me-2 bi bi-bar-chart-fill"></i>Results</a>
+      <a class="nav-link" href="#" data-page="settings"><i class="me-2 bi bi-gear"></i>Settings</a>
+    </nav>
+
+    <div class="mt-auto px-3 py-3 small-muted">
+      Signed in as: <div id="adminEmail" class="mt-1 text-white fw-semibold">not signed in</div>
+      <div class="mt-2">
+        <button id="btnSignOut" class="btn-outline-light btn btn-sm d-none"><i class="bi-box-arrow-right bi"></i> Sign out</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main>
+    <!-- Topbar -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <h4 class="mb-0">Admin Dashboard</h4>
+        <div class="small-muted">Manage election, candidates, voters and results</div>
+      </div>
+      <div>
+        <button id="btnShowLogin" class="btn btn-primary btn-sm d-none" data-bs-toggle="modal" data-bs-target="#loginModal"><i class="bi bi-person-circle"></i> Admin login</button>
+      </div>
+    </div>
+
+    <!-- Pages -->
+    <section id="dashboard" class="page active">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="p-3 card">
+            <div class="small-muted">Positions</div>
+            <h3 id="statPositions">0</h3>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 card">
+            <div class="small-muted">Candidates</div>
+            <h3 id="statCandidates">0</h3>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 card">
+            <div class="small-muted">Voters</div>
+            <h3 id="statVoters">0</h3>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="categories" class="page">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5>Positions / Categories</h5>
+      </div>
+      <div class="mb-3 p-3 card">
+        <form id="categoryForm" class="row g-2">
+          <div class="col-md-8">
+            <input id="categoryName" class="form-control" placeholder="e.g. President, Governor" required>
+          </div>
+          <div class="col-md-4">
+            <button class="w-100 btn btn-primary">Add Position</button>
+          </div>
+        </form>
+      </div>
+
+      <ul id="categoriesList" class="list-group"></ul>
+    </section>
+
+    <section id="candidates" class="page">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5>Manage Candidates</h5>
+      </div>
+
+      <div class="mb-3 p-3 card">
+        <form id="candidateForm" class="row g-3">
+          <div class="col-md-4"><input id="candName" class="form-control" placeholder="Full name" required></div>
+          <div class="col-md-3">
+            <select id="candPosition" class="form-select" required><option value="">Select position</option></select>
+          </div>
+          <div class="col-md-3"><input id="candParty" class="form-control" placeholder="Party"></div>
+          <div class="col-md-2"><input id="candImage" type="file" accept="image/*" class="form-control" required></div>
+
+          <div class="col-12">
+            <label class="form-label small-muted">Candidate Documents (ID, party cert) — optional</label>
+            <input id="candDocs" type="file" accept=".pdf,.jpg,.png" class="form-control" multiple>
+          </div>
+
+          <div class="col-12"><button class="btn btn-success">Add Candidate</button></div>
+        </form>
+      </div>
+
+      <div class="p-3 card">
+        <table class="table table-striped mb-0 align-middle">
+          <thead class="table-dark">
+            <tr><th>Photo</th><th>Name</th><th>Position</th><th>Party</th><th>Docs</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="candidatesTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="voters" class="page">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5>Voter Registrations</h5>
+        <small class="small-muted">Approve or deny registered voters</small>
+      </div>
+     <div class="mb-3 p-3 card">
+  <h6 class="mb-3">Add Voter (Admin)</h6>
+  <form id="addVoterForm" class="row g-3">
+    <div class="col-md-3">
+      <input id="voterName" type="text" class="form-control" placeholder="Full name" required>
+    </div>
+    <div class="col-md-3">
+      <input id="voterId" type="text" class="form-control" placeholder="ID / Passport Number" required>
+    </div>
+    <div class="col-md-3">
+      <input id="voterPhone" type="text" class="form-control" placeholder="Phone number" required>
+    </div>
+    <div class="col-md-2">
+      <input id="voterDoc" type="file" accept=".pdf,.jpg,.png" class="form-control">
+    </div>
+    <div class="col-md-1">
+      <button class="w-100 btn btn-primary">Add</button>
+    </div>
+  </form>
+</div>
+
+
+
+      <div class="mb-3 p-3 card">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-dark">
+            <tr><th>ID</th><th>Name</th><th>Phone</th><th>Document</th><th>Registered</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="votersTable"></tbody>
+          
+        </table>
+      </div>
+    </section>
+
+    <section id="results" class="page">
+      <h5>Live Results</h5>
+      <div id="resultsContainer" class="row g-3"></div>
+    </section>
+
+    <section id="settings" class="page">
+      <h5>Election Settings</h5>
+      <div class="p-3 card">
+        <form id="settingsForm" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Voting Start</label>
+            <input id="startTime" type="datetime-local" class="form-control" required />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Voting End</label>
+            <input id="endTime" type="datetime-local" class="form-control" required />
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary">Save Settings</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <footer>
+      <div class="small-muted">National Voting System • Admin Panel</div>
+    </footer>
+  </main>
+
+  <!-- Login Modal -->
+  <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="loginForm" class="p-3">
+          <div class="modal-header">
+            <h5 class="modal-title">Admin Login</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="loginError" class="mb-2 text-danger small"></div>
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input id="loginEmail" type="email" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input id="loginPassword" type="password" class="form-control" required />
+            </div>
+            <div class="mb-2 form-check">
+              <input id="rememberMe" class="form-check-input" type="checkbox" />
+              <label class="form-check-label">Remember me</label>
+            </div>
+            <div class="small-muted">Use an admin account (Firebase Auth)</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" type="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase compat libs (simpler code for front-end demo) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+
+  <!-- Bootstrap bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    /***** Replace with your Firebase project config *****/
+    const firebaseConfig = {
+       apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+  authDomain: "moviedrift-fcc93.firebaseapp.com",
+  projectId: "moviedrift-fcc93",
+  storageBucket: "moviedrift-fcc93.firebasestorage.app",
+  messagingSenderId: "794171988540",
+  appId: "1:794171988540:web:4cd63d9aa3214b2cb98139",
+  measurementId: "G-LR52710HK8"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    /* UI elements */
+    const pages = document.querySelectorAll('[data-page], .page');
+    const navLinks = document.querySelectorAll('.sidebar .nav-link');
+    const adminEmailEl = document.getElementById('adminEmail');
+    const btnSignOut = document.getElementById('btnSignOut');
+    const btnShowLogin = document.getElementById('btnShowLogin');
+
+    // page switching
+    document.querySelectorAll('.sidebar .nav-link').forEach(link=>{
+      link.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const page = link.dataset.page;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(page).classList.add('active');
+        navLinks.forEach(n => n.classList.remove('active'));
+        link.classList.add('active');
+      });
+    });
+
+    // show login modal if not signed in
+    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+    function requireAuth() {
+      auth.currentUser ? initUIForAdmin() : loginModal.show();
+    }
+
+    // auth state changes
+    auth.onAuthStateChanged(user => {
+      if(user){
+        // show admin UI
+        adminEmailEl.textContent = user.email;
+        btnSignOut.classList.remove('d-none');
+        btnShowLogin.classList.add('d-none');
+        // start listeners
+        startRealtimeListeners();
+      } else {
+        adminEmailEl.textContent = 'not signed in';
+        btnSignOut.classList.add('d-none');
+        btnShowLogin.classList.remove('d-none');
+        stopRealtimeListeners();
+        // show login modal
+        loginModal.show();
+      }
+    });
+
+    // login form
+    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const pw = document.getElementById('loginPassword').value;
+      const remember = document.getElementById('rememberMe').checked;
+      document.getElementById('loginError').textContent = '';
+      try {
+        if(remember) {
+          await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        } else {
+          await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+        }
+        await auth.signInWithEmailAndPassword(email, pw);
+        loginModal.hide();
+      } catch(err){
+        console.error(err);
+        document.getElementById('loginError').textContent = err.message || 'Sign-in failed';
+      }
+    });
+
+    // sign out
+    btnSignOut.addEventListener('click', async ()=> {
+      await auth.signOut();
+      // clear UI
+    });
+
+    /*************** Firestore listeners and functions ***************/
+    let unsubscribeCategories = null;
+    let unsubscribeCandidates = null;
+    let unsubscribeVoters = null;
+    let unsubscribeVotes = null;
+    let unsubscribeSettings = null;
+
+    // start listeners
+    function startRealtimeListeners(){
+      // categories
+      unsubscribeCategories = db.collection('categories').orderBy('name').onSnapshot(snapshot=>{
+        renderCategories(snapshot.docs);
+        document.getElementById('statPositions').textContent = snapshot.size;
+        populatePositionSelect(snapshot.docs);
+      });
+
+      // candidates
+      unsubscribeCandidates = db.collection('candidates').onSnapshot(snapshot=>{
+        renderCandidates(snapshot.docs);
+        document.getElementById('statCandidates').textContent = snapshot.size;
+      });
+
+      // voters
+      unsubscribeVoters = db.collection('voters').orderBy('registeredAt','desc').onSnapshot(snapshot=>{
+        renderVoters(snapshot.docs);
+        document.getElementById('statVoters').textContent = snapshot.size;
+      });
+
+      // votes
+      unsubscribeVotes = db.collection('votes').onSnapshot(snapshot=>{
+        renderResults(snapshot.docs);
+        document.getElementById('totalVotes')?.setAttribute('data-count', snapshot.size);
+      });
+
+      // settings
+      unsubscribeSettings = db.collection('settings').doc('election').onSnapshot(doc=>{
+        if(doc.exists){
+          const d = doc.data();
+          if(d.start) document.getElementById('startTime').value = toInputDateLocal(d.start.toDate ? d.start.toDate() : new Date(d.start));
+          if(d.end) document.getElementById('endTime').value = toInputDateLocal(d.end.toDate ? d.end.toDate() : new Date(d.end));
+        }
+      });
+    }
+
+    // stop listeners
+    function stopRealtimeListeners(){
+      if(unsubscribeCategories) unsubscribeCategories();
+      if(unsubscribeCandidates) unsubscribeCandidates();
+      if(unsubscribeVoters) unsubscribeVoters();
+      if(unsubscribeVotes) unsubscribeVotes();
+      if(unsubscribeSettings) unsubscribeSettings();
+      // clear UI lists (optional)
+      document.getElementById('categoriesList').innerHTML = '';
+      document.getElementById('candidatesTable').innerHTML = '';
+      document.getElementById('votersTable').innerHTML = '';
+      document.getElementById('resultsContainer').innerHTML = '';
+    }
+// Add voter by admin (ID = document ID in Firestore)
+document.getElementById('addVoterForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('voterName').value.trim();
+  const id = document.getElementById('voterId').value.trim();
+  const phone = document.getElementById('voterPhone').value.trim();
+  const docFile = document.getElementById('voterDoc').files[0];
+
+  if(!name || !id || !phone){
+    return alert('Please fill in all fields (Name, ID, Phone).');
+  }
+
+  let docURL = null;
+  if(docFile){
+    const dRef = storage.ref().child(`voters/docs/${id}_${Date.now()}_${docFile.name}`);
+    await dRef.put(docFile);
+    docURL = await dRef.getDownloadURL();
+  }
+
+  try {
+    await db.collection('voters').doc(id).set({
+      name,
+      id,
+      phone,
+      docURL,
+      approved: true,   // auto-approved
+      denied: false,
+      voted: false,
+      registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+      addedByAdmin: true
+    });
+
+    e.target.reset();
+    alert("Voter added successfully!");
+  } catch(err){
+    console.error(err);
+    alert("Failed to add voter: " + err.message);
+  }
+});
+
+
+    /********** Categories (positions) **********/
+    document.getElementById('categoryForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('categoryName').value.trim();
+      if(!name) return;
+      await db.collection('categories').add({ name });
+      document.getElementById('categoryName').value = '';
+    });
+
+    function renderCategories(docs){
+      const el = document.getElementById('categoriesList');
+      el.innerHTML = '';
+      docs.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.innerHTML = `<div><strong>${escapeHtml(data.name)}</strong></div>
+                        <div>
+                          <button class="me-2 btn-outline-danger btn btn-sm" onclick="deleteCategory('${doc.id}')">Delete</button>
+                        </div>`;
+        el.appendChild(li);
+      });
+    }
+    async function deleteCategory(id){
+      if(!confirm('Delete this position?')) return;
+      await db.collection('categories').doc(id).delete();
+    }
+    function populatePositionSelect(docs){
+      const sel = document.getElementById('candPosition');
+      sel.innerHTML = '<option value="">Select position</option>';
+      docs.forEach(doc => {
+        sel.innerHTML += `<option value="${doc.id}">${escapeHtml(doc.data().name)}</option>`;
+      });
+    }
+
+    /********** Candidates **********/
+    document.getElementById('candidateForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('candName').value.trim();
+      const positionId = document.getElementById('candPosition').value;
+      const party = document.getElementById('candParty').value.trim();
+      const imageFile = document.getElementById('candImage').files[0];
+      const docsFiles = document.getElementById('candDocs').files;
+
+      if(!name || !positionId || !imageFile) return alert('Please complete name, position and image.');
+
+      // upload image
+      const imgRef = storage.ref().child(`candidates/images/${Date.now()}_${imageFile.name}`);
+      await imgRef.put(imageFile);
+      const imgURL = await imgRef.getDownloadURL();
+
+      // upload docs
+      const docsURLs = [];
+      for(let i=0;i<docsFiles.length;i++){
+        const f = docsFiles[i];
+        const dRef = storage.ref().child(`candidates/docs/${Date.now()}_${f.name}`);
+        await dRef.put(f);
+        docsURLs.push(await dRef.getDownloadURL());
+      }
+
+      // read position name
+      const posDoc = await db.collection('categories').doc(positionId).get();
+      const positionName = posDoc.exists ? posDoc.data().name : '';
+
+      await db.collection('candidates').add({
+        name,
+        positionId,
+        positionName,
+        party,
+        imageURL: imgURL,
+        docs: docsURLs,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // reset form
+      e.target.reset();
+    });
+
+    async function renderCandidates(docs){
+      const tbody = document.getElementById('candidatesTable');
+      tbody.innerHTML = '';
+      docs.forEach(doc => {
+        const c = doc.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><img src="${c.imageURL || ''}" class="preview-img" alt=""></td>
+          <td>${escapeHtml(c.name)}</td>
+          <td>${escapeHtml(c.positionName || '')}</td>
+          <td>${escapeHtml(c.party || '')}</td>
+          <td>${(c.docs && c.docs.length) ? c.docs.map(url=>`<a href="${url}" target="_blank">doc</a>`).join(', ') : '—'}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteCandidate('${doc.id}')"><i class="bi bi-trash"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function deleteCandidate(id){
+      if(!confirm('Delete candidate?')) return;
+      await db.collection('candidates').doc(id).delete();
+    }
+
+    /********** Voters (approve/deny/delete) **********/
+function renderVoters(docs){
+  const tbody = document.getElementById('votersTable');
+  tbody.innerHTML = '';
+  docs.forEach(doc=>{
+    const v = doc.data();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(doc.id)}</td>
+      <td>${escapeHtml(v.name || '—')}</td>
+      <td>${escapeHtml(v.phone || '—')}</td>
+      <td>${v.docURL ? `<a href="${v.docURL}" target="_blank">View</a>` : '—'}</td>
+      <td>${v.registeredAt ? (v.registeredAt.toDate ? v.registeredAt.toDate().toLocaleString() : new Date(v.registeredAt).toLocaleString()) : '—'}</td>
+      <td>
+        ${v.approved ? '<span class="bg-success badge">Approved</span>' 
+                     : v.denied ? '<span class="bg-danger badge">Denied</span>' 
+                     : '<span class="bg-warning text-dark badge">Pending</span>'}
+      </td>
+      <td>
+        ${v.approved ? `
+            <button class="me-2 btn-outline-secondary btn btn-sm" onclick="setVoterApproved('${doc.id}', false)">Revoke</button>` 
+          : `
+            <button class="me-2 btn btn-sm btn-success" onclick="setVoterApproved('${doc.id}', true)">Approve</button>
+            <button class="me-2 btn btn-sm btn-warning" onclick="setVoterApproved('${doc.id}', false, true)">Deny</button>`}
+        <button class="btn btn-sm btn-danger" onclick="deleteVoter('${doc.id}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// approve/revoke/deny
+async function setVoterApproved(id, approved, deny=false){
+  if(deny){
+    if(!confirm('Deny this voter registration? This will mark status as denied.')) return;
+  }
+  await db.collection('voters').doc(id).update({
+    approved: approved,
+    denied: deny ? true : (approved ? false : false),
+    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+// delete voter permanently
+async function deleteVoter(id){
+  if(!confirm('Are you sure you want to permanently delete this voter? This cannot be undone.')) return;
+  await db.collection('voters').doc(id).delete();
+  alert('Voter deleted successfully.');
+}
+
+// Reference to your table body
+  const voterTableBody = document.getElementById('voterTableBody');
+
+  // --- Live Voter Listener ---
+  db.collection("voters").orderBy("registeredAt", "desc")
+    .onSnapshot((snapshot) => {
+      voterTableBody.innerHTML = ""; // clear table each update
+
+      snapshot.forEach((doc) => {
+        const voter = doc.data();
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${voter.name || "-"}</td>
+          <td>${voter.id || doc.id}</td>
+          <td>${voter.phone || "-"}</td>
+          <td>
+            ${voter.docURL ? `<a href="${voter.docURL}" target="_blank">View</a>` : "No Doc"}
+          </td>
+          <td>
+            ${voter.approved ? "✅ Approved" : voter.denied ? "❌ Denied" : "⏳ Pending"}
+          </td>
+        `;
+
+        voterTableBody.appendChild(row);
+      });
+    });
+    /********** Results (live) **********/
+async function renderResults(voteDocs){
+  // aggregate counts
+  const counts = {};
+  voteDocs.forEach(d => {
+    const v = d.data();
+    counts[v.candidateId] = (counts[v.candidateId] || 0) + 1;
+  });
+
+  // load candidates map
+  const cSnap = await db.collection('candidates').get();
+  const candidatesMap = {};
+  cSnap.forEach(doc => candidatesMap[doc.id] = { id: doc.id, ...doc.data() });
+
+  // group per position
+  const groups = {};
+  for(const id in candidatesMap){
+    const c = candidatesMap[id];
+    groups[c.positionName || 'Unspecified'] = groups[c.positionName || 'Unspecified'] || [];
+    groups[c.positionName || 'Unspecified'].push({
+      id: c.id, name: c.name, party: c.party, imageURL: c.imageURL, votes: counts[c.id] || 0
+    });
+  }
+
+  const container = document.getElementById('resultsContainer');
+  container.innerHTML = '';
+
+  // --- Admin action buttons (Delete + PDF Export) ---
+  const actionBar = document.createElement('div');
+  actionBar.className = "mb-3 d-flex gap-2";
+  actionBar.innerHTML = `
+    <button class="btn btn-danger btn-sm" id="deleteVotesBtn">
+      <i class="bi bi-trash"></i> Delete All Votes
+    </button>
+    <button class="btn btn-success btn-sm" id="downloadPdfBtn">
+      <i class="bi bi-download"></i> Download PDF
+    </button>
+  `;
+  container.appendChild(actionBar);
+
+  // handle delete
+  document.getElementById('deleteVotesBtn').onclick = async ()=>{
+    if(confirm("Are you sure you want to delete ALL votes?")){
+      const snapshot = await db.collection("votes").get();
+      const batch = db.batch();
+      snapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      alert("All votes deleted. Election restarted.");
+    }
+  };
+
+  // handle PDF download
+  document.getElementById('downloadPdfBtn').onclick = ()=>{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Election Results", 14, 20);
+
+    let y = 30;
+    for(const pos in groups){
+      doc.setFontSize(14);
+      doc.text(pos, 14, y);
+      y += 6;
+      groups[pos].sort((a,b)=>b.votes - a.votes);
+      groups[pos].forEach(item=>{
+        doc.setFontSize(12);
+        doc.text(`${item.name} (${item.party||"Independent"}) - ${item.votes} votes`, 20, y);
+        y += 6;
+      });
+      y += 4;
+    }
+    doc.save("election_results.pdf");
+  };
+
+  // --- Render results grouped by position ---
+  for(const pos in groups){
+    const col = document.createElement('div');
+    col.className = 'col-12 mb-3';
+    let html = `<div class="p-3 card"><h6>${escapeHtml(pos)}</h6><div class="row g-2">`;
+    groups[pos].sort((a,b)=>b.votes - a.votes);
+    groups[pos].forEach(item => {
+      html += `<div class="col-md-4">
+                <div class="d-flex align-items-center gap-2">
+                  <img src="${item.imageURL || 'https://via.placeholder.com/120x80?text=No'}" style="width:72px;height:48px;object-fit:cover;border-radius:6px;" />
+                  <div>
+                    <div class="fw-semibold">${escapeHtml(item.name)}</div>
+                    <div class="small-muted">${escapeHtml(item.party || '')}</div>
+                  </div>
+                  <div class="ms-auto text-end">
+                    <div class="fw-bold">${item.votes}</div>
+                    <div class="small-muted">votes</div>
+                  </div>
+                </div></div>`;
+    });
+    html += `</div></div>`;
+    col.innerHTML = html;
+    container.appendChild(col);
+  }
+}
+
+
+    /********** Settings (election date) **********/
+    document.getElementById('settingsForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const start = new Date(document.getElementById('startTime').value);
+      const end = new Date(document.getElementById('endTime').value);
+      await db.collection('settings').doc('election').set({
+        start: firebase.firestore.Timestamp.fromDate(start),
+        end: firebase.firestore.Timestamp.fromDate(end)
+      });
+      alert('Election settings saved.');
+    });
+
+    /********** Utility helpers **********/
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'}[c])); }
+    function toInputDateLocal(d){
+      if(!(d instanceof Date)) d=new Date(d);
+      const tzoffset = d.getTimezoneOffset()*60000;
+      const localISOTime = (new Date(d - tzoffset)).toISOString().slice(0,16);
+      return localISOTime;
+    }
+
+    /********** Cleanup on unload **********/
+    window.addEventListener('beforeunload', ()=>{
+      stopRealtimeListeners();
+    });
+
+    // require sign-in on load
+    // show login button / modal
+    document.getElementById('btnShowLogin').addEventListener('click', ()=> loginModal.show());
+    // If not signed in, show login modal; else init
+    auth.onAuthStateChanged(user => {
+      if(!user){
+        // show login modal
+        loginModal.show();
+      } else {
+        // hide modal if open
+        try{ loginModal.hide(); }catch(e){}
+      }
+    });
+
+    // Small UX: allow direct show of login modal if admin not signed in
+    // Also show/hide signout button
+    auth.onAuthStateChanged(user=>{
+      if(user){
+        adminEmailEl.textContent = user.email;
+        btnSignOut.classList.remove('d-none');
+        btnShowLogin.classList.add('d-none');
+      } else {
+        adminEmailEl.textContent = 'not signed in';
+        btnSignOut.classList.add('d-none');
+        btnShowLogin.classList.remove('d-none');
+      }
+    });
+
+    // initial require auth call (show modal)
+    // We'll call requireAuth to show login when page opens
+    requireAuth();
+
+  </script>
+  <!-- Add this in your HTML <head> or before </body> -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>National Voting Portal — Voter</title>
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="icon" type="image/png" href="img/vot1.jpg">
+
+  <style>
+    :root{
+      --primary:#0d6efd;
+      --accent:#6610f2;
+      --muted:#6c757d;
+      --card-bg: #ffffff;
+      --glass: rgba(255,255,255,0.85);
+    }
+
+    body{
+      font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,#f4f6f9 0%, #e9eef8 100%);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      color: #1f2937;
+    }
+
+    .topbar{
+      background: linear-gradient(90deg,var(--primary),var(--accent));
+      color: #fff;
+      box-shadow: 0 6px 18px rgba(13,110,253,0.12);
+    }
+    .topbar .brand{
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .hero{
+      margin-top: -28px;
+      padding: 60px 20px;
+      border-radius: 12px;
+      color: white;
+      background-image: linear-gradient(135deg, rgba(13,110,253,0.95), rgba(102,16,242,0.88));
+      box-shadow: 0 12px 30px rgba(13,110,253,0.12);
+      text-align:center;
+    }
+    .hero h1{ font-size: clamp(20px, 3vw, 34px); font-weight:800; margin-bottom:8px; }
+    .hero p { opacity: .95; margin-bottom:0; }
+
+    .card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 6px 18px rgba(17,24,39,0.06); }
+
+    .countdown { font-weight: 700; color: #b91c1c; font-size: 1.1rem; }
+
+    .candidate-img { width:100%; height:160px; object-fit:cover; border-radius:8px; background: linear-gradient(180deg,#f3f4f6,#e5e7eb); }
+
+    .candidate-card { border-radius:12px; overflow:hidden; }
+    .candidate-meta { font-size: .95rem; color:var(--muted); }
+
+    .btn-pill { border-radius: 999px; padding-left:18px; padding-right:18px; }
+
+    footer { margin-top:40px; padding:20px 0; text-align:center; color:#6b7280; }
+
+    @media (max-width:767px){
+      .hero { padding:28px 12px; }
+      .candidate-img { height:140px; }
+    }
+
+    .active-select { border: 2px solid var(--primary); }
+  </style>
+</head>
+<body>
+  <!-- Topbar -->
+  <nav class="topbar py-3">
+    <div class="d-flex align-items-center justify-content-between container">
+      <div class="d-flex align-items-center gap-3">
+        <div class="brand fs-5"><i class="bi bi-shield-check"></i> National Voting Portal</div>
+        <div class="text-white-50 small">Secure • Transparent • Accountable</div>
+      </div>
+      <div class="text-white small">Need help? <a href="mailto:support@example.com" class="text-white fw-semibold">support@example.com</a></div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="container">
+      <h1>Participate in a fair & transparent election</h1>
+      <p>Register, verify, then log in with your ID & phone to cast one secure vote. Live results are published here.</p>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="my-5 container">
+    <div class="row g-4">
+      <!-- Registration -->
+      <section class="col-lg-5">
+        <div class="mb-4 p-4 card">
+          <h5 class="mb-2">Register as a Voter</h5>
+          <p class="mb-3 text-muted small">Upload your ID/passport — admin will verify the document. Use the exact phone and ID you will use to vote.</p>
+
+          <form id="voterRegisterForm" class="needs-validation" novalidate>
+            
+
+           
+
+           
+
+            
+
+            
+
+            <div id="regStatus" class="mt-3 text-muted small"></div>
+          </form>
+        </div>
+
+        <!-- Voting Countdown -->
+        <div class="p-4 card">
+          <h6 class="mb-2">Voting Countdown</h6>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div id="countdownText" class="countdown">Loading...</div>
+              <div class="text-muted small">Voting start time is set by the administrator.</div>
+            </div>
+            <div class="text-end small"><div id="electionRange">—</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Login & Candidates -->
+      <section class="col-lg-7">
+        <div class="mb-4 p-4 card">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <h5 class="mb-0">Voter Login (Required to vote)</h5>
+              <div class="text-muted small">Once voting opens enter your ID & phone to start voting.</div>
+            </div>
+            <div>
+              <span id="votingStateBadge" class="bg-secondary badge">Checking...</span>
+            </div>
+          </div>
+
+          <!-- login form -->
+          <form id="voterLoginForm" class="align-items-end row g-3" style="display:none;">
+            <div class="col-md-6">
+              <label class="form-label">ID / Passport</label>
+              <input id="login_id" class="form-control" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone</label>
+              <input id="login_phone" class="form-control" required />
+            </div>
+            <div class="col-12">
+              <div class="d-flex gap-2">
+                <button id="btnLogin" type="submit" class="btn btn-success btn-pill">Verify & Start Voting</button>
+                <button id="btnLogout" type="button" class="btn-outline-secondary btn btn-pill" style="display:none;">Logout</button>
+              </div>
+            </div>
+            <div class="col-12">
+              <div id="loginMessage" class="text-muted small"></div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Candidates -->
+        <div id="candidatesArea" class="p-3 card" style="display:none;">
+          <h5 class="mb-3">Candidates</h5>
+          <div id="candidatesContainer" class="row g-3"></div>
+        </div>
+
+        <!-- Ballot notice -->
+        <div id="ballotNotice" class="mt-3 p-3 card" style="display:none;">
+          <div class="d-flex align-items-start gap-3">
+            <div><i class="text-success bi bi-check-circle fs-2"></i></div>
+            <div>
+              <h6 class="mb-1">You are verified</h6>
+              <div class="text-muted small">Choose one candidate per position. Once you submit your vote, it is final and cannot be changed.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live Results -->
+      <section class="col-12">
+        <div class="p-4 card">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="mb-0">Live Results</h5>
+            <div class="text-muted small">Updated in real-time</div>
+          </div>
+          <div id="resultsArea" class="row gy-3"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container small">
+      © National Voting Portal — Transparency & Security. For demonstration only.
+    </div>
+  </footer>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDFVoYWgoxpRBxi3l3OUarvUn2_M9_lqqY",
+      authDomain: "moviedrift-fcc93.firebaseapp.com",
+      projectId: "moviedrift-fcc93",
+      storageBucket: "moviedrift-fcc93.appspot.com",
+      messagingSenderId: "794171988540",
+      appId: "1:794171988540:web:4cd63d9aa3214b2cb98139"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // State
+    let election = null;
+    let currentVoterId = null;
+    let currentVoterDoc = null;
+    let candidates = {};            // candidate docs keyed by id
+    let votesSnapshotUnsub = null;
+    let candidatesUnsub = null;
+
+    // UI
+    const btnRegister = document.getElementById('btnRegister');
+    const regStatus = document.getElementById('regStatus');
+    const countdownText = document.getElementById('countdownText');
+    const electionRange = document.getElementById('electionRange');
+    const votingStateBadge = document.getElementById('votingStateBadge');
+    const voterLoginForm = document.getElementById('voterLoginForm');
+    const loginMessage = document.getElementById('loginMessage');
+    const candidatesArea = document.getElementById('candidatesArea');
+    const candidatesContainer = document.getElementById('candidatesContainer');
+    const ballotNotice = document.getElementById('ballotNotice');
+    const resultsArea = document.getElementById('resultsArea');
+    const btnLogout = document.getElementById('btnLogout');
+
+    // --- Listen election settings (admin writes `start` & `end` timestamps) ---
+    db.collection('settings').doc('election').onSnapshot(doc => {
+      if (!doc.exists) {
+        election = null;
+        votingStateBadge.textContent = 'Not configured';
+        votingStateBadge.className = 'badge bg-secondary';
+        countdownText.textContent = 'Election date not set';
+        electionRange.textContent = '—';
+        return;
+      }
+      const data = doc.data();
+      // admin stores start/end as Firestore timestamps named `start` and `end`
+      const start = (data.start && data.start.toDate) ? data.start.toDate() : new Date(data.start);
+      const end = (data.end && data.end.toDate) ? data.end.toDate() : new Date(data.end);
+      election = { ...data, _start: start, _end: end };
+      electionRange.textContent = `${start.toLocaleString()} — ${end.toLocaleString()}`;
+      updateCountdown();
+    });
+
+    function updateCountdown(){
+      if(!election || !election._start){
+        countdownText.textContent = 'Election date not set';
+        return;
+      }
+      const now = new Date();
+      const start = election._start;
+      const end = election._end;
+      if(now < start){
+        countdownText.textContent = formatDuration(start - now) + ' until voting opens';
+        votingStateBadge.textContent = 'Upcoming';
+        votingStateBadge.className = 'badge bg-info';
+        voterLoginForm.style.display = 'none';
+        candidatesArea.style.display = 'none';
+        ballotNotice.style.display = 'none';
+      } else if(now >= start && now <= end){
+        countdownText.textContent = 'Voting open • ' + formatDuration(end - now) + ' remaining';
+        votingStateBadge.textContent = 'Open';
+        votingStateBadge.className = 'badge bg-success';
+        voterLoginForm.style.display = 'flex';
+      } else {
+        countdownText.textContent = 'Voting closed';
+        votingStateBadge.textContent = 'Closed';
+        votingStateBadge.className = 'badge bg-secondary';
+        voterLoginForm.style.display = 'none';
+        candidatesArea.style.display = 'none';
+        ballotNotice.style.display = 'none';
+      }
+    }
+    setInterval(updateCountdown, 1000);
+
+    function formatDuration(ms){
+      if(ms <= 0) return '0s';
+      const s = Math.floor(ms / 1000);
+      const days = Math.floor(s / (3600*24));
+      const hrs = Math.floor((s % (3600*24)) / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      if(days>0) return `${days}d ${hrs}h ${mins}m`;
+      if(hrs>0) return `${hrs}h ${mins}m`;
+      return `${mins}m ${s%60}s`;
+    }
+
+     // Make sure Firebase is initialized above this script:
+  // const firebaseConfig = { ... };
+  // firebase.initializeApp(firebaseConfig);
+ 
+
+  // --- Voter Registration ---
+  document.getElementById('voterRegisterForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+
+    const name = document.getElementById('reg_name').value.trim();
+    const idNum = document.getElementById('reg_id').value.trim();
+    const phone = document.getElementById('reg_phone').value.trim();
+    const fileInput = document.getElementById('reg_doc');
+    const regStatus = document.getElementById('regStatus');
+    const btnRegister = document.getElementById('btnRegister');
+
+    if (!name || !idNum || !phone || !fileInput.files.length) {
+      regStatus.textContent = '⚠️ Please complete all fields.';
+      regStatus.className = 'text-danger small mt-2';
+      return;
+    }
+
+    btnRegister.disabled = true;
+    regStatus.textContent = '⏳ Uploading document and saving registration...';
+    regStatus.className = 'text-muted small mt-2';
+
+    try {
+      const voterRef = db.collection('voters').doc(idNum);
+      const existing = await voterRef.get();
+      if (existing.exists) {
+        regStatus.textContent = '❌ This ID is already registered.';
+        regStatus.className = 'text-danger small mt-2';
+        btnRegister.disabled = false;
+        return;
+      }
+
+      // Upload the document to Firebase Storage
+      const file = fileInput.files[0];
+      const ext = (file.name || '').split('.').pop();
+      const storagePath = `voter_docs/${idNum}_${Date.now()}.${ext}`;
+      const storageRef = storage.ref().child(storagePath);
+
+      await storageRef.put(file);   // upload
+      const fileURL = await storageRef.getDownloadURL(); // get URL
+
+      // Save voter record in Firestore
+      await voterRef.set({
+        name,
+        id: idNum,   // use same field name as admin side
+        phone,
+        docURL: fileURL,
+        approved: false,
+        denied: false,
+        voted: false,
+        registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+        addedByAdmin: false
+      });
+
+      regStatus.textContent = '✅ Registration submitted. Admin will verify your document.';
+      regStatus.className = 'text-success small mt-2';
+      document.getElementById('voterRegisterForm').reset();
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      regStatus.textContent = '❌ Registration failed. Please try again later.';
+      regStatus.className = 'text-danger small mt-2';
+    } finally {
+      btnRegister.disabled = false;
+    }
+  });
+
+    // --- Login (voter verifies ID + phone) ---
+    document.getElementById('voterLoginForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const id = document.getElementById('login_id').value.trim();
+      const phone = document.getElementById('login_phone').value.trim();
+      if(!id || !phone){
+        loginMessage.textContent = 'Enter both ID and phone.';
+        loginMessage.className = 'text-danger small';
+        return;
+      }
+
+      try {
+        const doc = await db.collection('voters').doc(id).get();
+        if(!doc.exists){
+          loginMessage.textContent = 'No registration found for this ID.';
+          loginMessage.className = 'text-danger small';
+          return;
+        }
+        const data = doc.data();
+        if(String(data.phone).trim() !== phone.trim()){
+          loginMessage.textContent = 'Phone number does not match registration.';
+          loginMessage.className = 'text-danger small';
+          return;
+        }
+        if(data.denied){
+          loginMessage.textContent = 'Your registration was denied by admin.';
+          loginMessage.className = 'text-danger small';
+          return;
+        }
+        if(!data.approved){
+          loginMessage.textContent = 'Your registration is not yet approved by admin.';
+          loginMessage.className = 'text-warning small';
+          return;
+        }
+        if(data.voted){
+          loginMessage.textContent = 'You have already voted. Thank you.';
+          loginMessage.className = 'text-info small';
+          // still allow viewing results but no voting
+          showResultsOnly();
+          return;
+        }
+
+        // verified
+        currentVoterId = id;
+        currentVoterDoc = data;
+        loginMessage.textContent = 'Verified — you can now select a candidate and cast your vote.';
+        loginMessage.className = 'text-success small';
+        btnLogout.style.display = 'inline-block';
+        voterLoginForm.style.display = 'none';
+        candidatesArea.style.display = 'block';
+        ballotNotice.style.display = 'block';
+        subscribeVotes();
+
+        // show candidates for voting
+        showCandidates();
+
+      } catch(err){
+        console.error(err);
+        loginMessage.textContent = 'Login failed, try again.';
+        loginMessage.className = 'text-danger small';
+      }
+    });
+
+    // Logout
+    btnLogout.addEventListener('click', () => {
+      currentVoterId = null;
+      currentVoterDoc = null;
+      loginMessage.textContent = '';
+      btnLogout.style.display = 'none';
+      voterLoginForm.style.display = 'flex';
+      candidatesArea.style.display = 'none';
+      ballotNotice.style.display = 'none';
+      if(votesSnapshotUnsub) votesSnapshotUnsub();
+    });
+
+    // --- Candidates: subscribe + render (uses admin `candidates` collection) ---
+    function showCandidates(){
+      // create/refresh snapshot listener
+      if(candidatesUnsub) candidatesUnsub();
+      candidatesUnsub = db.collection('candidates').orderBy('positionName').onSnapshot(snapshot => {
+        candidates = {};
+        const grouped = {};
+        snapshot.forEach(doc => {
+          const c = doc.data();
+          c.id = doc.id;
+          // admin stores `positionName` & `imageURL`
+          const pos = c.positionName || c.position || 'Unspecified Position';
+          c.position = pos;
+          candidates[c.id] = c;
+          if(!grouped[pos]) grouped[pos] = [];
+          grouped[pos].push(c);
+        });
+
+        // render grouped candidates
+        candidatesContainer.innerHTML = '';
+        if(Object.keys(grouped).length === 0){
+          candidatesContainer.innerHTML = '<div class="text-muted">No candidates published yet.</div>';
+          return;
+        }
+
+        for(const position of Object.keys(grouped)){
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'mb-3';
+          groupDiv.innerHTML = `<h6 class="mb-2">${escapeHtml(position)}</h6>`;
+          const row = document.createElement('div');
+          row.className = 'row g-3';
+          grouped[position].forEach(c => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4';
+            col.innerHTML = `
+              <div class="p-2 h-100 text-center candidate-card card">
+                <img src="${c.imageURL || 'https://via.placeholder.com/600x400?text=No+Image'}" class="mb-2 candidate-img" alt="${escapeHtml(c.name)}" />
+                <div class="fw-semibold">${escapeHtml(c.name)}</div>
+                <div class="candidate-meta">${escapeHtml(c.party || '')}</div>
+                <div class="text-muted small">${escapeHtml(c.position)}</div>
+                <button class="mt-2 w-100 btn btn-sm btn-primary btn-pill" onclick="castVote('${c.id}','${escapeJs(c.position)}')">Vote</button>
+              </div>
+            `;
+            row.appendChild(col);
+          });
+          groupDiv.appendChild(row);
+          candidatesContainer.appendChild(groupDiv);
+        }
+      });
+    }
+
+    // --- Cast vote (transaction: write vote doc & mark voter.voted true) ---
+    // --- Cast vote per position ---
+async function castVote(candidateId, position){
+  if(!currentVoterId){
+    alert('You must verify with your ID and phone first.');
+    return;
+  }
+
+  const vref = db.collection('voters').doc(currentVoterId);
+  try {
+    await db.runTransaction(async (tx) => {
+      const voterSnapshot = await tx.get(vref);
+      if(!voterSnapshot.exists) throw new Error('Voter not found');
+
+      const voterData = voterSnapshot.data();
+      const votedPositions = voterData.votedPositions || {};
+
+      if(votedPositions[position]) {
+        throw new Error(`You have already voted for ${position}.`);
+      }
+
+      // add vote record
+      const votesRef = db.collection('votes').doc();
+      tx.set(votesRef, {
+        candidateId,
+        voterId: currentVoterId,
+        position,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // update votedPositions map
+      votedPositions[position] = true;
+      tx.update(vref, { 
+        votedPositions: votedPositions,
+        lastVotedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    alert(`✅ Your vote for ${position} has been recorded.`);
+    // update UI (per position)
+    const posNotice = document.getElementById(`notice_${position}`);
+    if(posNotice){
+      posNotice.innerHTML = `<div class="text-success"><i class="bi bi-check-circle"></i> You voted for ${position}.`;
+    }
+
+    // refresh live results
+    if(votesSnapshotUnsub) votesSnapshotUnsub();
+    subscribeVotes();
+
+  } catch (err) {
+    console.error(err);
+    alert('Vote failed: ' + (err.message || err));
+  }
+}
+
+    
+  // 🔹 Load candidates once and cache
+  async function loadCandidates(){
+    const snap = await db.collection('candidates').get();
+    candidates = {};
+    snap.forEach(doc=>{
+      candidates[doc.id] = { id: doc.id, ...doc.data() };
+    });
+  }
+
+  // --- Live results subscription ---
+  function subscribeVotes(){
+    if(votesSnapshotUnsub) votesSnapshotUnsub();
+    votesSnapshotUnsub = db.collection('votes').onSnapshot((snap) => {
+      // aggregate counts by candidateId, grouped by position
+      const counts = {};
+      snap.forEach(d => {
+        const data = d.data();
+        if(!data || !data.candidateId) return;
+        const pos = data.position || 'Unspecified';
+        counts[pos] = counts[pos] || {};
+        counts[pos][data.candidateId] = (counts[pos][data.candidateId] || 0) + 1;
+      });
+
+      renderResults(counts);
+    });
+  }
+
+  // --- Render results ---
+  function renderResults(counts){
+    resultsArea.innerHTML = '';
+    for(const pos in counts){
+      const divPos = document.createElement('div');
+      divPos.className = 'mb-3';
+      divPos.innerHTML = `<h6 class="mb-2">${escapeHtml(pos)}</h6>`;
+      const row = document.createElement('div');
+      row.className = 'row g-3';
+
+      for(const cid in counts[pos]){
+        const c = candidates[cid] || {};   // use cached candidate data
+        const votes = counts[pos][cid] || 0;
+        const col = document.createElement('div');
+        col.className = 'col-md-4';
+        col.innerHTML = `
+          <div class="p-2 h-100 text-center card">
+            <img src="${(c.imageURL || 'https://via.placeholder.com/120x80?text=No')}" 
+                 style="width:84px;height:56px;object-fit:cover;border-radius:6px" 
+                 alt="${escapeHtml(c.name||'')}" />
+            <div class="fw-semibold">${escapeHtml(c.name || 'Unknown')}</div>
+            <div class="candidate-meta">${escapeHtml(c.position || '')}</div>
+            <div class="mt-2 fw-bold">${votes} votes</div>
+          </div>
+        `;
+        row.appendChild(col);
+      }
+
+      divPos.appendChild(row);
+      resultsArea.appendChild(divPos);
+    }
+  }
+
+  // show results only (no voting)
+  function showResultsOnly(){
+    candidatesArea.style.display = 'none';
+    ballotNotice.style.display = 'none';
+    if(!votesSnapshotUnsub) subscribeVotes();
+  }
+
+  // --- Escape helpers ---
+  function escapeHtml(text){
+    if(!text) return '';
+    return String(text).replace(/[&<>"'`=\/]/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'}[c];
+    });
+  }
+  function escapeJs(text){
+    if(!text) return '';
+    return String(text).replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g,'');
+  }
+
+  // --- Init: load candidates, then subscribe ---
+  loadCandidates().then(()=>{
+    subscribeVotes();
+  });
+
+  // ensure Enter on phone triggers login submit
+  document.getElementById('login_phone').addEventListener('keypress', (e)=>{
+    if(e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+  </script>
+</body>
+</html>
