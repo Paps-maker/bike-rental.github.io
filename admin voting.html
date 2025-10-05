@@ -93,74 +93,261 @@
     </section>
 
     <section id="categories" class="page">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <h5>Positions / Categories</h5>
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h5>Positions / Categories</h5>
+  </div>
+  <div class="mb-3 p-3 card">
+    <form id="categoryForm" class="row g-2">
+      <div class="col-md-4">
+        <input id="categoryName" class="form-control" placeholder="e.g. President, Governor" required>
       </div>
-      <div class="mb-3 p-3 card">
-        <form id="categoryForm" class="row g-2">
-          <div class="col-md-8">
-            <input id="categoryName" class="form-control" placeholder="e.g. President, Governor" required>
-          </div>
-          <div class="col-md-4">
-            <button class="w-100 btn btn-primary">Add Position</button>
-          </div>
-        </form>
+      <div class="col-md-3">
+        <select id="categoryCounty" class="form-select" required>
+          <option value="">Select County</option>
+          <option value="Mombasa">Mombasa</option>
+          <option value="Kwale">Kwale</option>
+          <option value="Kilifi">Kilifi</option>
+          <option value="Tana River">Tana River</option>
+          <option value="Lamu">Lamu</option>
+          <option value="Taita Taveta">Taita Taveta</option>
+          <option value="Garissa">Garissa</option>
+          <option value="Wajir">Wajir</option>
+          <option value="Mandera">Mandera</option>
+          <option value="Marsabit">Marsabit</option>
+          <option value="Isiolo">Isiolo</option>
+          <option value="Meru">Meru</option>
+          <option value="Tharaka Nithi">Tharaka Nithi</option>
+          <option value="Embu">Embu</option>
+          <option value="Kitui">Kitui</option>
+          <option value="Machakos">Machakos</option>
+          <option value="Makueni">Makueni</option>
+          <option value="Nyandarua">Nyandarua</option>
+          <option value="Nyeri">Nyeri</option>
+          <option value="Kirinyaga">Kirinyaga</option>
+          <option value="Murang'a">Murang'a</option>
+          <option value="Kiambu">Kiambu</option>
+          <option value="Turkana">Turkana</option>
+          <option value="West Pokot">West Pokot</option>
+          <option value="Samburu">Samburu</option>
+          <option value="Trans Nzoia">Trans Nzoia</option>
+          <option value="Uasin Gishu">Uasin Gishu</option>
+          <option value="Elgeyo Marakwet">Elgeyo Marakwet</option>
+          <option value="Nandi">Nandi</option>
+          <option value="Baringo">Baringo</option>
+          <option value="Laikipia">Laikipia</option>
+          <option value="Nakuru">Nakuru</option>
+          <option value="Narok">Narok</option>
+          <option value="Kajiado">Kajiado</option>
+          <option value="Kericho">Kericho</option>
+          <option value="Bomet">Bomet</option>
+          <option value="Kakamega">Kakamega</option>
+          <option value="Vihiga">Vihiga</option>
+          <option value="Bungoma">Bungoma</option>
+          <option value="Busia">Busia</option>
+          <option value="Siaya">Siaya</option>
+          <option value="Kisumu">Kisumu</option>
+          <option value="Homa Bay">Homa Bay</option>
+          <option value="Migori">Migori</option>
+          <option value="Kisii">Kisii</option>
+          <option value="Nyamira">Nyamira</option>
+          <option value="Nairobi">Nairobi</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select id="categoryWard" class="form-select" required>
+          <option value="">Select Ward</option>
+          <!-- Wards will populate dynamically based on selected county -->
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="w-100 btn btn-primary">Add Position</button>
+      </div>
+    </form>
+  </div>
+
+  <ul id="categoriesList" class="list-group"></ul>
+</section>
+
+   <section id="candidates" class="page">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h5>Manage Candidates</h5>
+  </div>
+
+  <div class="mb-3 p-3 card">
+    <form id="candidateForm" class="row g-3">
+      <div class="col-md-3"><input id="candName" class="form-control" placeholder="Full name" required></div>
+      <div class="col-md-2">
+        <select id="candPosition" class="form-select" required>
+          <option value="">Select position</option>
+        </select>
+      </div>
+      <div class="col-md-2"><input id="candParty" class="form-control" placeholder="Party"></div>
+      <div class="col-md-2">
+        <select id="candCounty" class="form-select" required>
+           <option value="">Select County</option>
+        <option value="Mombasa">Mombasa</option>
+        <option value="Kwale">Kwale</option>
+        <option value="Kilifi">Kilifi</option>
+        <option value="Tana River">Tana River</option>
+        <option value="Lamu">Lamu</option>
+        <option value="Taita Taveta">Taita Taveta</option>
+        <option value="Garissa">Garissa</option>
+        <option value="Wajir">Wajir</option>
+        <option value="Mandera">Mandera</option>
+        <option value="Marsabit">Marsabit</option>
+        <option value="Isiolo">Isiolo</option>
+        <option value="Meru">Meru</option>
+        <option value="Tharaka Nithi">Tharaka Nithi</option>
+        <option value="Embu">Embu</option>
+        <option value="Kitui">Kitui</option>
+        <option value="Machakos">Machakos</option>
+        <option value="Makueni">Makueni</option>
+        <option value="Nyandarua">Nyandarua</option>
+        <option value="Nyeri">Nyeri</option>
+        <option value="Kirinyaga">Kirinyaga</option>
+        <option value="Murang'a">Murang'a</option>
+        <option value="Kiambu">Kiambu</option>
+        <option value="Turkana">Turkana</option>
+        <option value="West Pokot">West Pokot</option>
+        <option value="Samburu">Samburu</option>
+        <option value="Trans Nzoia">Trans Nzoia</option>
+        <option value="Uasin Gishu">Uasin Gishu</option>
+        <option value="Elgeyo Marakwet">Elgeyo Marakwet</option>
+        <option value="Nandi">Nandi</option>
+        <option value="Baringo">Baringo</option>
+        <option value="Laikipia">Laikipia</option>
+        <option value="Nakuru">Nakuru</option>
+        <option value="Narok">Narok</option>
+        <option value="Kajiado">Kajiado</option>
+        <option value="Kericho">Kericho</option>
+        <option value="Bomet">Bomet</option>
+        <option value="Kakamega">Kakamega</option>
+        <option value="Vihiga">Vihiga</option>
+        <option value="Bungoma">Bungoma</option>
+        <option value="Busia">Busia</option>
+        <option value="Siaya">Siaya</option>
+        <option value="Kisumu">Kisumu</option>
+        <option value="Homa Bay">Homa Bay</option>
+        <option value="Migori">Migori</option>
+        <option value="Kisii">Kisii</option>
+        <option value="Nyamira">Nyamira</option>
+        <option value="Nairobi">Nairobi</option>
+          <!-- Add all 47 counties here -->
+        </select>
+      </div>
+      <div class="col-md-2">
+      <select id="candWard" class="form-select" required>
+  <option value="">Select Ward</option>
+</select>
+
+    </div>
+      <div class="form-control"><input id="candImage" type="file" accept="image/*" class="form-control" required></div>
+
+      <div class="col-12">
+        <label class="form-label small-muted">Candidate Documents (ID, party cert) — optional</label>
+        <input id="candDocs" type="file" accept=".pdf,.jpg,.png" class="form-control" multiple>
       </div>
 
-      <ul id="categoriesList" class="list-group"></ul>
-    </section>
+      <div class="btn btn-success"><button class="btn btn-success">Add Candidate</button></div>
+    </form>
+  </div>
 
-    <section id="candidates" class="page">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <h5>Manage Candidates</h5>
-      </div>
-
-      <div class="mb-3 p-3 card">
-        <form id="candidateForm" class="row g-3">
-          <div class="col-md-4"><input id="candName" class="form-control" placeholder="Full name" required></div>
-          <div class="col-md-3">
-            <select id="candPosition" class="form-select" required><option value="">Select position</option></select>
-          </div>
-          <div class="col-md-3"><input id="candParty" class="form-control" placeholder="Party"></div>
-          <div class="col-md-2"><input id="candImage" type="file" accept="image/*" class="form-control" required></div>
-
-          <div class="col-12">
-            <label class="form-label small-muted">Candidate Documents (ID, party cert) — optional</label>
-            <input id="candDocs" type="file" accept=".pdf,.jpg,.png" class="form-control" multiple>
-          </div>
-
-          <div class="col-12"><button class="btn btn-success">Add Candidate</button></div>
-        </form>
-      </div>
-
-      <div class="p-3 card">
-        <table class="table table-striped mb-0 align-middle">
-          <thead class="table-dark">
-            <tr><th>Photo</th><th>Name</th><th>Position</th><th>Party</th><th>Docs</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="candidatesTable"></tbody>
-        </table>
-      </div>
-    </section>
+  <div class="p-3 card">
+    <table class="table table-striped mb-0 align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Photo</th>
+          <th>Name</th>
+          <th>Position</th>
+          <th>Party</th>
+          <th>County</th>
+          <th>Ward</th>
+          <th>Docs</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="candidatesTable"></tbody>
+    </table>
+  </div>
+</section>
 
     <section id="voters" class="page">
       <div class="d-flex align-items-center justify-content-between mb-3">
         <h5>Voter Registrations</h5>
         <small class="small-muted">Approve or deny registered voters</small>
       </div>
-     <div class="mb-3 p-3 card">
+   <div class="mb-3 p-3 card">
   <h6 class="mb-3">Add Voter (Admin)</h6>
   <form id="addVoterForm" class="row g-3">
     <div class="col-md-3">
       <input id="voterName" type="text" class="form-control" placeholder="Full name" required>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
       <input id="voterId" type="text" class="form-control" placeholder="ID / Passport Number" required>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
       <input id="voterPhone" type="text" class="form-control" placeholder="Phone number" required>
     </div>
     <div class="col-md-2">
+      <select id="voterCounty" class="form-select" required>
+        <option value="">Select County</option>
+        <option value="Nairobi">Nairobi</option>
+        <option value="Mombasa">Mombasa</option>
+        <option value="Kwale">Kwale</option>
+        <option value="Kilifi">Kilifi</option>
+        <option value="Tana River">Tana River</option>
+        <option value="Lamu">Lamu</option>
+        <option value="Taita Taveta">Taita Taveta</option>
+        <option value="Garissa">Garissa</option>
+        <option value="Wajir">Wajir</option>
+        <option value="Mandera">Mandera</option>
+        <option value="Marsabit">Marsabit</option>
+        <option value="Isiolo">Isiolo</option>
+        <option value="Meru">Meru</option>
+        <option value="Tharaka Nithi">Tharaka Nithi</option>
+        <option value="Embu">Embu</option>
+        <option value="Kitui">Kitui</option>
+        <option value="Machakos">Machakos</option>
+        <option value="Makueni">Makueni</option>
+        <option value="Nyandarua">Nyandarua</option>
+        <option value="Nyeri">Nyeri</option>
+        <option value="Kirinyaga">Kirinyaga</option>
+        <option value="Murang'a">Murang'a</option>
+        <option value="Kiambu">Kiambu</option>
+        <option value="Turkana">Turkana</option>
+        <option value="West Pokot">West Pokot</option>
+        <option value="Samburu">Samburu</option>
+        <option value="Trans Nzoia">Trans Nzoia</option>
+        <option value="Uasin Gishu">Uasin Gishu</option>
+        <option value="Elgeyo Marakwet">Elgeyo Marakwet</option>
+        <option value="Nandi">Nandi</option>
+        <option value="Baringo">Baringo</option>
+        <option value="Laikipia">Laikipia</option>
+        <option value="Nakuru">Nakuru</option>
+        <option value="Narok">Narok</option>
+        <option value="Kajiado">Kajiado</option>
+        <option value="Kericho">Kericho</option>
+        <option value="Bomet">Bomet</option>
+        <option value="Kakamega">Kakamega</option>
+        <option value="Vihiga">Vihiga</option>
+        <option value="Bungoma">Bungoma</option>
+        <option value="Busia">Busia</option>
+        <option value="Siaya">Siaya</option>
+        <option value="Kisumu">Kisumu</option>
+        <option value="Homa Bay">Homa Bay</option>
+        <option value="Migori">Migori</option>
+        <option value="Kisii">Kisii</option>
+        <option value="Nyamira">Nyamira</option>
+        <option value="Nairobi">Nairobi</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select id="voterWard" class="form-select" required>
+        <option value="">Select Ward</option>
+        <!-- wards dynamically populated based on county -->
+      </select>
+    </div>
+    <div class="col-md-1">
       <input id="voterDoc" type="file" accept=".pdf,.jpg,.png" class="form-control">
     </div>
     <div class="col-md-1">
@@ -169,17 +356,26 @@
   </form>
 </div>
 
+<!-- Voters Table -->
+<div class="mb-3 p-3 card">
+  <table class="table table-hover mb-0 align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>County</th>
+        <th>Ward</th>
+        <th>Document</th>
+        <th>Registered</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="votersTable"></tbody>
+  </table>
+</div>
 
-
-      <div class="mb-3 p-3 card">
-        <table class="table table-hover mb-0 align-middle">
-          <thead class="table-dark">
-            <tr><th>ID</th><th>Name</th><th>Phone</th><th>Document</th><th>Registered</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="votersTable"></tbody>
-          
-        </table>
-      </div>
     </section>
 
     <section id="results" class="page">
@@ -234,7 +430,7 @@
               <input id="rememberMe" class="form-check-input" type="checkbox" />
               <label class="form-check-label">Remember me</label>
             </div>
-           
+            <div class="small-muted">Use an admin account (Firebase Auth)</div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
@@ -398,200 +594,349 @@
       document.getElementById('votersTable').innerHTML = '';
       document.getElementById('resultsContainer').innerHTML = '';
     }
-// Add voter by admin (ID = document ID in Firestore)
-document.getElementById('addVoterForm').addEventListener('submit', async (e)=>{
+
+
+   /********** Categories (positions with location) **********/
+document.getElementById('categoryForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
-  const name = document.getElementById('voterName').value.trim();
-  const id = document.getElementById('voterId').value.trim();
-  const phone = document.getElementById('voterPhone').value.trim();
-  const docFile = document.getElementById('voterDoc').files[0];
+  const name = document.getElementById('categoryName').value.trim();
+  const county = document.getElementById('categoryCounty').value;
+  const ward = document.getElementById('categoryWard').value;
 
-  if(!name || !id || !phone){
-    return alert('Please fill in all fields (Name, ID, Phone).');
-  }
-
-  let docURL = null;
-  if(docFile){
-    const dRef = storage.ref().child(`voters/docs/${id}_${Date.now()}_${docFile.name}`);
-    await dRef.put(docFile);
-    docURL = await dRef.getDownloadURL();
+  if(!name || !county || !ward){
+    return alert('Please enter position name, county, and ward.');
   }
 
   try {
-    await db.collection('voters').doc(id).set({
+    await db.collection('categories').add({
       name,
-      id,
-      phone,
-      docURL,
-      approved: true,   // auto-approved
-      denied: false,
-      voted: false,
-      registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
-      addedByAdmin: true
+      county,
+      ward,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-
-    e.target.reset();
-    alert("Voter added successfully!");
+    document.getElementById('categoryName').value = '';
+    document.getElementById('categoryCounty').value = '';
+    document.getElementById('categoryWard').innerHTML = '<option value="">Select Ward</option>';
+    alert('Position added successfully!');
   } catch(err){
     console.error(err);
-    alert("Failed to add voter: " + err.message);
+    alert('Failed to add position: ' + err.message);
   }
 });
 
+// --- Render Categories ---
+function renderCategories(docs){
+  const el = document.getElementById('categoriesList');
+  el.innerHTML = '';
+  docs.forEach(doc => {
+    const data = doc.data();
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.innerHTML = `<div>
+                      <strong>${escapeHtml(data.name)}</strong> 
+                      <small class="text-muted">(${escapeHtml(data.county)}, ${escapeHtml(data.ward)})</small>
+                    </div>
+                    <div>
+                      <button class="me-2 btn-outline-danger btn btn-sm" onclick="deleteCategory('${doc.id}')">Delete</button>
+                    </div>`;
+    el.appendChild(li);
+  });
+}
 
-    /********** Categories (positions) **********/
-    document.getElementById('categoryForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const name = document.getElementById('categoryName').value.trim();
-      if(!name) return;
-      await db.collection('categories').add({ name });
-      document.getElementById('categoryName').value = '';
+// --- Delete Category ---
+async function deleteCategory(id){
+  if(!confirm('Delete this position?')) return;
+  await db.collection('categories').doc(id).delete();
+}
+
+// --- Populate Position Select (for candidates) ---
+function populatePositionSelect(docs){
+  const sel = document.getElementById('candPosition');
+  sel.innerHTML = '<option value="">Select position</option>';
+  docs.forEach(doc => {
+    const data = doc.data();
+    sel.innerHTML += `<option value="${doc.id}">
+                        ${escapeHtml(data.name)} (${escapeHtml(data.county)}, ${escapeHtml(data.ward)})
+                      </option>`;
+  });
+}
+
+// --- Dynamic Wards for Categories ---
+const categoryCountySelect = document.getElementById('categoryCounty');
+const categoryWardSelect = document.getElementById('categoryWard');
+
+categoryCountySelect.addEventListener('change', ()=>{
+  const selectedCounty = categoryCountySelect.value;
+  categoryWardSelect.innerHTML = '<option value="">Select Ward</option>';
+  if(selectedCounty && wardsByCounty[selectedCounty]){
+    wardsByCounty[selectedCounty].forEach(ward=>{
+      const option = document.createElement('option');
+      option.value = ward;
+      option.textContent = ward;
+      categoryWardSelect.appendChild(option);
+    });
+  }
+});
+
+/********** Candidates **********/
+
+// --- Wards per County ---
+const wardsByCounty = {
+  "Mombasa": ["Mvita", "Jomvu", "Kisauni", "Nyali", "Changamwe", "Likoni"],
+  "Kwale": ["Msambweni", "Matuga", "Lunga Lunga", "Kinango"],
+  "Kilifi": ["Kilifi North", "Kilifi South", "Rabai", "Ganze", "Kaloleni", "Malindi"],
+  "Tana River": ["Galole", "Garsen", "Bura"],
+  "Lamu": ["Lamu East", "Lamu West"],
+  "Taita Taveta": ["Voi", "Mwatate", "Wundanyi", "Mwatate"],
+  "Nairobi": ["Westlands", "Kasarani", "Lang'ata", "Embakasi North", "Embakasi South", "Dagoretti North", "Dagoretti South"]
+};
+
+// --- Populate Ward dropdown ---
+const countySelect = document.getElementById('candCounty');
+const wardSelect = document.getElementById('candWard');
+
+countySelect.addEventListener('change', () => {
+  const selectedCounty = countySelect.value;
+  wardSelect.innerHTML = '<option value="">Select Ward</option>'; // reset
+  if (selectedCounty && wardsByCounty[selectedCounty]) {
+    wardsByCounty[selectedCounty].forEach(ward => {
+      const option = document.createElement('option');
+      option.value = ward;
+      option.textContent = ward;
+      wardSelect.appendChild(option);
+    });
+  }
+});
+
+// --- Escape HTML Helper ---
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// --- Candidate Form Submit ---
+document.getElementById('candidateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById('candName').value.trim();
+  const positionId = document.getElementById('candPosition').value;
+  const party = document.getElementById('candParty').value.trim();
+  const county = countySelect.value;
+  const ward = wardSelect.value;
+  const imageFile = document.getElementById('candImage').files[0];
+  const docsFiles = document.getElementById('candDocs').files;
+
+  if (!name || !positionId || !imageFile || !county || !ward) {
+    return alert('Please complete all required fields (name, position, county, ward, image).');
+  }
+
+  try {
+    // Upload image
+    const imgRef = storage.ref().child(`candidates/images/${Date.now()}_${imageFile.name}`);
+    await imgRef.put(imageFile);
+    const imgURL = await imgRef.getDownloadURL();
+
+    // Upload docs
+    const docsURLs = [];
+    for (let i = 0; i < docsFiles.length; i++) {
+      const f = docsFiles[i];
+      const dRef = storage.ref().child(`candidates/docs/${Date.now()}_${f.name}`);
+      await dRef.put(f);
+      docsURLs.push(await dRef.getDownloadURL());
+    }
+
+    // Get position name
+    const posDoc = await db.collection('categories').doc(positionId).get();
+    const positionName = posDoc.exists ? posDoc.data().name : '';
+
+    // Save candidate
+    await db.collection('candidates').add({
+      name,
+      positionId,
+      positionName,
+      party,
+      county,
+      ward,
+      imageURL: imgURL,
+      docs: docsURLs,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    function renderCategories(docs){
-      const el = document.getElementById('categoriesList');
-      el.innerHTML = '';
-      docs.forEach(doc => {
-        const data = doc.data();
-        const li = document.createElement('li');
-        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-        li.innerHTML = `<div><strong>${escapeHtml(data.name)}</strong></div>
-                        <div>
-                          <button class="me-2 btn-outline-danger btn btn-sm" onclick="deleteCategory('${doc.id}')">Delete</button>
-                        </div>`;
-        el.appendChild(li);
-      });
-    }
-    async function deleteCategory(id){
-      if(!confirm('Delete this position?')) return;
-      await db.collection('categories').doc(id).delete();
-    }
-    function populatePositionSelect(docs){
-      const sel = document.getElementById('candPosition');
-      sel.innerHTML = '<option value="">Select position</option>';
-      docs.forEach(doc => {
-        sel.innerHTML += `<option value="${doc.id}">${escapeHtml(doc.data().name)}</option>`;
-      });
-    }
+    e.target.reset();
+    wardSelect.innerHTML = '<option value="">Select Ward</option>'; // reset ward
+    alert("Candidate added successfully!");
 
-    /********** Candidates **********/
-    document.getElementById('candidateForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const name = document.getElementById('candName').value.trim();
-      const positionId = document.getElementById('candPosition').value;
-      const party = document.getElementById('candParty').value.trim();
-      const imageFile = document.getElementById('candImage').files[0];
-      const docsFiles = document.getElementById('candDocs').files;
+  } catch (err) {
+    console.error(err);
+    alert('Error adding candidate: ' + err.message);
+  }
+});
 
-      if(!name || !positionId || !imageFile) return alert('Please complete name, position and image.');
-
-      // upload image
-      const imgRef = storage.ref().child(`candidates/images/${Date.now()}_${imageFile.name}`);
-      await imgRef.put(imageFile);
-      const imgURL = await imgRef.getDownloadURL();
-
-      // upload docs
-      const docsURLs = [];
-      for(let i=0;i<docsFiles.length;i++){
-        const f = docsFiles[i];
-        const dRef = storage.ref().child(`candidates/docs/${Date.now()}_${f.name}`);
-        await dRef.put(f);
-        docsURLs.push(await dRef.getDownloadURL());
-      }
-
-      // read position name
-      const posDoc = await db.collection('categories').doc(positionId).get();
-      const positionName = posDoc.exists ? posDoc.data().name : '';
-
-      await db.collection('candidates').add({
-        name,
-        positionId,
-        positionName,
-        party,
-        imageURL: imgURL,
-        docs: docsURLs,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      // reset form
-      e.target.reset();
-    });
-
-    async function renderCandidates(docs){
-      const tbody = document.getElementById('candidatesTable');
-      tbody.innerHTML = '';
-      docs.forEach(doc => {
-        const c = doc.data();
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><img src="${c.imageURL || ''}" class="preview-img" alt=""></td>
-          <td>${escapeHtml(c.name)}</td>
-          <td>${escapeHtml(c.positionName || '')}</td>
-          <td>${escapeHtml(c.party || '')}</td>
-          <td>${(c.docs && c.docs.length) ? c.docs.map(url=>`<a href="${url}" target="_blank">doc</a>`).join(', ') : '—'}</td>
-          <td>
-            <button class="btn btn-sm btn-danger" onclick="deleteCandidate('${doc.id}')"><i class="bi bi-trash"></i></button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function deleteCandidate(id){
-      if(!confirm('Delete candidate?')) return;
-      await db.collection('candidates').doc(id).delete();
-    }
-
-    /********** Voters (approve/deny/delete) **********/
-function renderVoters(docs){
-  const tbody = document.getElementById('votersTable');
+// --- Render Candidates Table ---
+async function renderCandidates(docs) {
+  const tbody = document.getElementById('candidatesTable');
   tbody.innerHTML = '';
-  docs.forEach(doc=>{
-    const v = doc.data();
+  docs.forEach(doc => {
+    const c = doc.data();
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${escapeHtml(doc.id)}</td>
-      <td>${escapeHtml(v.name || '—')}</td>
-      <td>${escapeHtml(v.phone || '—')}</td>
-      <td>${v.docURL ? `<a href="${v.docURL}" target="_blank">View</a>` : '—'}</td>
-      <td>${v.registeredAt ? (v.registeredAt.toDate ? v.registeredAt.toDate().toLocaleString() : new Date(v.registeredAt).toLocaleString()) : '—'}</td>
+      <td><img src="${c.imageURL || ''}" class="preview-img" alt="" style="width:50px; height:50px; border-radius:4px;"></td>
+      <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.positionName || '')}</td>
+      <td>${escapeHtml(c.party || '')}</td>
+      <td>${escapeHtml(c.county || '')}</td>
+      <td>${escapeHtml(c.ward || '')}</td>
+      <td>${(c.docs && c.docs.length) ? c.docs.map(url => `<a href="${url}" target="_blank">doc</a>`).join(', ') : '—'}</td>
       <td>
-        ${v.approved ? '<span class="bg-success badge">Approved</span>' 
-                     : v.denied ? '<span class="bg-danger badge">Denied</span>' 
-                     : '<span class="bg-warning text-dark badge">Pending</span>'}
-      </td>
-      <td>
-        ${v.approved ? `
-            <button class="me-2 btn-outline-secondary btn btn-sm" onclick="setVoterApproved('${doc.id}', false)">Revoke</button>` 
-          : `
-            <button class="me-2 btn btn-sm btn-success" onclick="setVoterApproved('${doc.id}', true)">Approve</button>
-            <button class="me-2 btn btn-sm btn-warning" onclick="setVoterApproved('${doc.id}', false, true)">Deny</button>`}
-        <button class="btn btn-sm btn-danger" onclick="deleteVoter('${doc.id}')">Delete</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteCandidate('${doc.id}')"><i class="bi bi-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-// approve/revoke/deny
-async function setVoterApproved(id, approved, deny=false){
-  if(deny){
-    if(!confirm('Deny this voter registration? This will mark status as denied.')) return;
+// --- Delete Candidate ---
+async function deleteCandidate(id) {
+  if (!confirm('Delete candidate?')) return;
+  try {
+    await db.collection('candidates').doc(id).delete();
+    alert('Candidate deleted successfully.');
+  } catch (err) {
+    console.error(err);
+    alert('Error deleting candidate: ' + err.message);
   }
-  await db.collection('voters').doc(id).update({
-    approved: approved,
-    denied: deny ? true : (approved ? false : false),
-    reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+}
+
+// --- Firestore Real-time Listener ---
+db.collection('candidates').orderBy('createdAt', 'desc')
+  .onSnapshot(snapshot => {
+    renderCandidates(snapshot.docs);
   });
-}
 
-// delete voter permanently
-async function deleteVoter(id){
-  if(!confirm('Are you sure you want to permanently delete this voter? This cannot be undone.')) return;
-  await db.collection('voters').doc(id).delete();
-  alert('Voter deleted successfully.');
-}
+    /********** Voters (approve/deny/delete) **********/
+// Add voter by admin
+/********** Add Voter Form **********/
+// County -> Ward mapping
+  const countyWards = {
+    "Nairobi": ["Starehe", "Kasarani", "Lang'ata", "Embakasi North", "Embakasi South", "Westlands", "Dagoretti North", "Dagoretti South", "Roysambu"],
+    "Mombasa": ["Mvita", "Changamwe", "Kisauni", "Jomvu", "Nyali"],
+    "Kwale": ["Lunga Lunga", "Msambweni", "Matuga", "Kinango"],
+    "Kilifi": ["Kilifi North", "Kilifi South", "Ganze", "Rabai", "Kaloleni", "Malindi", "Magarini"],
+    "Tana River": ["Galole", "Bura", "Garsen"],
+    "Lamu": ["Lamu East", "Lamu West"],
+    "Taita Taveta": ["Mwatate", "Voi", "Wundanyi", "Taveta"],
+    "Garissa": ["Garissa Township", "Balambala", "Dadaab", "Lagdera", "Fafi", "Ijara"],
+    "Wajir": ["Wajir North", "Wajir East", "Wajir West", "Wajir South", "Eldas", "Tarbaj", "Bute"],
+    "Mandera": ["Mandera East", "Mandera West", "Mandera North", "Banissa", "Mandera South", "Lafey"],
+    // ... add other counties and wards
+  };
 
+  // Populate ward dropdown based on county
+  document.getElementById('voterCounty').addEventListener('change', function(){
+    const wards = countyWards[this.value] || [];
+    const wardSelect = document.getElementById('voterWard');
+    wardSelect.innerHTML = '<option value="">Select Ward</option>';
+    wards.forEach(w => {
+      const option = document.createElement('option');
+      option.value = w;
+      option.textContent = w;
+      wardSelect.appendChild(option);
+    });
+  });
+
+  // Add Voter
+  document.getElementById('addVoterForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const name = document.getElementById('voterName').value.trim();
+    const id = document.getElementById('voterId').value.trim();
+    const phone = document.getElementById('voterPhone').value.trim();
+    const county = document.getElementById('voterCounty').value;
+    const ward = document.getElementById('voterWard').value;
+    const docFile = document.getElementById('voterDoc').files[0];
+
+    if(!name || !id || !phone || !county || !ward){
+      return alert('Please fill in all fields (Name, ID, Phone, County, Ward).');
+    }
+
+    let docURL = null;
+    if(docFile){
+      const dRef = storage.ref().child(`voters/docs/${id}_${Date.now()}_${docFile.name}`);
+      await dRef.put(docFile);
+      docURL = await dRef.getDownloadURL();
+    }
+
+    try {
+      await db.collection('voters').doc(id).set({
+        name,
+        id,
+        phone,
+        county,
+        ward,
+        docURL,
+        approved: true,
+        denied: false,
+        voted: false,
+        registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+        addedByAdmin: true
+      });
+      e.target.reset();
+      alert("Voter added successfully!");
+    } catch(err){
+      console.error(err);
+      alert("Failed to add voter: " + err.message);
+    }
+  });
+
+  // Render voters
+  function renderVoters(docs){
+    const tbody = document.getElementById('votersTable');
+    tbody.innerHTML = '';
+    docs.forEach(doc=>{
+      const v = doc.data();
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(doc.id)}</td>
+        <td>${escapeHtml(v.name || '—')}</td>
+        <td>${escapeHtml(v.phone || '—')}</td>
+        <td>${escapeHtml(v.county || '—')}</td>
+        <td>${escapeHtml(v.ward || '—')}</td>
+        <td>${v.docURL ? `<a href="${v.docURL}" target="_blank">View</a>` : '—'}</td>
+        <td>${v.registeredAt ? (v.registeredAt.toDate ? v.registeredAt.toDate().toLocaleString() : new Date(v.registeredAt).toLocaleString()) : '—'}</td>
+        <td>
+          ${v.approved ? '<span class="bg-success badge">Approved</span>' 
+                       : v.denied ? '<span class="bg-danger badge">Denied</span>' 
+                       : '<span class="bg-warning text-dark badge">Pending</span>'}
+        </td>
+        <td>
+          ${v.approved ? `
+              <button class="me-2 btn-outline-secondary btn btn-sm" onclick="setVoterApproved('${doc.id}', false)">Revoke</button>` 
+            : `
+              <button class="me-2 btn btn-sm btn-success" onclick="setVoterApproved('${doc.id}', true)">Approve</button>
+              <button class="me-2 btn btn-sm btn-warning" onclick="setVoterApproved('${doc.id}', false, true)">Deny</button>`}
+          <button class="btn btn-sm btn-danger" onclick="deleteVoter('${doc.id}')">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Approve / Revoke / Deny
+  async function setVoterApproved(id, approved, deny=false){
+    if(deny && !confirm('Deny this voter registration? This will mark status as denied.')) return;
+    await db.collection('voters').doc(id).update({
+      approved: approved,
+      denied: deny ? true : (approved ? false : false),
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  // Delete voter
+  async function deleteVoter(id){
+    if(!confirm('Are you sure you want to permanently delete this voter? This cannot be undone.')) return;
+    await db.collection('voters').doc(id).delete();
+    alert('Voter deleted successfully.');
+  }
 // Reference to your table body
   const voterTableBody = document.getElementById('voterTableBody');
 
@@ -782,7 +1127,7 @@ async function renderResults(voteDocs){
   </script>
   <!-- Add this in your HTML <head> or before </body> -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script>
+<script>
 // Auto Logout Settings
 let inactivityTime = 60 * 5; // 5 minutes
 let countdown; 
@@ -867,7 +1212,6 @@ document.getElementById("stayLoggedIn").addEventListener("click", () => {
 });
 
 </script>
-
 
 </body>
 </html>
