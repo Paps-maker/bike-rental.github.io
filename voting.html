@@ -447,63 +447,77 @@ btnLogout.addEventListener('click', () => {
 });
 
 // --- Candidates: subscribe + render (filtered by voter location) ---
-function showCandidates(){
-  if(!currentVoterDoc) return;
+// --- Candidates: render (filtered by voter county only) ---
+function showCandidates() {
+  if (!currentVoterDoc) return;
 
   const voterCounty = currentVoterDoc.county;
-  const voterWard = currentVoterDoc.ward;
 
-  if(candidatesUnsub) candidatesUnsub();
+  // Listen to all candidates and filter client-side
+  if (candidatesUnsub) candidatesUnsub();
 
-  // Filter candidates by county and ward
   candidatesUnsub = db.collection('candidates')
-    .where('county', '==', voterCounty)
-    .where('ward', '==', voterWard)
     .orderBy('positionName')
     .onSnapshot(snapshot => {
       candidates = {};
       const grouped = {};
+
       snapshot.forEach(doc => {
         const c = doc.data();
         c.id = doc.id;
+
+        // FILTER: only candidates matching voter's county
+        if (c.county !== voterCounty) return;
+
         const pos = c.positionName || c.position || 'Unspecified Position';
         c.position = pos;
         candidates[c.id] = c;
-        if(!grouped[pos]) grouped[pos] = [];
+
+        if (!grouped[pos]) grouped[pos] = [];
         grouped[pos].push(c);
       });
 
       candidatesContainer.innerHTML = '';
-      if(Object.keys(grouped).length === 0){
-        candidatesContainer.innerHTML = '<div class="text-muted">No candidates available for your location yet.</div>';
+      if (Object.keys(grouped).length === 0) {
+        candidatesContainer.innerHTML = '<div class="text-muted">No candidates available for your county yet.</div>';
         return;
       }
 
-      for(const position of Object.keys(grouped)){
+      for (const position of Object.keys(grouped)) {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'mb-3';
         groupDiv.innerHTML = `<h6 class="mb-2">${escapeHtml(position)}</h6>`;
+
         const row = document.createElement('div');
         row.className = 'row g-3';
+
         grouped[position].forEach(c => {
           const col = document.createElement('div');
           col.className = 'col-md-4';
           col.innerHTML = `
             <div class="p-2 h-100 text-center candidate-card card">
-              <img src="${c.imageURL || 'https://via.placeholder.com/600x400?text=No+Image'}" class="mb-2 candidate-img" alt="${escapeHtml(c.name)}" />
+              <img src="${c.imageURL || 'https://via.placeholder.com/600x400?text=No+Image'}" 
+                   class="mb-2 candidate-img" alt="${escapeHtml(c.name)}" />
               <div class="fw-semibold">${escapeHtml(c.name)}</div>
               <div class="candidate-meta">${escapeHtml(c.party || '')}</div>
               <div class="text-muted small">${escapeHtml(c.position)}</div>
-              <button class="mt-2 w-100 btn btn-sm btn-primary btn-pill" onclick="castVote('${c.id}','${escapeJs(c.position)}')">Vote</button>
+              <button class="mt-2 w-100 btn btn-sm btn-primary btn-pill" 
+                      onclick="castVote('${c.id}','${escapeJs(c.position)}')">Vote</button>
             </div>
           `;
           row.appendChild(col);
         });
+
         groupDiv.appendChild(row);
         candidatesContainer.appendChild(groupDiv);
       }
+
+      // Show the candidates area after rendering
+      candidatesArea.style.display = 'block';
+      ballotNotice.style.display = 'block';
     });
 }
+
 
 // --- Cast vote ---
 async function castVote(candidateId, position){
