@@ -985,10 +985,13 @@
     });
     new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
   }
+  
 
- // SESSIONS: active timers rendering
-const timers = {}; // local intervals
+ // === ACTIVE SESSION TIMER & CONTROL SYSTEM (Dynamic + Real-Time) ===
+const timers = {}; // active local timers
+state.sessions = state.sessions || {}; // ensure sessions object exists
 
+// --- Compute elapsed seconds ---
 function computeElapsedSeconds(session) {
   if (!session) return 0;
   const acc = session.accumulatedSeconds || 0;
@@ -1010,6 +1013,7 @@ function computeElapsedStr(s) {
   return formatDuration(computeElapsedSeconds(s));
 }
 
+// --- Start / Stop local timers ---
 function startLocalTimer(sessionId) {
   if (timers[sessionId]) return;
   timers[sessionId] = setInterval(() => {
@@ -1019,7 +1023,6 @@ function startLocalTimer(sessionId) {
     const elGames = document.getElementById(`games-${sessionId}`);
     const g = state.games[s.gameId] || {};
 
-    // use actual game duration if available, fallback 1 game per 2 minutes
     const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
     const elapsed = computeElapsedSeconds(s);
     const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
@@ -1036,19 +1039,21 @@ function stopLocalTimer(sessionId) {
   }
 }
 
+// --- Render all active & paused sessions ---
 function renderActiveSessions() {
   const container = $('#activeSessionsList');
   if (!container) return;
   container.innerHTML = '';
 
   Object.values(state.sessions || {})
-    .filter((s) => s.status === 'active')
-    .forEach((s) => {
+    .filter(s => s.status === 'active' || s.status === 'paused')
+    .forEach(s => {
       const st = state.stations[s.stationId] || {};
       const g = state.games[s.gameId] || {};
       const elapsed = computeElapsedSeconds(s);
       const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 120);
       const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+      const isPaused = s.status === 'paused';
 
       const card = document.createElement('div');
       card.className = 'station-card';
@@ -1060,7 +1065,9 @@ function renderActiveSessions() {
           <div id="games-${s.id}" class="text-light small">Games Played: ${gamesPlayed}</div>
         </div>
         <div>
-          <button class="btn-outline-light btn btn-sm pause-session" data-id="${s.id}">Pause</button>
+          <button class="btn-outline-light btn btn-sm pause-session" data-id="${s.id}">
+            ${isPaused ? 'Resume' : 'Pause'}
+          </button>
           <button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>
           <button class="btn btn-sm btn-light print-session" data-id="${s.id}">
             <i class="bi bi-printer"></i>
@@ -1069,32 +1076,44 @@ function renderActiveSessions() {
             <i class="bi bi-trash"></i>
           </button>
         </div>`;
+
       container.appendChild(card);
-      startLocalTimer(s.id);
+      if (s.status === 'active') startLocalTimer(s.id);
     });
 
-  // wire buttons
-  $all('.pause-session').forEach((b) => (b.onclick = async () => {
-    const sid = b.dataset.id;
-    await togglePauseSession(sid);
-  }));
-  $all('.stop-session').forEach((b) => (b.onclick = async () => {
-    const sid = b.dataset.id;
-    await stopSession(sid);
-  }));
-  $all('.print-session').forEach((b) => (b.onclick = async () => {
-    const sid = b.dataset.id;
-    await makePdfForSession(sid);
-  }));
-  $all('.delete-session').forEach((b) => (b.onclick = async () => {
+  // button handlers
+  $all('.pause-session').forEach(b => (b.onclick = async () => togglePauseSession(b.dataset.id)));
+  $all('.stop-session').forEach(b => (b.onclick = async () => stopSession(b.dataset.id)));
+  $all('.print-session').forEach(b => (b.onclick = async () => makePdfForSession(b.dataset.id)));
+  $all('.delete-session').forEach(b => (b.onclick = async () => {
     if (!confirm('Delete session?')) return;
     await deleteDoc(doc(db, 'sessions', b.dataset.id));
   }));
 }
 
+// --- Real-time listener for Firestore sessions ---
+function initRealtimeSessions() {
+  const sessionsRef = collection(db, 'sessions');
+  onSnapshot(sessionsRef, snapshot => {
+    snapshot.docChanges().forEach(change => {
+      const data = { id: change.doc.id, ...change.doc.data() };
+      if (change.type === 'added' || change.type === 'modified') {
+        state.sessions[data.id] = data;
+      } else if (change.type === 'removed') {
+        delete state.sessions[data.id];
+        stopLocalTimer(data.id);
+      }
+    });
+    renderActiveSessions();
+  });
+}
+
+// --- Pause / Resume logic ---
 async function togglePauseSession(sessionId) {
   const s = state.sessions[sessionId];
   if (!s) return;
+  const btn = document.querySelector(`.pause-session[data-id="${sessionId}"]`);
+
   if (s.status === 'active') {
     const elapsed = computeElapsedSeconds(s);
     await updateDoc(doc(db, 'sessions', sessionId), {
@@ -1103,6 +1122,7 @@ async function togglePauseSession(sessionId) {
       pausedAt: new Date().toISOString()
     });
     stopLocalTimer(sessionId);
+    if (btn) btn.textContent = 'Resume';
   } else if (s.status === 'paused') {
     await updateDoc(doc(db, 'sessions', sessionId), {
       status: 'active',
@@ -1110,9 +1130,11 @@ async function togglePauseSession(sessionId) {
       pausedAt: null
     });
     startLocalTimer(sessionId);
+    if (btn) btn.textContent = 'Pause';
   }
 }
 
+// --- Stop session logic ---
 async function stopSession(sessionId) {
   const s = state.sessions[sessionId];
   if (!s) return;
@@ -1121,7 +1143,6 @@ async function stopSession(sessionId) {
   const rate = Number(state.settings?.defaultRate || 300);
   const price = Math.round((elapsed / 3600) * rate);
 
-  // Mark session as ended
   await updateDoc(doc(db, 'sessions', sessionId), {
     status: 'ended',
     endTime: new Date().toISOString(),
@@ -1129,50 +1150,58 @@ async function stopSession(sessionId) {
     price
   });
 
-  // Free the station immediately
   if (s.stationId) {
     await setDoc(
       doc(db, 'stations', s.stationId),
       { status: 'free', currentSessionId: null },
       { merge: true }
     );
-
-    // Update local state so UI refreshes instantly
     if (state.stations[s.stationId]) {
       state.stations[s.stationId].status = 'free';
       state.stations[s.stationId].currentSessionId = null;
     }
   }
 
-  // Stop local timer and refresh UI
   stopLocalTimer(sessionId);
-  renderStations(); // refresh the station cards/list instantly
-  renderAllSessions(); // optional: update sessions list too
+  renderStations?.();
+  renderAllSessions?.();
 
   alert('Session ended — price KSh ' + price);
 }
 
-  // make PDF for single session
-  async function makePdfForSession(sessionId){
-    const { jsPDF } = window.jspdf;
-    const s = state.sessions[sessionId];
-    if(!s) return alert('Session not found');
-    const doc = new jsPDF();
-    if(state.settings?.logoData){
-      try{ doc.addImage(state.settings.logoData, 'PNG', 15, 10, 60, 30); }catch(e){}
-    }
-    doc.setFontSize(14); doc.text(state.settings?.businessName||'Gaming Centre', 105, 20, null, null, 'center');
-    let y = 45; doc.setFontSize(11);
-    doc.text(`Receipt #: ${sessionId}`, 15, y); y+=8;
-    doc.text(`Customer: ${s.playerName || s.player || 'Guest'}`, 15, y); y+=8;
-    doc.text(`Station: ${state.stations[s.stationId]?.name || '-'}`, 15, y); y+=8;
-    doc.text(`Game: ${state.games[s.gameId]?.name || '-'}`, 15, y); y+=8;
-    doc.text(`Start: ${fmtDate(s.startTime)}`, 15, y); y+=8;
-    doc.text(`End: ${s.endTime ? fmtDate(s.endTime) : '-'}`, 15, y); y+=8;
-    doc.text(`Duration: ${formatDuration(computeElapsedSeconds(s))}`, 15, y); y+=8;
-    doc.text(`Price: KSh ${s.price||0}`, 15, y); y+=12;
-    doc.save(`receipt-${sessionId}.pdf`);
+// --- Generate session PDF receipt ---
+async function makePdfForSession(sessionId) {
+  const { jsPDF } = window.jspdf;
+  const s = state.sessions[sessionId];
+  if (!s) return alert('Session not found');
+
+  const doc = new jsPDF();
+  if (state.settings?.logoData) {
+    try {
+      doc.addImage(state.settings.logoData, 'PNG', 15, 10, 60, 30);
+    } catch (e) {}
   }
+
+  doc.setFontSize(14);
+  doc.text(state.settings?.businessName || 'Gaming Centre', 105, 20, null, null, 'center');
+
+  let y = 45;
+  doc.setFontSize(11);
+  doc.text(`Receipt #: ${sessionId}`, 15, y); y += 8;
+  doc.text(`Customer: ${s.playerName || s.player || 'Guest'}`, 15, y); y += 8;
+  doc.text(`Station: ${state.stations[s.stationId]?.name || '-'}`, 15, y); y += 8;
+  doc.text(`Game: ${state.games[s.gameId]?.name || '-'}`, 15, y); y += 8;
+  doc.text(`Start: ${fmtDate(s.startTime)}`, 15, y); y += 8;
+  doc.text(`End: ${s.endTime ? fmtDate(s.endTime) : '-'}`, 15, y); y += 8;
+  doc.text(`Duration: ${formatDuration(computeElapsedSeconds(s))}`, 15, y); y += 8;
+  doc.text(`Price: KSh ${s.price || 0}`, 15, y); y += 12;
+
+  doc.save(`receipt-${sessionId}.pdf`);
+}
+
+// --- Initialize the real-time system ---
+initRealtimeSessions();
+
 
   // Render all sessions list
   function renderAllSessions(){
