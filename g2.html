@@ -1,0 +1,1392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gaming Admin Dashboard</title>
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- jsPDF + autotable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Firebase (v9 modular CDN) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+    import { getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    // We'll attach firebase objects to window for use in inline script below
+    window.__firebase = { initializeApp, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, getDoc, query, orderBy };
+  </script>
+
+  <style>
+    :root{
+      --brand:#0d6efd;
+      --muted:#6c757d;
+      --bg:#0f1724; /* dark theme background */
+      --card:#0b1220;
+      --text:#e6eef8;
+      --muted-text: #9fb0d6;
+      --accent:#7c9cff;
+    }
+    html,body{height:100%}
+    body{
+      background: linear-gradient(180deg,#071022,#081222);
+      color:var(--text);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    .app-shell{display:flex; min-height:100vh;}
+    aside.sidebar{
+      width:260px; background:linear-gradient(180deg,var(--brand),#0b5ed7);
+      padding:1rem; color:#fff; flex-shrink:0;
+    }
+    .sidebar .logo-preview{ max-height:48px; object-fit:contain; display:inline-block; }
+    .nav-link{ color:rgba(255,255,255,0.95); cursor:pointer; padding:.5rem .6rem; display:block; border-radius:8px; margin-bottom:6px; }
+    .nav-link.active{ background: rgba(255,255,255,0.06); }
+    main.main {flex:1; padding:1rem; overflow:auto;}
+    .card { background:var(--card); border:0; color:var(--text); border-radius:10px; }
+    .small-muted{ color:var(--muted-text); font-size:.9rem; }
+    .station-card{ background:rgba(255,255,255,0.02); padding:.6rem; border-radius:8px; margin-bottom:.6rem; display:flex; justify-content:space-between; align-items:center; }
+    .timer-big{ font-family:monospace; font-size:1.1rem; color:var(--accent); margin-top:.25rem; }
+    .rounded-input{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--text); padding:.5rem; border-radius:6px; }
+    .btn-outline-light{ color:#fff; border-color:rgba(255,255,255,0.08); }
+    .modal-content{ background:linear-gradient(180deg,#071224,#08142a); color:var(--text); }
+    .table thead th{ background:rgba(255,255,255,0.03); color:var(--text); }
+    .badge-accent{ background:var(--accent); color:#001; }
+
+    /* mobile toggle */
+    .mobile-top{ display:none; }
+    @media (max-width:900px){
+      aside.sidebar{ position:fixed; left:0; top:0; bottom:0; z-index:1050; transform:translateX(-110%); transition:transform .22s ease; width:260px; }
+      aside.sidebar.open{ transform:translateX(0); }
+      .mobile-top{ display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:.75rem; }
+      main.main{ padding-top:3rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ADMIN LOGIN MODAL -->
+  <div class="modal fade" id="adminLoginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="p-3 modal-content">
+        <h5 class="modal-title">Admin Sign in</h5>
+        <div class="mb-2 small-muted">Sign in with admin email/password</div>
+        <form id="loginForm" class="mt-2">
+          <div class="mb-2">
+            <label class="form-label small">Email</label>
+            <input id="loginEmail" type="email" class="rounded-input form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Password</label>
+            <input id="loginPassword" type="password" class="rounded-input form-control" required>
+          </div>
+          <div class="d-flex align-items-center justify-content-between">
+            <button class="btn btn-primary" type="submit">Sign in</button>
+            <button class="btn-outline-light btn" data-bs-dismiss="modal" type="button">Cancel</button>
+          </div>
+          <div id="loginError" class="mt-2 text-danger small" style="display:none"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP SHELL -->
+  <div class="app-shell" id="appShell" style="display:none">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <img id="logoPreviewSidebar" class="logo-preview" style="display:none">
+        <div>
+          <div id="businessTitle" class="mb-0 h5">Gaming Centre Admin</div>
+          <div class="small-muted" id="businessSubtitle">Manage sessions & tournaments</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <input id="searchNav" class="rounded-input form-control form-control-sm" placeholder="Search...">
+      </div>
+
+      <nav class="flex-column nav">
+        <a class="nav-link active" data-section="dashboard"><i class="me-2 bi bi-speedometer2"></i>Dashboard</a>
+        <a class="nav-link" data-section="sessions"><i class="me-2 bi bi-clock-history"></i>Sessions</a>
+        <a class="nav-link" data-section="stations"><i class="me-2 bi bi-hdd-stack"></i>Stations</a>
+        <a class="nav-link" data-section="games"><i class="me-2 bi bi-controller"></i>Games</a>
+        <a class="nav-link" data-section="tournaments"><i class="me-2 bi bi-trophy"></i>Tournaments</a>
+        <a class="nav-link" data-section="memberships"><i class="me-2 bi bi-card-checklist"></i>Memberships</a>
+        <a class="nav-link" data-section="birthdays"><i class="me-2 bi bi-gift-fill"></i>Birthdays</a>
+        <a class="nav-link" data-section="offers"><i class="me-2 bi bi-tag"></i>Offers</a>
+        <a class="nav-link" data-section="reports"><i class="me-2 bi bi-file-earmark-bar-graph"></i>Reports</a>
+        <a class="nav-link" data-section="settings"><i class="me-2 bi bi-gear"></i>Settings</a>
+      </nav>
+
+      <hr style="border-color:rgba(255,255,255,0.05)">
+
+      <div class="gap-2 d-grid">
+        <button class="btn btn-light btn-sm" id="btnExportAllPdf"><i class="me-1 bi bi-cloud-arrow-down"></i>Download Full PDF</button>
+        <button id="btnLogout" class="btn btn-danger btn-sm"><i class="bi-box-arrow-right me-1 bi"></i>Logout</button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <!-- mobile top -->
+      <div class="mobile-top mb-2 d-md-none">
+        <button id="mobileMenuBtn" class="btn-outline-light btn btn-sm"><i class="bi bi-list"></i></button>
+        <div><strong id="mobileTitle">Dashboard</strong></div>
+        <div>
+          <button id="mobileProfileBtn" class="btn-outline-light btn btn-sm"><i class="bi bi-person-circle"></i></button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD PAGE -->
+      <section id="section-dashboard" class="mb-3">
+        <div class="d-flex align-items-start justify-content-between mb-3">
+          <div>
+            <h3>Dashboard</h3>
+            <div class="small-muted">Overview & quick actions</div>
+          </div>
+          <div class="d-flex gap-2">
+            <input id="uploadLogoInput" type="file" accept="image/*" class="form-control form-control-sm" style="max-width:220px">
+            <button id="btnAddStationMobile" class="btn-outline-light btn btn-sm d-md-none"><i class="bi bi-hdd-stack"></i> Add Station</button>
+          </div>
+        </div>
+
+        <div class="mb-3 row g-3">
+          <div class="col-6 col-md-3">
+            <div class="p-3 card">
+              <div class="small-muted">Active Sessions</div>
+              <div id="statActive" class="mt-1 h4">0</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 card">
+              <div class="small-muted">Upcoming Tournaments</div>
+              <div id="statTournaments" class="mt-1 h4">0</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 card">
+              <div class="small-muted">Customers</div>
+              <div id="statCustomers" class="mt-1 h4">0</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 card">
+              <div class="small-muted">Revenue (today)</div>
+              <div id="statRevenue" class="mt-1 h4">KSh 0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="p-3 card">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div><h6 class="mb-0">Quick Actions</h6><div class="small-muted">Create sessions, tournaments and offers quickly</div></div>
+                <div class="small-muted">Admin</div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" id="btnNewSessionTop"><i class="me-1 bi bi-play-circle"></i>New Session</button>
+                <button class="btn-outline-light btn" id="btnNewTournamentTop"><i class="me-1 bi bi-flag"></i>New Tournament</button>
+                <button class="btn-outline-light btn" id="btnNewOfferTop"><i class="me-1 bi bi-tag"></i>New Offer</button>
+                <button class="btn-outline-light btn" id="btnExportSessionsPdfTop"><i class="me-1 bi bi-file-earmark-pdf"></i>Export Sessions</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="p-3 card">
+              <h6 class="mb-2">Today's Sessions</h6>
+              <div id="todaySessions" style="max-height:220px; overflow:auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SESSIONS PAGE -->
+      <section id="section-sessions" style="display:none;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div>
+            <h4>Sessions</h4>
+            <div class="small-muted">Manage sessions, timers & receipts</div>
+          </div>
+          <div>
+            <button class="btn-outline-light btn btn-sm" id="btnDownloadSessionsPdf"><i class="me-1 bi bi-file-earmark-pdf"></i>Download Sessions PDF</button>
+            <button class="btn btn-accent btn-sm btn btn-primary" id="btnCreateSession"><i class="me-1 bi bi-plus"></i>Create Session</button>
+          </div>
+        </div>
+
+        <div class="mb-3 row g-3">
+          <div class="col-md-6">
+            <div class="p-3 card">
+              <h6>Active Sessions (Timers)</h6>
+              <div id="activeSessionsList"></div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 card">
+              <h6>All Sessions</h6>
+              <div id="allSessionsList" style="max-height:360px; overflow:auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATIONS PAGE -->
+      <section id="section-stations" style="display:none;">
+        <div class="d-flex justify-content-between mb-2">
+          <div><h4>Stations</h4><div class="small-muted">Manage gaming stations</div></div>
+          <div><button class="btn-outline-light btn btn-sm" id="btnResetStations">Reset Stations</button> <button class="btn btn-primary btn-sm" id="btnAddStation">Add Station</button></div>
+        </div>
+        <div id="manageStations" class="row g-2"></div>
+      </section>
+
+      <!-- GAMES PAGE -->
+      <section id="section-games" style="display:none;">
+        <div class="d-flex justify-content-between mb-2">
+          <div><h4>Games</h4></div>
+          <div><button class="btn btn-primary btn-sm" id="btnAddGame">Add Game</button></div>
+        </div>
+        <div id="gamesList" class="row g-2"></div>
+      </section>
+
+      <!-- TOURNAMENTS PAGE -->
+      <section id="section-tournaments" style="display:none;">
+        <div class="d-flex justify-content-between mb-2">
+          <div><h4>Tournaments</h4></div>
+          <div><button class="btn btn-primary btn-sm" id="btnAddTournament">New Tournament</button></div>
+        </div>
+        <div id="tournamentsAdminList"></div>
+      </section>
+
+      <!-- MEMBERSHIPS PAGE -->
+      <section id="section-memberships" style="display:none;">
+        <div class="d-flex justify-content-between mb-2"><div><h4>Memberships</h4></div><div><button class="btn btn-primary btn-sm" id="btnAddMembership">Add</button></div></div>
+        <div id="membershipsList"></div>
+      </section>
+
+      <!-- BIRTHDAYS PAGE -->
+      <section id="section-birthdays" style="display:none;">
+        <div class="d-flex justify-content-between mb-2"><div><h4>Birthdays</h4></div><div><button class="btn-outline-light btn btn-sm" id="btnAddBirthday">Add</button></div></div>
+        <div id="birthdaysAdminList"></div>
+      </section>
+
+      <!-- OFFERS PAGE -->
+      <section id="section-offers" style="display:none;">
+        <div class="d-flex justify-content-between mb-2"><div><h4>Offers</h4></div><div><button class="btn btn-primary btn-sm" id="btnCreateOffer">New Offer</button></div></div>
+        <div id="offersAdminList"></div>
+      </section>
+
+      <!-- REPORTS -->
+      <section id="section-reports" style="display:none;">
+        <h4>Reports</h4>
+        <div class="p-3 card">
+          <div class="d-flex gap-2">
+            <button class="btn-outline-light btn" id="btnExportAllPdf">Export Full PDF</button>
+            <button class="btn-outline-light btn" id="btnExportMembersPdf">Export Memberships (PDF)</button>
+            <button class="btn-outline-light btn" id="btnExportCustomersPdf">Export Customers (PDF)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="section-settings" style="display:none;">
+        <h4>Settings</h4>
+        <div class="p-3 card">
+          <div class="mb-2"><label class="text-muted form-label small">Business Name</label><input id="settingsBusinessName" class="rounded-input form-control"></div>
+          <div class="mb-2"><label class="text-muted form-label small">Business Address</label><input id="settingsBusinessAddress" class="rounded-input form-control"></div>
+          <div class="mb-2"><label class="text-muted form-label small">Default Rate (KSh per hour)</label><input id="settingsDefaultRate" type="number" class="rounded-input form-control" value="300"></div>
+          <div class="d-flex gap-2"><button class="btn btn-primary" id="saveSettings">Save</button><button class="btn-outline-light btn" id="clearSettings">Reset</button></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODALS: Session, Game, Station, Tournament, Register Player, View Players, Offer, Membership, Birthday -->
+  <!-- SESSION MODAL -->
+  <div class="modal fade" id="modalSession" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="sessionForm">
+          <div class="modal-header"><h5 id="sessionModalTitle" class="modal-title">Create Session</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input type="hidden" id="sessionId">
+            <div class="mb-2"><label class="form-label small">Player name</label><input id="sessionPlayer" class="bg-transparent rounded-input text-white form-control" placeholder="Player name"></div>
+            <div class="mb-2"><label class="form-label small">Station</label><select id="sessionStation" class="rounded-input form-select"></select></div>
+            <div class="mb-2"><label class="form-label small">Game</label><select id="sessionGameSelect" class="rounded-input form-select"></select></div>
+            <div class="mb-2"><label class="form-label small">Type</label><select id="sessionType" class="rounded-input form-select"><option value="hourly">Hourly</option><option value="perGame">Per Game</option></select></div>
+            <div class="mb-2" id="durationRow"><label class="form-label small">Duration (minutes)</label><input id="sessionDuration" type="number" class="rounded-input form-control" value="60"></div>
+            <div class="mb-2"><label class="form-label small">Price (KSh)</label><input id="sessionPrice" type="number" class="rounded-input form-control" value="300"></div>
+            <div class="mb-2"><label class="form-label small">Notes</label><textarea id="sessionNotes" class="rounded-input form-control" rows="2"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <button class="btn-outline-light btn" type="button" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOURNAMENT MODAL -->
+  <div class="modal fade" id="tournamentModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="tournamentForm">
+          <div class="modal-header"><h5 id="tournamentModalTitle" class="modal-title">Add Tournament</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input type="hidden" id="tournamentId">
+            <div class="mb-2"><label class="form-label small">Name</label><input id="tournamentName" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Game</label><select id="tournamentGame" class="rounded-input form-select"></select></div>
+            <div class="mb-2 row g-2">
+              <div class="col"><label class="form-label small">Date</label><input id="tournamentDate" type="date" class="rounded-input form-control"></div>
+              <div class="col"><label class="form-label small">Fee (KSh)</label><input id="tournamentFee" type="number" class="rounded-input form-control" value="300"></div>
+            </div>
+            <div class="mb-2"><label class="form-label small">Notes / Prize</label><input id="tournamentNotes" class="rounded-input form-control"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" type="submit">Save Tournament</button>
+            <button class="btn-outline-light btn" type="button" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGISTER PLAYER MODAL -->
+  <div class="modal fade" id="registerPlayerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="registerPlayerForm">
+          <div class="modal-header"><h5 class="modal-title">Register Player / Team</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input type="hidden" id="regTournamentId">
+            <div class="mb-2"><label class="form-label small">Player / Team Name</label><input id="regPlayerName" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Contact</label><input id="regPlayerContact" class="rounded-input form-control" placeholder="Phone or Email"></div>
+            <div class="mb-2 form-check"><input id="regPlayerPaid" class="form-check-input" type="checkbox"><label class="form-check-label small">Paid</label></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-success" type="submit">Register</button>
+            <button class="btn-outline-light btn" type="button" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW PLAYERS MODAL -->
+  <div class="modal fade" id="viewPlayersModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 id="viewPlayersTitle" class="modal-title">Players</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <table class="table table-sm table-striped">
+            <thead><tr><th>Name</th><th>Contact</th><th>Paid</th><th>Actions</th></tr></thead>
+            <tbody id="playersTable"></tbody>
+          </table>
+        </div>
+        <div class="modal-footer"><button class="btn-outline-light btn" data-bs-dismiss="modal">Close</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME MODAL -->
+  <div class="modal fade" id="gameModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="gameForm">
+          <div class="modal-header"><h5 id="gameModalTitle" class="modal-title">Add Game</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input id="gameId" type="hidden">
+            <div class="mb-2"><label class="form-label small">Game Name</label><input id="gameName" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Category</label><input id="gameCategory" class="rounded-input form-control" placeholder="e.g. FPS"></div>
+            <div class="mb-2"><label class="form-label small">Price per Hour (KSh)</label><input id="gamePrice" type="number" class="rounded-input form-control" value="300" required></div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-primary" type="submit">Save</button><button class="btn-outline-light btn" data-bs-dismiss="modal" type="button">Cancel</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATION MODAL -->
+  <div class="modal fade" id="stationModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="stationForm">
+          <div class="modal-header"><h5 id="stationModalTitle" class="modal-title">Add Station</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input id="stationId" type="hidden">
+            <div class="mb-2"><label class="form-label small">Station Name</label><input id="stationName" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Notes</label><input id="stationNotes" class="rounded-input form-control"></div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-primary" type="submit">Save Station</button><button class="btn-outline-light btn" data-bs-dismiss="modal" type="button">Cancel</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFER MODAL -->
+  <div class="modal fade" id="offerModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="offerForm">
+          <div class="modal-header"><h5 id="offerModalTitle" class="modal-title">New Offer</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input id="offerId" type="hidden">
+            <div class="mb-2"><label class="form-label small">Game</label><select id="offerGame" class="rounded-input form-select"></select></div>
+            <div class="mb-2"><label class="form-label small">Description</label><input id="offerDesc" class="rounded-input form-control"></div>
+            <div class="mb-2 row g-2"><div class="col"><label class="form-label small">Discount %</label><input id="offerDiscount" type="number" class="rounded-input form-control" value="10"></div><div class="col"><label class="form-label small">Valid Until</label><input id="offerUntil" type="date" class="rounded-input form-control"></div></div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-primary" type="submit">Save Offer</button><button class="btn-outline-light btn" data-bs-dismiss="modal">Cancel</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEMBERSHIP MODAL -->
+  <div class="modal fade" id="membershipModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="membershipForm">
+          <div class="modal-header"><h5 id="membershipModalTitle" class="modal-title">Create Membership</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input id="membershipId" type="hidden">
+            <div class="mb-2"><label class="form-label small">Name</label><input id="membershipName" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Price (KSh)</label><input id="membershipPrice" type="number" class="rounded-input form-control" value="1000"></div>
+            <div class="mb-2"><label class="form-label small">Duration (months)</label><input id="membershipDuration" type="number" class="rounded-input form-control" value="1"></div>
+            <div class="mb-2"><label class="form-label small">Description</label><input id="membershipDesc" class="rounded-input form-control"></div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-primary" type="submit">Save</button><button class="btn-outline-light btn" data-bs-dismiss="modal">Cancel</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- BIRTHDAY MODAL -->
+  <div class="modal fade" id="birthdayModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="birthdayForm">
+          <div class="modal-header"><h5 id="birthdayModalTitle" class="modal-title">Add Birthday</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <input id="birthdayId" type="hidden">
+            <div class="mb-2"><label class="form-label small">Name</label><input id="birthdayName" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Date of birth</label><input id="birthdayDate" type="date" class="rounded-input form-control" required></div>
+            <div class="mb-2"><label class="form-label small">Phone</label><input id="birthdayPhone" class="rounded-input form-control"></div>
+            <div class="mb-2"><label class="form-label small">Notes</label><input id="birthdayNotes" class="rounded-input form-control"></div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-primary" type="submit">Save</button><button class="btn-outline-light btn" data-bs-dismiss="modal">Cancel</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECEIPT MODAL -->
+  <div class="modal fade" id="receiptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body" id="receiptBody"></div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="printReceiptBtn"><i class="me-1 bi bi-printer"></i>Print</button>
+          <button class="btn-outline-light btn" id="saveReceiptPdfBtn"><i class="me-1 bi bi-cloud-arrow-down"></i>Download PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- APP SCRIPT (main) -->
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+  import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+  // ====== Firebase config - REPLACE with your project config ======
+  const firebaseConfig = {
+    apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
+  authDomain: "gamers-65b44.firebaseapp.com",
+  projectId: "gamers-65b44",
+  storageBucket: "gamers-65b44.firebasestorage.app",
+  messagingSenderId: "97331968745",
+  appId: "1:97331968745:web:c29463023389ee69dcce78",
+  measurementId: "G-K12P8RHWC5"
+  };
+  // =================================================================
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Helpers
+  const $ = sel => document.querySelector(sel);
+  const $all = sel => Array.from(document.querySelectorAll(sel));
+  const uid = ()=> 'id'+Math.random().toString(36).slice(2,9);
+  const fmtDate = d => d ? new Date(d).toLocaleString() : '-';
+  const formatDuration = secs=>{
+    secs = Number(secs||0);
+    const h = Math.floor(secs/3600); const m = Math.floor((secs%3600)/60); const s = secs%60;
+    return [h,m,s].map(v=>String(v).padStart(2,'0')).join(':');
+  };
+
+  // App state cache (populated by Firestore listeners)
+  const state = { sessions:{}, stations:{}, games:{}, tournaments:{}, customers:{}, memberships:{}, offers:{}, settings:{} };
+
+  // UI pieces
+  const appShell = $('#appShell');
+  const loginModalEl = document.getElementById('adminLoginModal');
+  const loginModal = new bootstrap.Modal(loginModalEl);
+
+  // AUTH
+  onAuthStateChanged(auth, user=>{
+    if(user){
+      // show app
+      appShell.style.display='flex';
+      $('#adminLoginModal') && bootstrap.Modal.getInstance(loginModalEl)?.hide();
+      startListeners();
+    } else {
+      // show login
+      appShell.style.display='none';
+      loginModal.show();
+    }
+  });
+
+  $('#loginForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const email = $('#loginEmail').value;
+    const pass = $('#loginPassword').value;
+    try{
+      await signInWithEmailAndPassword(auth,email,pass);
+      $('#loginError').style.display='none';
+    }catch(err){
+      $('#loginError').textContent = err.message; $('#loginError').style.display='block';
+    }
+  });
+
+  $('#btnLogout').addEventListener('click', async ()=> {
+    if(confirm('Sign out?')) await signOut(auth);
+  });
+
+  // NAV
+  $all('.nav-link').forEach(link=>{
+    link.addEventListener('click', ()=>{
+      $all('.nav-link').forEach(l=>l.classList.remove('active'));
+      link.classList.add('active');
+      const sec = link.dataset.section || link.dataset.target;
+      if(!sec) return;
+      $all('main .page, main section').forEach(p=>p.style.display='none');
+      const sel = sec==='dashboard' ? '#section-dashboard' : `#section-${sec}`;
+      const el = document.querySelector(sel);
+      if(el) el.style.display = 'block';
+      // mobile title
+      $('#mobileTitle').textContent = link.textContent.trim();
+      // close sidebar on mobile
+      if(window.innerWidth < 900) document.querySelector('aside.sidebar').classList.remove('open');
+    });
+  });
+
+  // MOBILE TOGGLE
+  $('#mobileMenuBtn')?.addEventListener('click', ()=>{
+    document.querySelector('aside.sidebar').classList.toggle('open');
+  });
+
+  // ======= Firestore listeners =======
+  let unsubscribers = [];
+  function startListeners(){
+    // sessions
+    const qSessions = query(collection(db,'sessions'), orderBy('startTime','desc'));
+    unsubscribers.push(onSnapshot(qSessions, snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data() });
+      state.sessions = obj; renderActiveSessions(); renderAllSessions(); renderDashboardSmall(); 
+    }));
+
+    // stations
+    unsubscribers.push(onSnapshot(collection(db,'stations'), snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data()});
+      state.stations = obj; renderStations(); renderStationSelects();
+    }));
+
+    // games
+    unsubscribers.push(onSnapshot(collection(db,'games'), snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data()});
+      state.games = obj; renderGames(); renderGameSelects();
+    }));
+
+    // tournaments
+    unsubscribers.push(onSnapshot(collection(db,'tournaments'), snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data()});
+      state.tournaments = obj; renderTournamentsAdmin();
+    }));
+
+    // customers
+    unsubscribers.push(onSnapshot(collection(db,'customers'), snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data()});
+      state.customers = obj; renderDashboardSmall();
+    }));
+
+    // memberships
+    unsubscribers.push(onSnapshot(collection(db,'memberships'), snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data()});
+      state.memberships = obj; renderMemberships();
+    }));
+
+    // offers
+    unsubscribers.push(onSnapshot(collection(db,'offers'), snap=>{
+      const obj={};
+      snap.forEach(d=> obj[d.id] = { id:d.id, ...d.data()});
+      state.offers = obj; renderOffers();
+    }));
+
+    // settings (single doc approach)
+    const settingsDocRef = doc(db,'app','settings');
+    unsubscribers.push(onSnapshot(settingsDocRef, snap=>{
+      if(snap.exists()) state.settings = snap.data();
+      else state.settings = {};
+      applySettingsToUI();
+    }));
+  }
+
+  // ======= UI rendering functions =======
+  // Dashboard small widgets
+  function renderDashboardSmall(){
+    const sessionsArr = Object.values(state.sessions||{});
+    const activeCount = sessionsArr.filter(s=> s.status==='active' || (!s.status && !s.endTime)).length;
+    $('#statActive').textContent = activeCount;
+    $('#statTournaments').textContent = Object.keys(state.tournaments||{}).length;
+    $('#statCustomers').textContent = Object.keys(state.customers||{}).length;
+    // revenue today
+    const today = new Date(); today.setHours(0,0,0,0);
+    let rev = 0;
+    sessionsArr.forEach(s=>{
+      const created = s.startTime ? new Date(s.startTime) : (s.createdAt ? new Date(s.createdAt) : null);
+      if(created && created >= today) rev += Number(s.price||0);
+    });
+    $('#statRevenue').textContent = `KSh ${rev}`;
+    // today's sessions preview
+    const todayEl = $('#todaySessions'); if(todayEl){
+      todayEl.innerHTML = '';
+      sessionsArr.slice(0,6).forEach(s=>{
+        const g = state.games[s.gameId] || {};
+        const row = document.createElement('div'); row.className='d-flex justify-content-between small-muted py-1';
+        row.innerHTML = `<div>${s.playerName || s.player || 'Guest'} — ${g.name|| '-'}</div><div>${fmtDate(s.startTime)}</div>`;
+        todayEl.appendChild(row);
+      });
+    }
+  }
+
+  // GAME render + selects
+  function renderGames(){
+    const wrap = $('#gamesList'); if(!wrap) return;
+    wrap.innerHTML = '';
+    Object.values(state.games||{}).forEach(g=>{
+      const col = document.createElement('div');
+      col.className='station-card';
+      col.innerHTML = `<div><strong>${g.name}</strong><div class="small-muted">${g.category||''} • KSh ${g.pricePerHour||state.settings?.defaultRate||300}</div></div>
+        <div><button class="btn btn-sm btn-primary edit-game" data-id="${g.id}">Edit</button> <button class="btn btn-sm btn-danger delete-game" data-id="${g.id}">Delete</button></div>`;
+      wrap.appendChild(col);
+    });
+    // handlers
+    $all('.delete-game').forEach(b=> b.onclick = async ()=> {
+      if(!confirm('Delete game?')) return;
+      await deleteDoc(doc(db,'games',b.dataset.id));
+    });
+    $all('.edit-game').forEach(b=> b.onclick = ()=>{
+      const g = state.games[b.dataset.id];
+      $('#gameModalTitle').textContent = 'Edit Game';
+      $('#gameId').value = g.id;
+      $('#gameName').value = g.name;
+      $('#gameCategory').value = g.category || '';
+      $('#gamePrice').value = g.pricePerHour || state.settings?.defaultRate || 300;
+      new bootstrap.Modal(document.getElementById('gameModal')).show();
+    });
+  }
+  function renderGameSelects(){
+    const s = $('#sessionGameSelect'); if(s) { s.innerHTML=''; Object.values(state.games||{}).forEach(g=> s.appendChild(new Option(g.name,g.id))); }
+    const tg = $('#tournamentGame'); if(tg){ tg.innerHTML=''; Object.values(state.games||{}).forEach(g=> tg.appendChild(new Option(g.name,g.id))); }
+    const ofg = $('#offerGame'); if(ofg){ ofg.innerHTML=''; ofg.appendChild(new Option('All','')); Object.values(state.games||{}).forEach(g=> ofg.appendChild(new Option(g.name,g.id))); }
+  }
+
+  // Stations
+  function renderStations(){
+    const wrap = $('#manageStations'); if(!wrap) return;
+    wrap.innerHTML='';
+    Object.values(state.stations||{}).forEach(st=>{
+      const col = document.createElement('div'); col.className='col-12 col-md-4';
+      col.innerHTML = `<div class="station-card"><div><strong>${st.name}</strong><div class="small-muted">${st.notes||''} • ${st.status||'free'}</div></div>
+        <div><button class="btn btn-sm btn-primary edit-station" data-id="${st.id}">Edit</button> <button class="btn btn-sm btn-danger del-station" data-id="${st.id}">Delete</button></div></div>`;
+      wrap.appendChild(col);
+    });
+    $all('.edit-station').forEach(b=> b.onclick = ()=>{
+      const st = state.stations[b.dataset.id];
+      $('#stationModalTitle').textContent = 'Edit Station';
+      $('#stationId').value = st.id;
+      $('#stationName').value = st.name;
+      $('#stationNotes').value = st.notes || '';
+      new bootstrap.Modal(document.getElementById('stationModal')).show();
+    });
+    $all('.del-station').forEach(b=> b.onclick = async ()=>{
+      if(!confirm('Delete station?')) return;
+      await deleteDoc(doc(db,'stations',b.dataset.id));
+    });
+  }
+  function renderStationSelects(){
+    const sel = $('#sessionStation'); if(sel){ sel.innerHTML=''; Object.values(state.stations||{}).filter(st=> st.status !== 'busy').forEach(st=> sel.appendChild(new Option(st.name,st.id))); }
+  }
+
+  // Memberships
+  function renderMemberships(){
+    const out = $('#membershipsList'); if(!out) return;
+    out.innerHTML='';
+    Object.values(state.memberships||{}).forEach(m=>{
+      const div = document.createElement('div'); div.className='station-card';
+      div.innerHTML = `<div><strong>${m.name}</strong><div class="small-muted">KSh ${m.price} • ${m.duration || 1} month(s)</div><div class="small-muted">${m.description||''}</div></div>
+        <div><button class="btn btn-sm btn-primary edit-membership-btn" data-id="${m.id}">Edit</button> <button class="btn btn-sm btn-danger remove-m" data-id="${m.id}">Remove</button></div>`;
+      out.appendChild(div);
+    });
+    document.querySelectorAll('.remove-m').forEach(b=> b.onclick = async ()=> { if(!confirm('Delete?')) return; await deleteDoc(doc(db,'memberships',b.dataset.id)); });
+    document.querySelectorAll('.edit-membership-btn').forEach(b=>{
+      b.onclick = ()=>{
+        const m = state.memberships[b.dataset.id];
+        $('#membershipModalTitle').textContent = 'Edit Membership';
+        $('#membershipId').value = m.id;
+        $('#membershipName').value = m.name;
+        $('#membershipPrice').value = m.price;
+        $('#membershipDuration').value = m.duration || 1;
+        $('#membershipDesc').value = m.description || '';
+        new bootstrap.Modal(document.getElementById('membershipModal')).show();
+      };
+    });
+  }
+
+  // Offers
+  function renderOffers(){
+    const out = $('#offersAdminList'); if(!out) return;
+    out.innerHTML='';
+    Object.values(state.offers||{}).forEach(o=>{
+      const div = document.createElement('div'); div.className='station-card';
+      div.innerHTML = `<div><strong>${o.gameName||'All'}</strong><div class="small-muted">${o.desc||''} • ${o.discount||0}%</div></div>
+        <div><button class="btn btn-sm btn-primary edit-offer-btn" data-id="${o.id}">Edit</button> <button class="btn btn-sm btn-danger remove-offer" data-id="${o.id}">Remove</button></div>`;
+      out.appendChild(div);
+    });
+    document.querySelectorAll('.remove-offer').forEach(b=> b.onclick = async ()=> { if(!confirm('Delete offer?')) return; await deleteDoc(doc(db,'offers',b.dataset.id)); });
+    document.querySelectorAll('.edit-offer-btn').forEach(b=>{
+      b.onclick = ()=>{
+        const o = state.offers[b.dataset.id];
+        $('#offerModalTitle').textContent = 'Edit Offer';
+        $('#offerId').value = o.id;
+        $('#offerDesc').value = o.desc || '';
+        $('#offerDiscount').value = o.discount || 0;
+        $('#offerUntil').value = o.until || '';
+        // set game name select if exists
+        $('#offerGame').value = o.gameId || '';
+        new bootstrap.Modal(document.getElementById('offerModal')).show();
+      };
+    });
+  }
+
+  // Birthdays
+  function renderBirthdays(){
+    const out = $('#birthdaysAdminList'); if(!out) return;
+    out.innerHTML='';
+    Object.values(state.customers||{}).filter(c=> c.dob).forEach(b=>{
+      const div = document.createElement('div'); div.className='station-card';
+      div.innerHTML = `<div><strong>${b.name}</strong><div class="small-muted">${b.dob} • ${b.phone||''}</div></div>
+        <div><button class="btn btn-sm btn-danger remove-b" data-id="${b.id}">Remove</button></div>`;
+      out.appendChild(div);
+    });
+    document.querySelectorAll('.remove-b').forEach(b=> b.onclick = async ()=> { if(!confirm('Delete?')) return; await deleteDoc(doc(db,'customers',b.dataset.id)); });
+  }
+
+  // Tournaments admin render + register button
+  function renderTournamentsAdmin(){
+    const wrap = $('#tournamentsAdminList'); if(!wrap) return;
+    wrap.innerHTML='';
+    Object.values(state.tournaments||{}).forEach(t=>{
+      const g = state.games[t.gameId] || {};
+      const div = document.createElement('div');
+      div.className='station-card';
+      div.innerHTML = `<div><strong>${t.name}</strong><div class="small-muted">${g.name|| '-'} • ${t.date || '-'}</div><div class="small-muted">Fee: KSh ${t.fee || 0}</div></div>
+        <div><button class="btn btn-sm btn-success register-t" data-id="${t.id}">Register</button> <button class="btn btn-sm btn-primary edit-tournament-btn" data-id="${t.id}">Edit</button> <button class="btn btn-sm btn-danger delete-tournament-btn" data-id="${t.id}">Delete</button></div>`;
+      wrap.appendChild(div);
+    });
+
+    // register
+    document.querySelectorAll('.register-t').forEach(btn=>{
+      btn.onclick = ()=>{
+        const tid = btn.dataset.id;
+        $('#regTournamentId').value = tid;
+        $('#regPlayerName').value = '';
+        $('#regPlayerContact').value = '';
+        $('#regPlayerPaid').checked = false;
+        new bootstrap.Modal(document.getElementById('registerPlayerModal')).show();
+      };
+    });
+
+    // edit
+    document.querySelectorAll('.edit-tournament-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        const t = state.tournaments[btn.dataset.id];
+        $('#tournamentModalTitle').textContent = "Edit Tournament";
+        $('#tournamentId').value = t.id;
+        $('#tournamentName').value = t.name;
+        $('#tournamentGame').value = t.gameId || '';
+        $('#tournamentDate').value = t.date || '';
+        $('#tournamentFee').value = t.fee || 300;
+        $('#tournamentNotes').value = t.notes || '';
+        new bootstrap.Modal(document.getElementById('tournamentModal')).show();
+      };
+    });
+
+    // delete
+    document.querySelectorAll('.delete-tournament-btn').forEach(btn=>{
+      btn.onclick = async ()=>{
+        if(!confirm('Delete this tournament?')) return;
+        await deleteDoc(doc(db,'tournaments',btn.dataset.id));
+      };
+    });
+  }
+
+  // Render players for a tournament (in view modal)
+  function openViewPlayers(tid){
+    const t = state.tournaments[tid];
+    if(!t) return alert('Tournament not found');
+    $('#viewPlayersTitle').textContent = `Players: ${t.name}`;
+    const tbody = document.querySelector('#playersTable');
+    tbody.innerHTML = '';
+    (t.participants||[]).forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.name}</td><td>${p.contact||'-'}</td><td>${p.paid? '✅':'❌'}</td>
+        <td>
+          <button class="btn btn-sm btn-warning edit-player-btn" data-tid="${t.id}" data-pid="${p.id}">Edit</button>
+          <button class="btn btn-sm btn-danger delete-player-btn" data-tid="${t.id}" data-pid="${p.id}">Delete</button>
+          <button class="btn btn-sm btn-primary print-receipt-btn" data-tid="${t.id}" data-pid="${p.id}">Print</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    // wire actions
+    tbody.querySelectorAll('.edit-player-btn').forEach(b=>{
+      b.onclick = async ()=>{
+        const tid = b.dataset.tid; const pid = b.dataset.pid;
+        const t = state.tournaments[tid];
+        const player = (t.participants||[]).find(pp=> pp.id === pid);
+        if(!player) return alert('Player not found');
+        const newName = prompt('Edit player name:', player.name);
+        if(newName !== null && newName.trim() !== ''){
+          player.name = newName.trim();
+          await updateDoc(doc(db,'tournaments',tid), { participants: t.participants });
+          // UI will update via snapshot
+        }
+      };
+    });
+    tbody.querySelectorAll('.delete-player-btn').forEach(b=>{
+      b.onclick = async ()=>{
+        if(!confirm('Delete player?')) return;
+        const tid = b.dataset.tid; const pid = b.dataset.pid;
+        const t = state.tournaments[tid];
+        t.participants = (t.participants||[]).filter(p=> p.id !== pid);
+        await updateDoc(doc(db,'tournaments',tid), { participants: t.participants });
+      };
+    });
+    tbody.querySelectorAll('.print-receipt-btn').forEach(b=>{
+      b.onclick = ()=>{
+        const tid = b.dataset.tid; const pid = b.dataset.pid;
+        const t = state.tournaments[tid];
+        const p = (t.participants||[]).find(x=> x.id === pid);
+        if(!p) return alert('Not found');
+        // build a receipt for tournament registration
+        const html = `<div style="font-family:Arial;color:#000;padding:10px;">
+          ${state.settings.logoData? `<img src="${state.settings.logoData}" style="max-width:120px;display:block;margin-bottom:10px">` : ''}
+          <h3>${state.settings.businessName||'Gaming Centre'}</h3>
+          <div><strong>Tournament:</strong> ${t.name}</div>
+          <div><strong>Player:</strong> ${p.name}</div>
+          <div><strong>Paid:</strong> ${p.paid ? 'Yes' : 'No'}</div>
+          <div style="margin-top:12px">Thank you!</div></div>`;
+        $('#receiptBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('receiptModal')).show();
+      };
+    });
+    new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
+  }
+
+  // SESSIONS: active timers rendering
+  const timers = {}; // local intervals
+  function computeElapsedSeconds(session){
+    if(!session) return 0;
+    const acc = session.accumulatedSeconds || 0;
+    if(session.status === 'active'){
+      const now = Date.now();
+      const start = session.startTime ? new Date(session.startTime).getTime() : now;
+      return acc + Math.floor((now - start)/1000);
+    } else {
+      if(session.endTime){
+        const start = new Date(session.startTime || session.createdAt).getTime();
+        const end = new Date(session.endTime).getTime();
+        return Math.max(0, Math.floor((end - start)/1000) + (session.accumulatedSeconds||0));
+      }
+      return acc;
+    }
+  }
+  function computeElapsedStr(s){ return formatDuration(computeElapsedSeconds(s)); }
+
+  function startLocalTimer(sessionId){
+    if(timers[sessionId]) return;
+    timers[sessionId] = setInterval(()=>{
+      const el = document.getElementById(`timer-${sessionId}`);
+      if(el && state.sessions[sessionId]) el.textContent = computeElapsedStr(state.sessions[sessionId]);
+    }, 1000);
+  }
+  function stopLocalTimer(sessionId){
+    if(timers[sessionId]) { clearInterval(timers[sessionId]); delete timers[sessionId]; }
+  }
+
+  function renderActiveSessions(){
+    const container = $('#activeSessionsList'); if(!container) return;
+    container.innerHTML = '';
+    Object.values(state.sessions || {}).filter(s=> s.status==='active').forEach(s=>{
+      const st = state.stations[s.stationId] || {};
+      const g = state.games[s.gameId] || {};
+      const card = document.createElement('div');
+      card.className = 'station-card';
+      card.innerHTML = `<div><div class="fw-bold">${s.playerName || s.player || 'Guest'} — ${g.name || '-'}</div>
+        <div class="small-muted">${st.name || '-'}</div>
+        <div id="timer-${s.id}" class="timer-big">${computeElapsedStr(s)}</div></div>
+        <div>
+          <button class="btn-outline-light btn btn-sm pause-session" data-id="${s.id}">Pause</button>
+          <button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>
+          <button class="btn btn-sm btn-light print-session" data-id="${s.id}"><i class="bi bi-printer"></i></button>
+          <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}"><i class="bi bi-trash"></i></button>
+        </div>`;
+      container.appendChild(card);
+      startLocalTimer(s.id);
+    });
+
+    // wire buttons
+    $all('.pause-session').forEach(b=> b.onclick = async ()=>{
+      const sid = b.dataset.id; await togglePauseSession(sid);
+    });
+    $all('.stop-session').forEach(b=> b.onclick = async ()=>{
+      const sid = b.dataset.id; await stopSession(sid);
+    });
+    $all('.print-session').forEach(b=> b.onclick = async ()=>{
+      const sid = b.dataset.id; await makePdfForSession(sid);
+    });
+    $all('.delete-session').forEach(b=> b.onclick = async ()=>{
+      if(!confirm('Delete session?')) return;
+      await deleteDoc(doc(db,'sessions',b.dataset.id));
+    });
+  }
+
+  async function togglePauseSession(sessionId){
+    const s = state.sessions[sessionId];
+    if(!s) return;
+    if(s.status === 'active'){
+      const elapsed = computeElapsedSeconds(s);
+      await updateDoc(doc(db,'sessions',sessionId), { status:'paused', accumulatedSeconds: elapsed, pausedAt: new Date().toISOString() });
+      stopLocalTimer(sessionId);
+    } else if(s.status === 'paused'){
+      await updateDoc(doc(db,'sessions',sessionId), { status:'active', startTime: new Date().toISOString(), pausedAt: null });
+      startLocalTimer(sessionId);
+    }
+  }
+
+  async function stopSession(sessionId){
+    const s = state.sessions[sessionId];
+    if(!s) return;
+    const elapsed = computeElapsedSeconds(s);
+    const rate = Number(state.settings?.defaultRate || 300);
+    const price = Math.round((elapsed/3600) * rate);
+    await updateDoc(doc(db,'sessions',sessionId), { status:'ended', endTime: new Date().toISOString(), accumulatedSeconds: elapsed, price });
+    if(s.stationId) await setDoc(doc(db,'stations',s.stationId), { status:'free', currentSessionId: null }, { merge:true });
+    stopLocalTimer(sessionId);
+    alert('Session ended — price KSh '+price);
+  }
+
+  // make PDF for single session
+  async function makePdfForSession(sessionId){
+    const { jsPDF } = window.jspdf;
+    const s = state.sessions[sessionId];
+    if(!s) return alert('Session not found');
+    const doc = new jsPDF();
+    if(state.settings?.logoData){
+      try{ doc.addImage(state.settings.logoData, 'PNG', 15, 10, 60, 30); }catch(e){}
+    }
+    doc.setFontSize(14); doc.text(state.settings?.businessName||'Gaming Centre', 105, 20, null, null, 'center');
+    let y = 45; doc.setFontSize(11);
+    doc.text(`Receipt #: ${sessionId}`, 15, y); y+=8;
+    doc.text(`Customer: ${s.playerName || s.player || 'Guest'}`, 15, y); y+=8;
+    doc.text(`Station: ${state.stations[s.stationId]?.name || '-'}`, 15, y); y+=8;
+    doc.text(`Game: ${state.games[s.gameId]?.name || '-'}`, 15, y); y+=8;
+    doc.text(`Start: ${fmtDate(s.startTime)}`, 15, y); y+=8;
+    doc.text(`End: ${s.endTime ? fmtDate(s.endTime) : '-'}`, 15, y); y+=8;
+    doc.text(`Duration: ${formatDuration(computeElapsedSeconds(s))}`, 15, y); y+=8;
+    doc.text(`Price: KSh ${s.price||0}`, 15, y); y+=12;
+    doc.save(`receipt-${sessionId}.pdf`);
+  }
+
+  // Render all sessions list
+  function renderAllSessions(){
+    const wrap = $('#allSessionsList'); if(!wrap) return;
+    wrap.innerHTML = '';
+    const rows = Object.values(state.sessions||{}).sort((a,b)=> new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt));
+    if(rows.length === 0){ wrap.innerHTML = '<div class="small-muted">No sessions yet</div>'; return; }
+    rows.forEach(s=>{
+      const st = state.stations[s.stationId] || {};
+      const g = state.games[s.gameId] || {};
+      const row = document.createElement('div'); row.className='station-card d-flex justify-content-between align-items-center';
+      row.innerHTML = `<div><div class="fw-bold">${s.playerName || s.player || 'Guest'} • ${g.name || '-'}</div><div class="small-muted">${st.name || '-'} • ${fmtDate(s.startTime)} • ${s.endTime ? 'Ended ' + fmtDate(s.endTime) : 'Active'}</div></div>
+        <div>
+          ${s.status === 'active' ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>` : ''}
+          <button class="btn btn-sm btn-light print-session" data-id="${s.id}"><i class="bi bi-printer"></i></button>
+          <button class="btn-outline-light btn btn-sm pdf-session" data-id="${s.id}"><i class="bi bi-file-earmark-pdf"></i></button>
+          <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}"><i class="bi bi-trash"></i></button>
+        </div>`;
+      wrap.appendChild(row);
+    });
+    // wire actions
+    $all('.stop-session').forEach(b=> b.onclick = ()=> stopSession(b.dataset.id));
+    $all('.print-session').forEach(b=> b.onclick = ()=> { window.printReceiptFromId(b.dataset.id); });
+    $all('.pdf-session').forEach(b=> b.onclick = ()=> makePdfForSession(b.dataset.id));
+    $all('.delete-session').forEach(b=> b.onclick = async ()=> { if(!confirm('Delete session?')) return; await deleteDoc(doc(db,'sessions',b.dataset.id));});
+  }
+
+  // printReceiptFromId: open receipt modal
+  window.printReceiptFromId = async function(sessionId){
+    const s = state.sessions[sessionId];
+    if(!s) return alert('Session not found');
+    const game = state.games[s.gameId] || {};
+    const station = state.stations[s.stationId] || {};
+    const logoHtml = state.settings?.logoData ? `<img src="${state.settings.logoData}" style="max-width:120px;display:block;margin-bottom:10px">` : '';
+    const html = `<div style="font-family:Arial;color:#000">${logoHtml}<h2>${state.settings?.businessName||'Gaming Centre'}</h2><div style="font-size:12px">${state.settings?.businessAddress||''}</div><hr/>
+      <div><strong>Receipt #:</strong> ${sessionId}</div>
+      <div><strong>Customer:</strong> ${s.playerName || s.player || 'Guest'}</div>
+      <div><strong>Station:</strong> ${station.name||''}</div>
+      <div><strong>Game:</strong> ${game.name||''}</div>
+      <div><strong>Start:</strong> ${fmtDate(s.startTime)}</div>
+      <div><strong>End:</strong> ${s.endTime?fmtDate(s.endTime):'-'}</div>
+      <div><strong>Duration:</strong> ${formatDuration(computeElapsedSeconds(s))}</div>
+      <div><strong>Price:</strong> KSh ${s.price||0}</div>
+      <hr/><div style="font-size:12px">Thank you!</div></div>`;
+    $('#receiptBody').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('receiptModal')).show();
+    $('#printReceiptBtn').onclick = ()=> {
+      const w = window.open('','_blank','width=600,height=800');
+      w.document.write(`<html><head><title>Receipt</title></head><body>${html}</body></html>`);
+      w.document.close();
+      setTimeout(()=>w.print(),300);
+    };
+    $('#saveReceiptPdfBtn').onclick = ()=> {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({unit:'pt', format:'a4'});
+      doc.html(html, { x:20, y:20, callback: ()=> doc.save(`receipt-${sessionId}.pdf`) });
+    };
+  };
+
+  // ======= Forms submit handlers (create/update) =======
+
+  // GAME form
+  $('#btnAddGame')?.addEventListener('click', ()=> {
+    $('#gameModalTitle').textContent = 'Add Game';
+    $('#gameId').value=''; $('#gameName').value=''; $('#gameCategory').value=''; $('#gamePrice').value = state.settings?.defaultRate||300;
+    new bootstrap.Modal(document.getElementById('gameModal')).show();
+  });
+  $('#gameForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = $('#gameId').value;
+    const data = { name: $('#gameName').value.trim(), category: $('#gameCategory').value.trim(), pricePerHour: Number($('#gamePrice').value) || state.settings?.defaultRate || 300 };
+    if(id) await updateDoc(doc(db,'games',id), data);
+    else await addDoc(collection(db,'games'), data);
+    bootstrap.Modal.getInstance(document.getElementById('gameModal')).hide();
+  });
+
+  // STATION form
+  $('#btnAddStation')?.addEventListener('click', ()=> {
+    $('#stationModalTitle').textContent = 'Add Station';
+    $('#stationId').value=''; $('#stationName').value=''; $('#stationNotes').value='';
+    new bootstrap.Modal(document.getElementById('stationModal')).show();
+  });
+  $('#stationForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = $('#stationId').value;
+    const data = { name: $('#stationName').value.trim(), notes: $('#stationNotes').value.trim(), status:'free' };
+    if(id) await updateDoc(doc(db,'stations',id), data);
+    else await addDoc(collection(db,'stations'), data);
+    bootstrap.Modal.getInstance(document.getElementById('stationModal')).hide();
+  });
+
+  // SESSION form create
+  $('#btnCreateSession').addEventListener('click', ()=> openCreateSessionModal());
+  $('#btnNewSessionTop').addEventListener('click', ()=> openCreateSessionModal());
+  function openCreateSessionModal(prefStationId){
+    // populate selects
+    renderStationSelects(); renderGameSelects();
+    if(prefStationId) $('#sessionStation').value = prefStationId;
+    $('#sessionModalTitle').textContent = 'Create Session';
+    $('#sessionId').value=''; $('#sessionPlayer').value=''; $('#sessionDuration').value=60;
+    $('#sessionPrice').value = state.settings?.defaultRate || 300;
+    new bootstrap.Modal(document.getElementById('modalSession')).show();
+  }
+  $('#sessionForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const player = $('#sessionPlayer').value || 'Guest';
+    const stationId = $('#sessionStation').value;
+    const gameId = $('#sessionGameSelect').value;
+    const duration = Number($('#sessionDuration').value) || 60;
+    const price = Number($('#sessionPrice').value) || Math.round((state.settings?.defaultRate||300) * duration/60);
+    const notes = $('#sessionNotes').value || '';
+    const startTime = new Date().toISOString();
+    const docData = {
+      playerName: player,
+      stationId,
+      gameId,
+      startTime,
+      accumulatedSeconds: 0,
+      status: 'active',
+      durationMinutes: duration,
+      price,
+      notes
+    };
+    const newRef = await addDoc(collection(db,'sessions'), docData);
+    if(stationId) await setDoc(doc(db,'stations',stationId), { status:'busy', currentSessionId: newRef.id }, { merge:true });
+    bootstrap.Modal.getInstance(document.getElementById('modalSession')).hide();
+  });
+
+  // TOURNAMENT form
+  $('#btnAddTournament').addEventListener('click', ()=> {
+    $('#tournamentModalTitle').textContent = 'Add Tournament';
+    $('#tournamentId').value=''; $('#tournamentName').value=''; $('#tournamentDate').value=''; $('#tournamentFee').value=300;
+    renderGameSelects();
+    new bootstrap.Modal(document.getElementById('tournamentModal')).show();
+  });
+  $('#tournamentForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = $('#tournamentId').value;
+    const data = {
+      name: $('#tournamentName').value.trim(),
+      gameId: $('#tournamentGame').value || '',
+      date: $('#tournamentDate').value || '',
+      fee: Number($('#tournamentFee').value)||0,
+      notes: $('#tournamentNotes').value || '',
+      participants: (id && state.tournaments[id]?.participants) ? state.tournaments[id].participants : []
+    };
+    if(id) await updateDoc(doc(db,'tournaments',id), data);
+    else await addDoc(collection(db,'tournaments'), data);
+    bootstrap.Modal.getInstance(document.getElementById('tournamentModal')).hide();
+  });
+
+  // REGISTER PLAYER form
+  $('#registerPlayerForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const tid = $('#regTournamentId').value;
+    const participant = { id: uid(), name: $('#regPlayerName').value.trim(), contact: $('#regPlayerContact').value.trim(), paid: !!$('#regPlayerPaid').checked, createdAt: new Date().toISOString() };
+    const tRef = doc(db,'tournaments',tid);
+    // push to participants array
+    const t = state.tournaments[tid] || {};
+    const arr = t.participants || [];
+    arr.push(participant);
+    await updateDoc(tRef, { participants: arr });
+    bootstrap.Modal.getInstance(document.getElementById('registerPlayerModal')).hide();
+    alert('Registered!');
+  });
+
+  // VIEW PLAYERS handler on tournament cards:
+  // delegate: when tournaments list renders we attached buttons to open view players
+
+  // OFFER form
+  $('#btnCreateOffer').addEventListener('click', ()=> { $('#offerModalTitle').textContent='New Offer'; $('#offerId').value=''; $('#offerDesc').value=''; $('#offerDiscount').value=10; renderGameSelects(); new bootstrap.Modal(document.getElementById('offerModal')).show(); });
+  $('#offerForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = $('#offerId').value;
+    const data = { gameId: $('#offerGame').value || '', gameName: (state.games[$('#offerGame').value]?.name) || 'All', desc: $('#offerDesc').value, discount: Number($('#offerDiscount').value)||0, until: $('#offerUntil').value || null };
+    if(id) await updateDoc(doc(db,'offers',id), data);
+    else await addDoc(collection(db,'offers'), data);
+    bootstrap.Modal.getInstance(document.getElementById('offerModal')).hide();
+  });
+
+  // MEMBERSHIP
+  $('#btnAddMembership').addEventListener('click', ()=> { $('#membershipModalTitle').textContent='Add Membership'; $('#membershipId').value=''; $('#membershipName').value=''; $('#membershipPrice').value=1000; $('#membershipDuration').value=1; $('#membershipDesc').value=''; new bootstrap.Modal(document.getElementById('membershipModal')).show(); });
+  $('#membershipForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = $('#membershipId').value;
+    const data = { name: $('#membershipName').value.trim(), price: Number($('#membershipPrice').value)||0, duration: Number($('#membershipDuration').value)||1, description: $('#membershipDesc').value.trim() };
+    if(id) await updateDoc(doc(db,'memberships',id), data);
+    else await addDoc(collection(db,'memberships'), data);
+    bootstrap.Modal.getInstance(document.getElementById('membershipModal')).hide();
+  });
+
+  // BIRTHDAY
+  $('#btnAddBirthday').addEventListener('click', ()=> { $('#birthdayModalTitle').textContent='Add Birthday'; $('#birthdayId').value=''; $('#birthdayName').value=''; $('#birthdayDate').value=''; $('#birthdayPhone').value=''; $('#birthdayNotes').value=''; new bootstrap.Modal(document.getElementById('birthdayModal')).show(); });
+  $('#birthdayForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const id = $('#birthdayId').value;
+    const data = { name: $('#birthdayName').value.trim(), dob: $('#birthdayDate').value, phone: $('#birthdayPhone').value.trim(), notes: $('#birthdayNotes').value.trim() };
+    // store birthdays as customers entries (simple approach)
+    if(id) await updateDoc(doc(db,'customers',id), data);
+    else await addDoc(collection(db,'customers'), data);
+    bootstrap.Modal.getInstance(document.getElementById('birthdayModal')).hide();
+  });
+
+  // GAMES add/edit done earlier
+
+  // ======= PDF EXPORTS =======
+  $('#btnExportAllPdf').addEventListener('click', exportAllReportPDF);
+  $('#btnExportSessionsPdf').addEventListener('click', exportAllReportPDF);
+  $('#btnDownloadSessionsPdf')?.addEventListener('click', exportSessionsPdf);
+  $('#btnExportMembersPdf')?.addEventListener('click', exportMembershipsPdf);
+  $('#btnExportCustomersPdf')?.addEventListener('click', exportCustomersPdf);
+  $('#btnExportAllPdf')?.addEventListener('click', exportAllReportPDF);
+
+  function exportSessionsPdf(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    doc.setFontSize(14); doc.text(state.settings?.businessName||'Gaming Centre', 40, 30);
+    if(state.settings?.logoData) try{ doc.addImage(state.settings.logoData,'PNG',450,10,80,40);}catch(e){}
+    doc.setFontSize(11); doc.text('Sessions Report — ' + new Date().toLocaleString(), 40, 60);
+    const sessionsArr = Object.values(state.sessions||{}).sort((a,b)=> new Date(b.startTime) - new Date(a.startTime));
+    const table = sessionsArr.map(s=> [ s.id, s.playerName||s.player||'Guest', state.games[s.gameId]?.name||'-', fmtDate(s.startTime), s.endTime?fmtDate(s.endTime):'-', `KSh ${s.price||0}` ]);
+    doc.autoTable({ startY:80, head:[['ID','Player','Game','Start','End','Price']], body:table, styles:{fontSize:10}, headStyles:{fillColor:[41,128,185], textColor:255} });
+    doc.save('sessions-report.pdf');
+  }
+
+  function exportMembershipsPdf(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    doc.setFontSize(14); doc.text(state.settings?.businessName||'Gaming Centre', 40, 30);
+    doc.setFontSize(11); doc.text('Memberships Report — ' + new Date().toLocaleString(), 40, 60);
+    const arr = Object.values(state.memberships||{}).map(m=> [m.name, `KSh ${m.price||0}`, `${m.duration||1} month(s)`, m.description||'-']);
+    doc.autoTable({ startY:80, head:[['Membership','Price','Duration','Description']], body:arr, styles:{fontSize:10} });
+    doc.save('memberships-report.pdf');
+  }
+
+  function exportCustomersPdf(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    doc.setFontSize(14); doc.text(state.settings?.businessName||'Gaming Centre', 40, 30);
+    doc.setFontSize(11); doc.text('Customers — ' + new Date().toLocaleDateString(), 40, 60);
+    const arr = Object.values(state.customers||{}).map(c=> [c.name, c.email||'-', c.phone||'-', c.dob||'-']);
+    doc.autoTable({ startY:80, head:[['Name','Email','Phone','Birthday']], body:arr, styles:{fontSize:10} });
+    doc.save('customers-report.pdf');
+  }
+
+  async function exportAllReportPDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    doc.setFontSize(16); doc.text(state.settings?.businessName||'Gaming Centre', 40, 30);
+    if(state.settings?.logoData) try{ doc.addImage(state.settings.logoData,'PNG',450,10,80,40); }catch(e){}
+    doc.setFontSize(12); doc.text('Full Report — ' + new Date().toLocaleString(), 40, 60);
+
+    // Sessions
+    const sessionsArr = Object.values(state.sessions||{}).sort((a,b)=> new Date(b.startTime) - new Date(a.startTime));
+    const sessionsTable = sessionsArr.map(s=> [ s.id, s.playerName||'Guest', state.games[s.gameId]?.name||'-', fmtDate(s.startTime), s.endTime?fmtDate(s.endTime):'-', `KSh ${s.price||0}` ]);
+    doc.autoTable({ startY:80, head:[['ID','Player','Game','Start','End','Price']], body:sessionsTable, styles:{fontSize:9} });
+
+    // Customers
+    let y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : 80;
+    const custArr = Object.values(state.customers||{}).map(c=> [c.name, c.email||'-', c.phone||'-', c.dob||'-']);
+    doc.autoTable({ startY:y, head:[['Name','Email','Phone','Birthday']], body:custArr, styles:{fontSize:9} });
+
+    // Offers
+    y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : y+100;
+    const offersArr = Object.values(state.offers||{}).map(o=> [o.gameName || 'All', o.desc || '-', `${o.discount||0}%`, o.until || '-']);
+    doc.autoTable({ startY:y, head:[['Game','Desc','Discount','Until']], body:offersArr, styles:{fontSize:9} });
+
+    doc.save('full-report.pdf');
+  }
+
+  // ======= Settings save =======
+  $('#saveSettings').addEventListener('click', async ()=>{
+    const data = {
+      businessName: $('#settingsBusinessName').value.trim(),
+      businessAddress: $('#settingsBusinessAddress').value.trim(),
+      defaultRate: Number($('#settingsDefaultRate').value) || 300,
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(doc(db,'app','settings'), data, { merge:true });
+    alert('Settings saved');
+  });
+  $('#clearSettings').addEventListener('click', async ()=>{
+    if(!confirm('Reset settings?')) return;
+    await setDoc(doc(db,'app','settings'), { businessName:'', businessAddress:'', defaultRate:300 }, { merge:true });
+  });
+
+  // Upload logo in settings (store base64 in settings.logoData)
+  $('#uploadLogoInput').addEventListener('change', e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = async ()=> {
+      const base64 = r.result;
+      $('#logoPreviewSidebar').src = base64; $('#logoPreviewSidebar').style.display='inline-block';
+      await setDoc(doc(db,'app','settings'), { logoData: base64 }, { merge:true });
+    };
+    r.readAsDataURL(f);
+  });
+
+  // apply settings to UI when available
+  function applySettingsToUI(){
+    const s = state.settings || {};
+    $('#businessTitle').textContent = s.businessName || 'Gaming Centre Admin';
+    $('#businessSubtitle').textContent = s.businessAddress || 'Manage sessions & tournaments';
+    if(s.logoData){ $('#logoPreviewSidebar').src = s.logoData; $('#logoPreviewSidebar').style.display='inline-block'; }
+    $('#settingsBusinessName').value = s.businessName || '';
+    $('#settingsBusinessAddress').value = s.businessAddress || '';
+    $('#settingsDefaultRate').value = s.defaultRate || 300;
+  }
+
+  // ======= Players view open (delegate) =======
+  // we will attach view players buttons when tournaments render; but also support global click
+  document.body.addEventListener('click', (e)=>{
+    const t = e.target;
+    if(t.closest && t.closest('.view-players-btn')) {
+      const btn = t.closest('.view-players-btn');
+      openViewPlayers(btn.dataset.id);
+    }
+    // also handle view players from tournament admin list
+    if(t.classList.contains('register-t')) return; // handled earlier
+  });
+
+  // Apply initial UI state for pages
+  // show dashboard on load (if logged in)
+  $all('main section').forEach(s=> s.style.display='none');
+  $('#section-dashboard').style.display='block';
+
+  // Helpers: show settings values, game/station selects (call once)
+  function renderGameAndStationStatic(){
+    renderGameSelects(); renderStationSelects();
+  }
+
+  // When settings snapshot first arrives will call applySettingsToUI -> that will set defaults
+
+  // Hook: when tournaments list updated, add view players buttons ability
+  // We'll put a small loop to attach view buttons in renderTournamentsAdmin (call openViewPlayers when clicking participants count)
+  // For simplicity we also attach click delegation on tournamentsAdminList
+  document.getElementById('tournamentsAdminList')?.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.view-players-btn');
+    if(btn) openViewPlayers(btn.dataset.id);
+  });
+
+  // Ensure UI select content updates when games/stations change
+  // A small interval to update selects if needed (keeps UI responsive before snapshots)
+  setInterval(()=> { renderGameSelects(); renderStationSelects(); }, 2000);
+
+  // Before finishing, expose some debug on window
+  window.__APP = { state, db };
+
+  // End of module
+  </script>
+
+</body>
+</html>
