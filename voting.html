@@ -453,7 +453,7 @@ function showCandidates() {
 
   const voterCounty = currentVoterDoc.county;
 
-  // Listen to all candidates and filter client-side
+  // Stop any previous listeners before setting up a new one
   if (candidatesUnsub) candidatesUnsub();
 
   candidatesUnsub = db.collection('candidates')
@@ -501,6 +501,8 @@ function showCandidates() {
               <div class="fw-semibold">${escapeHtml(c.name)}</div>
               <div class="candidate-meta">${escapeHtml(c.party || '')}</div>
               <div class="text-muted small">${escapeHtml(c.position)}</div>
+              <div class="text-muted small">County: ${escapeHtml(c.county || 'N/A')}</div>
+              <div class="text-muted small">Ward: ${escapeHtml(c.ward || 'N/A')}</div>
               <button class="mt-2 w-100 btn btn-sm btn-primary btn-pill" 
                       onclick="castVote('${c.id}','${escapeJs(c.position)}')">Vote</button>
             </div>
@@ -584,16 +586,16 @@ function subscribeVotes(){
 }
 
 // --- Render results ---
-function renderResults(counts){
+function renderResults(counts) {
   resultsArea.innerHTML = '';
-  for(const pos in counts){
+  for (const pos in counts) {
     const divPos = document.createElement('div');
     divPos.className = 'mb-3';
     divPos.innerHTML = `<h6 class="mb-2">${escapeHtml(pos)}</h6>`;
     const row = document.createElement('div');
     row.className = 'row g-3';
 
-    for(const cid in counts[pos]){
+    for (const cid in counts[pos]) {
       const c = candidates[cid] || {};
       const votes = counts[pos][cid] || 0;
       const col = document.createElement('div');
@@ -602,10 +604,12 @@ function renderResults(counts){
         <div class="p-2 h-100 text-center card">
           <img src="${(c.imageURL || 'https://via.placeholder.com/120x80?text=No')}" 
                style="width:84px;height:56px;object-fit:cover;border-radius:6px" 
-               alt="${escapeHtml(c.name||'')}" />
-          <div class="fw-semibold">${escapeHtml(c.name || 'Unknown')}</div>
-          <div class="candidate-meta">${escapeHtml(c.position || '')}</div>
-          <div class="mt-2 fw-bold">${votes} votes</div>
+               alt="${escapeHtml(c.name || '')}" />
+          <div class="mt-2 fw-semibold">${escapeHtml(c.name || 'Unknown')}</div>
+          <div class="text-muted small">${escapeHtml(c.position || '')}</div>
+          <div class="text-muted small">County: ${escapeHtml(c.county || 'N/A')}</div>
+          <div class="text-muted small">Ward: ${escapeHtml(c.ward || 'N/A')}</div>
+          <div class="mt-2 text-primary fw-bold">${votes} votes</div>
         </div>
       `;
       row.appendChild(col);
@@ -617,11 +621,12 @@ function renderResults(counts){
 }
 
 // --- Show results only ---
-function showResultsOnly(){
+function showResultsOnly() {
   candidatesArea.style.display = 'none';
   ballotNotice.style.display = 'none';
-  if(!votesSnapshotUnsub) subscribeVotes();
+  if (!votesSnapshotUnsub) subscribeVotes();
 }
+
 
 // --- Escape helpers ---
 function escapeHtml(text){ if(!text) return ''; return String(text).replace(/[&<>"'`=\/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'" :'&#39;','/':'&#x2F;','`':'&#x60','=':'&#x3D'})[c]); }
