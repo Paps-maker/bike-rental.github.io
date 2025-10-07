@@ -70,6 +70,69 @@
   </style>
 </head>
 <body>
+  <style>
+  /* General modal styling for visibility on dark backgrounds */
+  #modalSession .modal-content {
+    background-color: #1f1f1f;
+    color: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #444;
+  }
+
+  #modalSession .modal-header, 
+  #modalSession .modal-footer {
+    border-color: #333;
+  }
+
+  #modalSession .form-label {
+    color: #f1f1f1;
+  }
+
+  /* Inputs and selects */
+  #modalSession .form-control,
+  #modalSession .form-select {
+    background-color: #2a2a2a;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 8px;
+  }
+
+  #modalSession .form-control:focus,
+  #modalSession .form-select:focus {
+    background-color: #333;
+    color: #fff;
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+  }
+
+  /* Dropdown items (force light text on dark bg) */
+  select option {
+    background-color: #2a2a2a;
+    color: #fff;
+  }
+
+  /* Buttons */
+  #modalSession .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  #modalSession .btn-outline-light {
+    color: #f8f9fa;
+    border-color: #f8f9fa;
+  }
+
+  #modalSession .btn-outline-light:hover {
+    background-color: #f8f9fa;
+    color: #000;
+  }
+
+  /* Rounded input consistency */
+  .rounded-input {
+    border-radius: 8px;
+  }
+</style>
+
   <!-- ADMIN LOGIN MODAL -->
   <div class="modal fade" id="adminLoginModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -923,98 +986,154 @@
     new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
   }
 
-  // SESSIONS: active timers rendering
-  const timers = {}; // local intervals
-  function computeElapsedSeconds(session){
-    if(!session) return 0;
-    const acc = session.accumulatedSeconds || 0;
-    if(session.status === 'active'){
-      const now = Date.now();
-      const start = session.startTime ? new Date(session.startTime).getTime() : now;
-      return acc + Math.floor((now - start)/1000);
-    } else {
-      if(session.endTime){
-        const start = new Date(session.startTime || session.createdAt).getTime();
-        const end = new Date(session.endTime).getTime();
-        return Math.max(0, Math.floor((end - start)/1000) + (session.accumulatedSeconds||0));
-      }
-      return acc;
+ // SESSIONS: active timers rendering
+const timers = {}; // local intervals
+
+function computeElapsedSeconds(session) {
+  if (!session) return 0;
+  const acc = session.accumulatedSeconds || 0;
+  if (session.status === 'active') {
+    const now = Date.now();
+    const start = session.startTime ? new Date(session.startTime).getTime() : now;
+    return acc + Math.floor((now - start) / 1000);
+  } else {
+    if (session.endTime) {
+      const start = new Date(session.startTime || session.createdAt).getTime();
+      const end = new Date(session.endTime).getTime();
+      return Math.max(0, Math.floor((end - start) / 1000) + (session.accumulatedSeconds || 0));
     }
+    return acc;
   }
-  function computeElapsedStr(s){ return formatDuration(computeElapsedSeconds(s)); }
+}
 
-  function startLocalTimer(sessionId){
-    if(timers[sessionId]) return;
-    timers[sessionId] = setInterval(()=>{
-      const el = document.getElementById(`timer-${sessionId}`);
-      if(el && state.sessions[sessionId]) el.textContent = computeElapsedStr(state.sessions[sessionId]);
-    }, 1000);
-  }
-  function stopLocalTimer(sessionId){
-    if(timers[sessionId]) { clearInterval(timers[sessionId]); delete timers[sessionId]; }
-  }
+function computeElapsedStr(s) {
+  return formatDuration(computeElapsedSeconds(s));
+}
 
-  function renderActiveSessions(){
-    const container = $('#activeSessionsList'); if(!container) return;
-    container.innerHTML = '';
-    Object.values(state.sessions || {}).filter(s=> s.status==='active').forEach(s=>{
+function startLocalTimer(sessionId) {
+  if (timers[sessionId]) return;
+  timers[sessionId] = setInterval(() => {
+    const s = state.sessions[sessionId];
+    if (!s) return;
+    const elTimer = document.getElementById(`timer-${sessionId}`);
+    const elGames = document.getElementById(`games-${sessionId}`);
+    const g = state.games[s.gameId] || {};
+
+    // use actual game duration if available, fallback 1 game per 2 minutes
+    const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 120);
+    const elapsed = computeElapsedSeconds(s);
+    const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+
+    if (elTimer) elTimer.textContent = formatDuration(elapsed);
+    if (elGames) elGames.textContent = `Games Played: ${gamesPlayed}`;
+  }, 1000);
+}
+
+function stopLocalTimer(sessionId) {
+  if (timers[sessionId]) {
+    clearInterval(timers[sessionId]);
+    delete timers[sessionId];
+  }
+}
+
+function renderActiveSessions() {
+  const container = $('#activeSessionsList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  Object.values(state.sessions || {})
+    .filter((s) => s.status === 'active')
+    .forEach((s) => {
       const st = state.stations[s.stationId] || {};
       const g = state.games[s.gameId] || {};
+      const elapsed = computeElapsedSeconds(s);
+      const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 120);
+      const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+
       const card = document.createElement('div');
       card.className = 'station-card';
-      card.innerHTML = `<div><div class="fw-bold">${s.playerName || s.player || 'Guest'} — ${g.name || '-'}</div>
-        <div class="small-muted">${st.name || '-'}</div>
-        <div id="timer-${s.id}" class="timer-big">${computeElapsedStr(s)}</div></div>
+      card.innerHTML = `
+        <div>
+          <div class="fw-bold">${s.playerName || s.player || 'Guest'} — ${g.name || '-'}</div>
+          <div class="small-muted">${st.name || '-'}</div>
+          <div id="timer-${s.id}" class="timer-big">${computeElapsedStr(s)}</div>
+          <div id="games-${s.id}" class="text-light small">Games Played: ${gamesPlayed}</div>
+        </div>
         <div>
           <button class="btn-outline-light btn btn-sm pause-session" data-id="${s.id}">Pause</button>
           <button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>
-          <button class="btn btn-sm btn-light print-session" data-id="${s.id}"><i class="bi bi-printer"></i></button>
-          <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}"><i class="bi bi-trash"></i></button>
+          <button class="btn btn-sm btn-light print-session" data-id="${s.id}">
+            <i class="bi bi-printer"></i>
+          </button>
+          <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}">
+            <i class="bi bi-trash"></i>
+          </button>
         </div>`;
       container.appendChild(card);
       startLocalTimer(s.id);
     });
 
-    // wire buttons
-    $all('.pause-session').forEach(b=> b.onclick = async ()=>{
-      const sid = b.dataset.id; await togglePauseSession(sid);
-    });
-    $all('.stop-session').forEach(b=> b.onclick = async ()=>{
-      const sid = b.dataset.id; await stopSession(sid);
-    });
-    $all('.print-session').forEach(b=> b.onclick = async ()=>{
-      const sid = b.dataset.id; await makePdfForSession(sid);
-    });
-    $all('.delete-session').forEach(b=> b.onclick = async ()=>{
-      if(!confirm('Delete session?')) return;
-      await deleteDoc(doc(db,'sessions',b.dataset.id));
-    });
-  }
+  // wire buttons
+  $all('.pause-session').forEach((b) => (b.onclick = async () => {
+    const sid = b.dataset.id;
+    await togglePauseSession(sid);
+  }));
+  $all('.stop-session').forEach((b) => (b.onclick = async () => {
+    const sid = b.dataset.id;
+    await stopSession(sid);
+  }));
+  $all('.print-session').forEach((b) => (b.onclick = async () => {
+    const sid = b.dataset.id;
+    await makePdfForSession(sid);
+  }));
+  $all('.delete-session').forEach((b) => (b.onclick = async () => {
+    if (!confirm('Delete session?')) return;
+    await deleteDoc(doc(db, 'sessions', b.dataset.id));
+  }));
+}
 
-  async function togglePauseSession(sessionId){
-    const s = state.sessions[sessionId];
-    if(!s) return;
-    if(s.status === 'active'){
-      const elapsed = computeElapsedSeconds(s);
-      await updateDoc(doc(db,'sessions',sessionId), { status:'paused', accumulatedSeconds: elapsed, pausedAt: new Date().toISOString() });
-      stopLocalTimer(sessionId);
-    } else if(s.status === 'paused'){
-      await updateDoc(doc(db,'sessions',sessionId), { status:'active', startTime: new Date().toISOString(), pausedAt: null });
-      startLocalTimer(sessionId);
-    }
-  }
-
-  async function stopSession(sessionId){
-    const s = state.sessions[sessionId];
-    if(!s) return;
+async function togglePauseSession(sessionId) {
+  const s = state.sessions[sessionId];
+  if (!s) return;
+  if (s.status === 'active') {
     const elapsed = computeElapsedSeconds(s);
-    const rate = Number(state.settings?.defaultRate || 300);
-    const price = Math.round((elapsed/3600) * rate);
-    await updateDoc(doc(db,'sessions',sessionId), { status:'ended', endTime: new Date().toISOString(), accumulatedSeconds: elapsed, price });
-    if(s.stationId) await setDoc(doc(db,'stations',s.stationId), { status:'free', currentSessionId: null }, { merge:true });
+    await updateDoc(doc(db, 'sessions', sessionId), {
+      status: 'paused',
+      accumulatedSeconds: elapsed,
+      pausedAt: new Date().toISOString()
+    });
     stopLocalTimer(sessionId);
-    alert('Session ended — price KSh '+price);
+  } else if (s.status === 'paused') {
+    await updateDoc(doc(db, 'sessions', sessionId), {
+      status: 'active',
+      startTime: new Date().toISOString(),
+      pausedAt: null
+    });
+    startLocalTimer(sessionId);
   }
+}
+
+async function stopSession(sessionId) {
+  const s = state.sessions[sessionId];
+  if (!s) return;
+  const elapsed = computeElapsedSeconds(s);
+  const rate = Number(state.settings?.defaultRate || 300);
+  const price = Math.round((elapsed / 3600) * rate);
+  await updateDoc(doc(db, 'sessions', sessionId), {
+    status: 'ended',
+    endTime: new Date().toISOString(),
+    accumulatedSeconds: elapsed,
+    price
+  });
+  if (s.stationId)
+    await setDoc(
+      doc(db, 'stations', s.stationId),
+      { status: 'free', currentSessionId: null },
+      { merge: true }
+    );
+  stopLocalTimer(sessionId);
+  alert('Session ended — price KSh ' + price);
+}
 
   // make PDF for single session
   async function makePdfForSession(sessionId){
