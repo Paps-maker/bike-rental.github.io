@@ -1020,7 +1020,7 @@ function startLocalTimer(sessionId) {
     const g = state.games[s.gameId] || {};
 
     // use actual game duration if available, fallback 1 game per 2 minutes
-    const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 120);
+    const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
     const elapsed = computeElapsedSeconds(s);
     const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
 
