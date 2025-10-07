@@ -1116,22 +1116,39 @@ async function togglePauseSession(sessionId) {
 async function stopSession(sessionId) {
   const s = state.sessions[sessionId];
   if (!s) return;
+
   const elapsed = computeElapsedSeconds(s);
   const rate = Number(state.settings?.defaultRate || 300);
   const price = Math.round((elapsed / 3600) * rate);
+
+  // Mark session as ended
   await updateDoc(doc(db, 'sessions', sessionId), {
     status: 'ended',
     endTime: new Date().toISOString(),
     accumulatedSeconds: elapsed,
     price
   });
-  if (s.stationId)
+
+  // Free the station immediately
+  if (s.stationId) {
     await setDoc(
       doc(db, 'stations', s.stationId),
       { status: 'free', currentSessionId: null },
       { merge: true }
     );
+
+    // Update local state so UI refreshes instantly
+    if (state.stations[s.stationId]) {
+      state.stations[s.stationId].status = 'free';
+      state.stations[s.stationId].currentSessionId = null;
+    }
+  }
+
+  // Stop local timer and refresh UI
   stopLocalTimer(sessionId);
+  renderStations(); // refresh the station cards/list instantly
+  renderAllSessions(); // optional: update sessions list too
+
   alert('Session ended — price KSh ' + price);
 }
 
