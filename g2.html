@@ -1346,31 +1346,89 @@ async function makePdfForSession(sessionId) {
 initRealtimeSessions();
 
 
-  // Render all sessions list
-  function renderAllSessions(){
-    const wrap = $('#allSessionsList'); if(!wrap) return;
-    wrap.innerHTML = '';
-    const rows = Object.values(state.sessions||{}).sort((a,b)=> new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt));
-    if(rows.length === 0){ wrap.innerHTML = '<div class="small-muted">No sessions yet</div>'; return; }
-    rows.forEach(s=>{
-      const st = state.stations[s.stationId] || {};
-      const g = state.games[s.gameId] || {};
-      const row = document.createElement('div'); row.className='station-card d-flex justify-content-between align-items-center';
-      row.innerHTML = `<div><div class="fw-bold">${s.playerName || s.player || 'Guest'} • ${g.name || '-'}</div><div class="small-muted">${st.name || '-'} • ${fmtDate(s.startTime)} • ${s.endTime ? 'Ended ' + fmtDate(s.endTime) : 'Active'}</div></div>
-        <div>
-          ${s.status === 'active' ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>` : ''}
-          <button class="btn btn-sm btn-light print-session" data-id="${s.id}"><i class="bi bi-printer"></i></button>
-          <button class="btn-outline-light btn btn-sm pdf-session" data-id="${s.id}"><i class="bi bi-file-earmark-pdf"></i></button>
-          <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}"><i class="bi bi-trash"></i></button>
-        </div>`;
-      wrap.appendChild(row);
-    });
-    // wire actions
-    $all('.stop-session').forEach(b=> b.onclick = ()=> stopSession(b.dataset.id));
-    $all('.print-session').forEach(b=> b.onclick = ()=> { window.printReceiptFromId(b.dataset.id); });
-    $all('.pdf-session').forEach(b=> b.onclick = ()=> makePdfForSession(b.dataset.id));
-    $all('.delete-session').forEach(b=> b.onclick = async ()=> { if(!confirm('Delete session?')) return; await deleteDoc(doc(db,'sessions',b.dataset.id));});
+ // --- Render all sessions list ---
+function renderAllSessions() {
+  const wrap = $('#allSessionsList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  const rows = Object.values(state.sessions || {}).sort(
+    (a, b) => new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt)
+  );
+
+  if (rows.length === 0) {
+    wrap.innerHTML = '<div class="small-muted">No sessions yet</div>';
+    return;
   }
+
+  rows.forEach((s) => {
+    const st = state.stations[s.stationId] || {};
+    const g = state.games[s.gameId] || {};
+    const elapsed = computeElapsedSeconds(s);
+    const perGameSeconds =
+      g.durationSeconds ||
+      (g.durationMinutes ? g.durationMinutes * 60 : 300); // default 5min
+    const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+    const hoursPlayed = (elapsed / 3600).toFixed(2);
+
+    const row = document.createElement('div');
+    row.className = 'station-card d-flex justify-content-between align-items-center';
+    row.setAttribute('data-id', s.id);
+
+    row.innerHTML = `
+      <div>
+        <div class="fw-bold">
+          ${s.playerName || s.player || 'Guest'} • ${g.name || '-'}
+        </div>
+        <div class="small-muted">
+          ${st.name || '-'} • ${fmtDate(s.startTime)} • ${
+      s.endTime ? 'Ended ' + fmtDate(s.endTime) : 'Active'
+    }
+        </div>
+        <div class="text-light small">
+          Games Played: ${gamesPlayed} | Hours Played: ${hoursPlayed}
+        </div>
+      </div>
+      <div>
+        ${
+          s.status === 'active'
+            ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>`
+            : ''
+        }
+        <button class="btn btn-sm btn-light print-session" data-id="${s.id}">
+          <i class="bi bi-printer"></i>
+        </button>
+        <button class="btn-outline-light btn btn-sm pdf-session" data-id="${s.id}">
+          <i class="bi bi-file-earmark-pdf"></i>
+        </button>
+        <button class="btn btn-sm btn-danger delete-session" data-id="${s.id}">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+
+    wrap.appendChild(row);
+  });
+
+  // --- Wire actions ---
+  $all('.stop-session').forEach((b) => (b.onclick = () => stopSession(b.dataset.id)));
+  $all('.print-session').forEach(
+    (b) => (b.onclick = () => window.printReceiptFromId(b.dataset.id))
+  );
+  $all('.pdf-session').forEach((b) => (b.onclick = () => makePdfForSession(b.dataset.id)));
+
+  // --- Delete session instantly without refresh ---
+  $all('.delete-session').forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm('Delete session?')) return;
+      const id = b.dataset.id;
+      await deleteDoc(doc(db, 'sessions', id));
+      // Instantly remove from UI
+      const el = document.querySelector(`[data-id="${id}"]`);
+      if (el) el.remove();
+    };
+  });
+}
 
   // printReceiptFromId: open receipt modal
   window.printReceiptFromId = async function(sessionId){
