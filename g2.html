@@ -397,6 +397,39 @@
       </div>
     </div>
   </div>
+<!-- Edit Player Modal -->
+<div class="modal fade" id="editPlayerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editPlayerForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Player</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editPlayerTournamentId">
+          <input type="hidden" id="editPlayerId">
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" id="editPlayerName" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Contact</label>
+            <input type="text" id="editPlayerContact" class="form-control">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" id="editPlayerPaid" class="form-check-input">
+            <label class="form-check-label" for="editPlayerPaid">Paid</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
   <!-- TOURNAMENT MODAL -->
   <div class="modal fade" id="tournamentModal" tabindex="-1">
@@ -445,20 +478,45 @@
   </div>
 
   <!-- VIEW PLAYERS MODAL -->
-  <div class="modal fade" id="viewPlayersModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header"><h5 id="viewPlayersTitle" class="modal-title">Players</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <table class="table table-sm table-striped">
-            <thead><tr><th>Name</th><th>Contact</th><th>Paid</th><th>Actions</th></tr></thead>
-            <tbody id="playersTable"></tbody>
-          </table>
-        </div>
-        <div class="modal-footer"><button class="btn-outline-light btn" data-bs-dismiss="modal">Close</button></div>
+  <!-- View Players Modal -->
+<!-- Players Modal -->
+<div class="modal fade" id="viewPlayersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 id="viewPlayersTitle" class="modal-title">Players</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Paid</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="playersTable"></tbody>
+        </table>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal fade" id="receiptModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-body" id="receiptBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
   <!-- GAME MODAL -->
   <div class="modal fade" id="gameModal" tabindex="-1">
@@ -875,117 +933,202 @@
     document.querySelectorAll('.remove-b').forEach(b=> b.onclick = async ()=> { if(!confirm('Delete?')) return; await deleteDoc(doc(db,'customers',b.dataset.id)); });
   }
 
-  // Tournaments admin render + register button
-  function renderTournamentsAdmin(){
-    const wrap = $('#tournamentsAdminList'); if(!wrap) return;
-    wrap.innerHTML='';
-    Object.values(state.tournaments||{}).forEach(t=>{
-      const g = state.games[t.gameId] || {};
-      const div = document.createElement('div');
-      div.className='station-card';
-      div.innerHTML = `<div><strong>${t.name}</strong><div class="small-muted">${g.name|| '-'} • ${t.date || '-'}</div><div class="small-muted">Fee: KSh ${t.fee || 0}</div></div>
-        <div><button class="btn btn-sm btn-success register-t" data-id="${t.id}">Register</button> <button class="btn btn-sm btn-primary edit-tournament-btn" data-id="${t.id}">Edit</button> <button class="btn btn-sm btn-danger delete-tournament-btn" data-id="${t.id}">Delete</button></div>`;
-      wrap.appendChild(div);
-    });
+ // === Tournaments admin render + register button ===
+function renderTournamentsAdmin() {
+  const wrap = $('#tournamentsAdminList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
 
-    // register
-    document.querySelectorAll('.register-t').forEach(btn=>{
-      btn.onclick = ()=>{
-        const tid = btn.dataset.id;
-        $('#regTournamentId').value = tid;
-        $('#regPlayerName').value = '';
-        $('#regPlayerContact').value = '';
-        $('#regPlayerPaid').checked = false;
-        new bootstrap.Modal(document.getElementById('registerPlayerModal')).show();
-      };
-    });
+  Object.values(state.tournaments || {}).forEach(t => {
+    const g = state.games[t.gameId] || {};
+    const participantCount = (t.participants || []).length;
 
-    // edit
-    document.querySelectorAll('.edit-tournament-btn').forEach(btn=>{
-      btn.onclick = ()=>{
-        const t = state.tournaments[btn.dataset.id];
-        $('#tournamentModalTitle').textContent = "Edit Tournament";
-        $('#tournamentId').value = t.id;
-        $('#tournamentName').value = t.name;
-        $('#tournamentGame').value = t.gameId || '';
-        $('#tournamentDate').value = t.date || '';
-        $('#tournamentFee').value = t.fee || 300;
-        $('#tournamentNotes').value = t.notes || '';
-        new bootstrap.Modal(document.getElementById('tournamentModal')).show();
-      };
-    });
+    const div = document.createElement('div');
+    div.className = 'station-card';
+    div.innerHTML = `
+      <div>
+        <strong>${t.name}</strong>
+        <div class="small-muted">${g.name || '-'} • ${t.date || '-'}</div>
+        <div class="small-muted">Fee: KSh ${t.fee || 0}</div>
+        <div class="small-muted">Players: ${participantCount}</div>
+      </div>
+      <div>
+        <button class="btn btn-sm btn-success register-t" data-id="${t.id}">Register</button>
+        <button class="btn btn-sm btn-warning view-players-btn" data-id="${t.id}">View Players</button>
+        <button class="btn btn-sm btn-primary edit-tournament-btn" data-id="${t.id}">Edit</button>
+        <button class="btn btn-sm btn-danger delete-tournament-btn" data-id="${t.id}">Delete</button>
+      </div>
+    `;
+    wrap.appendChild(div);
+  });
 
-    // delete
-    document.querySelectorAll('.delete-tournament-btn').forEach(btn=>{
-      btn.onclick = async ()=>{
-        if(!confirm('Delete this tournament?')) return;
-        await deleteDoc(doc(db,'tournaments',btn.dataset.id));
-      };
-    });
-  }
+  // === Register player ===
+  document.querySelectorAll('.register-t').forEach(btn => {
+    btn.onclick = () => {
+      const tid = btn.dataset.id;
+      $('#regTournamentId').value = tid;
+      $('#regPlayerName').value = '';
+      $('#regPlayerContact').value = '';
+      $('#regPlayerPaid').checked = false;
+      new bootstrap.Modal(document.getElementById('registerPlayerModal')).show();
+    };
+  });
 
-  // Render players for a tournament (in view modal)
-  function openViewPlayers(tid){
+  // === Edit tournament ===
+  document.querySelectorAll('.edit-tournament-btn').forEach(btn => {
+    btn.onclick = () => {
+      const t = state.tournaments[btn.dataset.id];
+      $('#tournamentModalTitle').textContent = "Edit Tournament";
+      $('#tournamentId').value = t.id;
+      $('#tournamentName').value = t.name;
+      $('#tournamentGame').value = t.gameId || '';
+      $('#tournamentDate').value = t.date || '';
+      $('#tournamentFee').value = t.fee || 300;
+      $('#tournamentNotes').value = t.notes || '';
+      new bootstrap.Modal(document.getElementById('tournamentModal')).show();
+    };
+  });
+
+  // === View Players ===
+  document.querySelectorAll('.view-players-btn').forEach(btn => {
+    btn.onclick = () => {
+      openViewPlayers(btn.dataset.id);
+    };
+  });
+
+  // === Delete tournament ===
+  document.querySelectorAll('.delete-tournament-btn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Delete this tournament?')) return;
+      await deleteDoc(doc(db, 'tournaments', btn.dataset.id));
+    };
+  });
+}
+
+// === Render players for a tournament (in view modal) ===
+function openViewPlayers(tid) {
+  const t = state.tournaments[tid];
+  if (!t) return alert('Tournament not found');
+  $('#viewPlayersTitle').textContent = `Players: ${t.name}`;
+  const tbody = document.querySelector('#playersTable');
+  tbody.innerHTML = '';
+
+  (t.participants || []).forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.name}</td>
+      <td>${p.contact || '-'}</td>
+      <td>${p.paid ? '✅' : '❌'}</td>
+      <td>
+        <button class="btn btn-sm btn-warning edit-player-btn" data-tid="${t.id}" data-pid="${p.id}">Edit</button>
+        <button class="btn btn-sm btn-danger delete-player-btn" data-tid="${t.id}" data-pid="${p.id}">Delete</button>
+        <button class="btn btn-sm btn-primary print-receipt-btn" data-tid="${t.id}" data-pid="${p.id}">Print</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // === Edit player using modal ===
+  tbody.querySelectorAll('.edit-player-btn').forEach(b => {
+    b.onclick = () => {
+      const tid = b.dataset.tid;
+      const pid = b.dataset.pid;
+      const t = state.tournaments[tid];
+      const player = (t.participants || []).find(pp => pp.id === pid);
+      if (!player) return alert('Player not found');
+
+      $('#editPlayerTournamentId').value = tid;
+      $('#editPlayerId').value = pid;
+      $('#editPlayerName').value = player.name || '';
+      $('#editPlayerContact').value = player.contact || '';
+      $('#editPlayerPaid').checked = !!player.paid;
+
+      new bootstrap.Modal(document.getElementById('editPlayerModal')).show();
+    };
+  });
+
+  // === Delete player ===
+  tbody.querySelectorAll('.delete-player-btn').forEach(b => {
+  b.onclick = async () => {
+    if (!confirm('Delete player?')) return;
+    const tid = b.dataset.tid;
+    const pid = b.dataset.pid;
     const t = state.tournaments[tid];
-    if(!t) return alert('Tournament not found');
-    $('#viewPlayersTitle').textContent = `Players: ${t.name}`;
-    const tbody = document.querySelector('#playersTable');
-    tbody.innerHTML = '';
-    (t.participants||[]).forEach(p=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${p.name}</td><td>${p.contact||'-'}</td><td>${p.paid? '✅':'❌'}</td>
-        <td>
-          <button class="btn btn-sm btn-warning edit-player-btn" data-tid="${t.id}" data-pid="${p.id}">Edit</button>
-          <button class="btn btn-sm btn-danger delete-player-btn" data-tid="${t.id}" data-pid="${p.id}">Delete</button>
-          <button class="btn btn-sm btn-primary print-receipt-btn" data-tid="${t.id}" data-pid="${p.id}">Print</button>
-        </td>`;
-      tbody.appendChild(tr);
-    });
-    // wire actions
-    tbody.querySelectorAll('.edit-player-btn').forEach(b=>{
-      b.onclick = async ()=>{
-        const tid = b.dataset.tid; const pid = b.dataset.pid;
-        const t = state.tournaments[tid];
-        const player = (t.participants||[]).find(pp=> pp.id === pid);
-        if(!player) return alert('Player not found');
-        const newName = prompt('Edit player name:', player.name);
-        if(newName !== null && newName.trim() !== ''){
-          player.name = newName.trim();
-          await updateDoc(doc(db,'tournaments',tid), { participants: t.participants });
-          // UI will update via snapshot
-        }
-      };
-    });
-    tbody.querySelectorAll('.delete-player-btn').forEach(b=>{
-      b.onclick = async ()=>{
-        if(!confirm('Delete player?')) return;
-        const tid = b.dataset.tid; const pid = b.dataset.pid;
-        const t = state.tournaments[tid];
-        t.participants = (t.participants||[]).filter(p=> p.id !== pid);
-        await updateDoc(doc(db,'tournaments',tid), { participants: t.participants });
-      };
-    });
-    tbody.querySelectorAll('.print-receipt-btn').forEach(b=>{
-      b.onclick = ()=>{
-        const tid = b.dataset.tid; const pid = b.dataset.pid;
-        const t = state.tournaments[tid];
-        const p = (t.participants||[]).find(x=> x.id === pid);
-        if(!p) return alert('Not found');
-        // build a receipt for tournament registration
-        const html = `<div style="font-family:Arial;color:#000;padding:10px;">
-          ${state.settings.logoData? `<img src="${state.settings.logoData}" style="max-width:120px;display:block;margin-bottom:10px">` : ''}
-          <h3>${state.settings.businessName||'Gaming Centre'}</h3>
+    if (!t) return alert('Tournament not found');
+
+    // Remove player from state immediately
+    t.participants = (t.participants || []).filter(p => p.id !== pid);
+    state.tournaments[tid] = t;
+
+    // Instantly remove row from the table
+    b.closest('tr').remove();
+
+    // Update Firestore in background
+    await updateDoc(doc(db, 'tournaments', tid), { participants: t.participants });
+
+    // Optional Bootstrap toast confirmation
+    if (window.bootstrap && bootstrap.Toast) {
+      const toast = document.createElement('div');
+      toast.className = 'toast align-items-center text-bg-success border-0 position-fixed top-0 end-0 m-3';
+      toast.role = 'alert';
+      toast.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">Player deleted successfully.</div>
+          <button type="button" class="m-auto me-2 btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>`;
+      document.body.appendChild(toast);
+      new bootstrap.Toast(toast).show();
+    }
+  };
+});
+
+
+  // === Print receipt ===
+  tbody.querySelectorAll('.print-receipt-btn').forEach(b => {
+    b.onclick = () => {
+      const tid = b.dataset.tid;
+      const pid = b.dataset.pid;
+      const t = state.tournaments[tid];
+      const p = (t.participants || []).find(x => x.id === pid);
+      if (!p) return alert('Not found');
+      const html = `
+        <div style="font-family:Arial;color:#000;padding:10px;">
+          ${state.settings.logoData ? `<img src="${state.settings.logoData}" style="max-width:120px;display:block;margin-bottom:10px">` : ''}
+          <h3>${state.settings.businessName || 'Gaming Centre'}</h3>
           <div><strong>Tournament:</strong> ${t.name}</div>
           <div><strong>Player:</strong> ${p.name}</div>
           <div><strong>Paid:</strong> ${p.paid ? 'Yes' : 'No'}</div>
-          <div style="margin-top:12px">Thank you!</div></div>`;
-        $('#receiptBody').innerHTML = html;
-        new bootstrap.Modal(document.getElementById('receiptModal')).show();
-      };
-    });
-    new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
-  }
-  
+          <div style="margin-top:12px">Thank you!</div>
+        </div>`;
+      $('#receiptBody').innerHTML = html;
+      new bootstrap.Modal(document.getElementById('receiptModal')).show();
+    };
+  });
+
+  new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
+}
+
+// === Handle edit player form submission ===
+$('#editPlayerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const tid = $('#editPlayerTournamentId').value;
+  const pid = $('#editPlayerId').value;
+  const name = $('#editPlayerName').value.trim();
+  const contact = $('#editPlayerContact').value.trim();
+  const paid = $('#editPlayerPaid').checked;
+
+  const t = state.tournaments[tid];
+  if (!t) return alert('Tournament not found');
+  const player = (t.participants || []).find(p => p.id === pid);
+  if (!player) return alert('Player not found');
+
+  player.name = name;
+  player.contact = contact;
+  player.paid = paid;
+
+  await updateDoc(doc(db, 'tournaments', tid), { participants: t.participants });
+  bootstrap.Modal.getInstance(document.getElementById('editPlayerModal')).hide();
+});
 
  // === ACTIVE SESSION TIMER & CONTROL SYSTEM (Dynamic + Real-Time) ===
 const timers = {}; // active local timers
