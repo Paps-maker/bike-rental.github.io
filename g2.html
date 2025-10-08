@@ -300,7 +300,10 @@
             </div>
           </div>
         </div>
+        
       </section>
+    
+
 
       <!-- STATIONS PAGE -->
       <section id="section-stations" style="display:none;">
@@ -380,6 +383,7 @@
       <div class="modal-content">
         <form id="sessionForm">
           <div class="modal-header"><h5 id="sessionModalTitle" class="modal-title">Create Session</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          
           <div class="modal-body">
             <input type="hidden" id="sessionId">
             <div class="mb-2"><label class="form-label small">Player name</label><input id="sessionPlayer" class="bg-transparent rounded-input text-white form-control" placeholder="Player name"></div>
@@ -623,6 +627,34 @@
       </div>
     </div>
   </div>
+<div class="modal fade" id="gamesPlayedModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="bg-dark text-light modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="gamesModalTitle">Games Played</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered table-dark align-middle">
+          <thead>
+            <tr>
+              <th>Game</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="gamesPlayedTableBody"></tbody>
+        </table>
+        <div class="mt-3 text-end">
+          <div id="totalAmount"></div>
+          <div id="amountPaid"></div>
+          <div id="remainingBalance"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1195,7 +1227,7 @@ function renderActiveSessions() {
       const st = state.stations[s.stationId] || {};
       const g = state.games[s.gameId] || {};
       const elapsed = computeElapsedSeconds(s);
-      const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 120);
+      const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
       const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
       const isPaused = s.status === 'paused';
 
@@ -1347,7 +1379,7 @@ async function makePdfForSession(sessionId) {
 initRealtimeSessions();
 
 
- // --- Render all sessions list ---
+ // --- Render all sessions list with dynamic payment tracking + clickable unpaid summary ---
 function renderAllSessions() {
   const wrap = $('#allSessionsList');
   if (!wrap) return;
@@ -1362,15 +1394,33 @@ function renderAllSessions() {
     return;
   }
 
+  const unpaidSummary = {}; // track unpaid balances by player
+  const playerToSession = {}; // map player name to session id
+
   rows.forEach((s) => {
     const st = state.stations[s.stationId] || {};
     const g = state.games[s.gameId] || {};
     const elapsed = computeElapsedSeconds(s);
     const perGameSeconds =
-      g.durationSeconds ||
-      (g.durationMinutes ? g.durationMinutes * 60 : 300); // default 5min
+      g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840); // default 5min
     const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
     const hoursPlayed = (elapsed / 3600).toFixed(2);
+
+    // Compute unpaid amount if any
+    const games = s.gamesPlayed || [];
+    let total = 0,
+      paid = 0;
+    games.forEach((gm) => {
+      total += gm.price || 0;
+      if (gm.paid) paid += gm.price || 0;
+    });
+    const remaining = total - paid;
+    const player = s.playerName || s.player || 'Guest';
+
+    if (remaining > 0) {
+      unpaidSummary[player] = (unpaidSummary[player] || 0) + remaining;
+      playerToSession[player] = s.id; // store session id
+    }
 
     const row = document.createElement('div');
     row.className = 'station-card d-flex justify-content-between align-items-center';
@@ -1378,17 +1428,18 @@ function renderAllSessions() {
 
     row.innerHTML = `
       <div>
-        <div class="fw-bold">
-          ${s.playerName || s.player || 'Guest'} • ${g.name || '-'}
-        </div>
-        <div class="small-muted">
-          ${st.name || '-'} • ${fmtDate(s.startTime)} • ${
+        <div class="fw-bold">${player} • ${g.name || '-'}</div>
+        <div class="small-muted">${st.name || '-'} • ${fmtDate(s.startTime)} • ${
       s.endTime ? 'Ended ' + fmtDate(s.endTime) : 'Active'
-    }
-        </div>
+    }</div>
         <div class="text-light small">
           Games Played: ${gamesPlayed} | Hours Played: ${hoursPlayed}
         </div>
+        ${
+          remaining > 0
+            ? `<div class="text-warning small">Unpaid Balance: KSh ${remaining}</div>`
+            : ''
+        }
       </div>
       <div>
         ${
@@ -1396,6 +1447,9 @@ function renderAllSessions() {
             ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>`
             : ''
         }
+        <button class="btn btn-sm btn-info view-games" data-id="${s.id}">
+          <i class="bi bi-controller"></i> Games
+        </button>
         <button class="btn btn-sm btn-light print-session" data-id="${s.id}">
           <i class="bi bi-printer"></i>
         </button>
@@ -1411,24 +1465,129 @@ function renderAllSessions() {
     wrap.appendChild(row);
   });
 
+  // --- Add clickable summary of all unpaid balances ---
+  if (Object.keys(unpaidSummary).length > 0) {
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'mt-3 p-2 border-top text-warning small';
+    summaryDiv.innerHTML =
+      `<strong>Pending Payments:</strong><br>` +
+      Object.entries(unpaidSummary)
+        .map(
+          ([name, amt]) =>
+            `<a href="#" class="text-warning fw-bold unpaid-link" data-player="${name}">${name}</a>: KSh ${amt}`
+        )
+        .join('<br>');
+    wrap.appendChild(summaryDiv);
+
+    // make unpaid names clickable
+    summaryDiv.querySelectorAll('.unpaid-link').forEach((a) => {
+      a.onclick = (e) => {
+        e.preventDefault();
+        const player = a.dataset.player;
+        const sid = playerToSession[player];
+        if (sid) openGamesModal(sid);
+      };
+    });
+  }
+
   // --- Wire actions ---
   $all('.stop-session').forEach((b) => (b.onclick = () => stopSession(b.dataset.id)));
-  $all('.print-session').forEach(
-    (b) => (b.onclick = () => window.printReceiptFromId(b.dataset.id))
-  );
+  $all('.print-session').forEach((b) => (b.onclick = () => window.printReceiptFromId(b.dataset.id)));
   $all('.pdf-session').forEach((b) => (b.onclick = () => makePdfForSession(b.dataset.id)));
 
-  // --- Delete session instantly without refresh ---
+  // --- Delete instantly without refresh ---
   $all('.delete-session').forEach((b) => {
     b.onclick = async () => {
       if (!confirm('Delete session?')) return;
       const id = b.dataset.id;
       await deleteDoc(doc(db, 'sessions', id));
-      // Instantly remove from UI
       const el = document.querySelector(`[data-id="${id}"]`);
       if (el) el.remove();
+      renderAllSessions(); // refresh summary if deleted
     };
   });
+
+  // --- View games modal ---
+  $all('.view-games').forEach((b) => {
+    b.onclick = () => openGamesModal(b.dataset.id);
+  });
+}
+
+// --- Open Games Modal for a session ---
+function openGamesModal(sessionId) {
+  const s = state.sessions[sessionId];
+  if (!s) return alert('Session not found');
+
+  const g = state.games[s.gameId] || {};
+  s.gamesPlayed = s.gamesPlayed || [];
+
+  const elapsed = computeElapsedSeconds(s);
+  const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
+  const totalGames = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+
+  // Auto-generate missing game entries
+  for (let i = 1; i <= totalGames; i++) {
+    if (!s.gamesPlayed.find((gm) => gm.id === `g${i}`)) {
+      s.gamesPlayed.push({
+        id: `g${i}`,
+        name: `${g.name || 'Game'} #${i}`,
+        paid: false,
+        price: g.price || 50,
+      });
+    }
+  }
+
+  let total = 0;
+  let paid = 0;
+  const tbody = $('#gamesPlayedTableBody');
+  tbody.innerHTML = '';
+
+  s.gamesPlayed.forEach((gm) => {
+    total += gm.price || 0;
+    if (gm.paid) paid += gm.price || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${gm.name}</td>
+      <td>KSh ${gm.price || 0}</td>
+      <td>
+        ${gm.paid
+          ? '<span class="bg-success badge">Paid</span>'
+          : '<span class="bg-danger badge">Not Paid</span>'}
+      </td>
+      <td>
+        ${gm.paid
+          ? ''
+          : `<button class="btn btn-sm btn-success mark-paid" data-sid="${s.id}" data-gid="${gm.id}">
+               Mark Paid
+             </button>`}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const remaining = total - paid;
+  $('#gamesModalTitle').textContent = `Games for ${s.playerName || 'Guest'}`;
+  $('#totalAmount').textContent = `Total: KSh ${total}`;
+  $('#amountPaid').textContent = `Paid: KSh ${paid}`;
+  $('#remainingBalance').textContent = `Remaining: KSh ${remaining}`;
+
+  // --- Mark game as paid instantly ---
+  tbody.querySelectorAll('.mark-paid').forEach((btn) => {
+    btn.onclick = async () => {
+      const sid = btn.dataset.sid;
+      const gid = btn.dataset.gid;
+      const sess = state.sessions[sid];
+      if (!sess) return;
+      sess.gamesPlayed = (sess.gamesPlayed || []).map((gm) =>
+        gm.id === gid ? { ...gm, paid: true } : gm
+      );
+      await updateDoc(doc(db, 'sessions', sid), { gamesPlayed: sess.gamesPlayed });
+      openGamesModal(sid); // refresh modal instantly
+      renderAllSessions(); // refresh main list + unpaid summary
+    };
+  });
+
+  new bootstrap.Modal(document.getElementById('gamesPlayedModal')).show();
 }
 
   // printReceiptFromId: open receipt modal
