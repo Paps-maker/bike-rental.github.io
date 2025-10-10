@@ -1281,6 +1281,7 @@ function initRealtimeSessions() {
       }
     });
     renderActiveSessions();
+    renderAllSessions();
   });
 }
 
@@ -1310,22 +1311,43 @@ async function togglePauseSession(sessionId) {
   }
 }
 
-// --- Stop session logic ---
+// --- Stop session logic (final version) ---
 async function stopSession(sessionId) {
   const s = state.sessions[sessionId];
   if (!s) return;
 
+  const g = state.games[s.gameId] || {};
+  const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
   const elapsed = computeElapsedSeconds(s);
+
+  // Calculate total games based on elapsed time
+  const totalGames = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+
+  // Generate exact games list once, based on elapsed time
+  const lockedGames = [];
+  for (let i = 1; i <= totalGames; i++) {
+    lockedGames.push({
+      id: `g${i}`,
+      name: `${g.name || 'Game'} #${i}`,
+      paid: false,
+      price: g.price || 50
+    });
+  }
+
+  // Compute total price
   const rate = Number(state.settings?.defaultRate || 300);
   const price = Math.round((elapsed / 3600) * rate);
 
+  // Update Firestore and lock session
   await updateDoc(doc(db, 'sessions', sessionId), {
     status: 'ended',
     endTime: new Date().toISOString(),
     accumulatedSeconds: elapsed,
-    price
+    price,
+    gamesPlayed: lockedGames // lock exact games played
   });
 
+  // Free up station if assigned
   if (s.stationId) {
     await setDoc(
       doc(db, 'stations', s.stationId),
@@ -1338,11 +1360,12 @@ async function stopSession(sessionId) {
     }
   }
 
+  // Stop timer and refresh UI
   stopLocalTimer(sessionId);
   renderStations?.();
   renderAllSessions?.();
 
-  alert('Session ended — price KSh ' + price);
+  alert(`Session ended — ${totalGames} game(s) played — Total KSh ${price}`);
 }
 
 // --- Generate session PDF receipt ---
@@ -1375,11 +1398,7 @@ async function makePdfForSession(sessionId) {
   doc.save(`receipt-${sessionId}.pdf`);
 }
 
-// --- Initialize the real-time system ---
-initRealtimeSessions();
-
-
- // --- Render all sessions list with dynamic payment tracking + clickable unpaid summary ---
+// --- Render all sessions list with unpaid summary ---
 function renderAllSessions() {
   const wrap = $('#allSessionsList');
   if (!wrap) return;
@@ -1389,28 +1408,29 @@ function renderAllSessions() {
     (a, b) => new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt)
   );
 
-  if (rows.length === 0) {
+  if (!rows.length) {
     wrap.innerHTML = '<div class="small-muted">No sessions yet</div>';
     return;
   }
 
-  const unpaidSummary = {}; // track unpaid balances by player
-  const playerToSession = {}; // map player name to session id
+  const unpaidSummary = {};
+  const playerToSession = {};
 
-  rows.forEach((s) => {
+  rows.forEach(s => {
     const st = state.stations[s.stationId] || {};
     const g = state.games[s.gameId] || {};
     const elapsed = computeElapsedSeconds(s);
-    const perGameSeconds =
-      g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840); // default 5min
-    const gamesPlayed = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
+    const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
+
+    // --- Ensure exact games played from session ---
+    const gamesPlayed = s.gamesPlayed?.length
+      ? s.gamesPlayed.length
+      : (perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0);
     const hoursPlayed = (elapsed / 3600).toFixed(2);
 
-    // Compute unpaid amount if any
     const games = s.gamesPlayed || [];
-    let total = 0,
-      paid = 0;
-    games.forEach((gm) => {
+    let total = 0, paid = 0;
+    games.forEach(gm => {
       total += gm.price || 0;
       if (gm.paid) paid += gm.price || 0;
     });
@@ -1419,7 +1439,7 @@ function renderAllSessions() {
 
     if (remaining > 0) {
       unpaidSummary[player] = (unpaidSummary[player] || 0) + remaining;
-      playerToSession[player] = s.id; // store session id
+      playerToSession[player] = s.id;
     }
 
     const row = document.createElement('div');
@@ -1430,26 +1450,27 @@ function renderAllSessions() {
       <div>
         <div class="fw-bold">${player} • ${g.name || '-'}</div>
         <div class="small-muted">${st.name || '-'} • ${fmtDate(s.startTime)} • ${
-      s.endTime ? 'Ended ' + fmtDate(s.endTime) : 'Active'
-    }</div>
+          s.endTime ? 'Ended ' + fmtDate(s.endTime) : 'Active'
+        }</div>
         <div class="text-light small">
           Games Played: ${gamesPlayed} | Hours Played: ${hoursPlayed}
         </div>
-        ${
-          remaining > 0
-            ? `<div class="text-warning small">Unpaid Balance: KSh ${remaining}</div>`
-            : ''
-        }
+        ${remaining > 0 ? `<div class="text-warning small">Unpaid Balance: KSh ${remaining}</div>` : ''}
       </div>
-      <div>
-        ${
-          s.status === 'active'
-            ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>`
-            : ''
+      <div class="text-end">
+        ${s.status === 'active'
+          ? `<button class="btn-outline-light btn btn-sm stop-session" data-id="${s.id}">Stop</button>`
+          : ''
         }
         <button class="btn btn-sm btn-info view-games" data-id="${s.id}">
           <i class="bi bi-controller"></i> Games
         </button>
+        ${remaining > 0
+          ? `<button class="btn btn-sm btn-success mark-paid" data-id="${s.id}">
+              <i class="bi bi-cash-coin"></i> Mark Paid
+            </button>`
+          : ''
+        }
         <button class="btn btn-sm btn-light print-session" data-id="${s.id}">
           <i class="bi bi-printer"></i>
         </button>
@@ -1461,59 +1482,263 @@ function renderAllSessions() {
         </button>
       </div>
     `;
-
     wrap.appendChild(row);
   });
 
-  // --- Add clickable summary of all unpaid balances ---
-  if (Object.keys(unpaidSummary).length > 0) {
+  // --- Unpaid summary clickable ---
+  if (Object.keys(unpaidSummary).length) {
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'mt-3 p-2 border-top text-warning small';
     summaryDiv.innerHTML =
       `<strong>Pending Payments:</strong><br>` +
       Object.entries(unpaidSummary)
-        .map(
-          ([name, amt]) =>
-            `<a href="#" class="text-warning fw-bold unpaid-link" data-player="${name}">${name}</a>: KSh ${amt}`
+        .map(([name, amt]) =>
+          `<a href="#" class="text-warning fw-bold unpaid-link" data-player="${name}">${name}</a>: KSh ${amt}`
         )
         .join('<br>');
     wrap.appendChild(summaryDiv);
 
-    // make unpaid names clickable
-    summaryDiv.querySelectorAll('.unpaid-link').forEach((a) => {
-      a.onclick = (e) => {
+    summaryDiv.querySelectorAll('.unpaid-link').forEach(a => {
+      a.onclick = e => {
         e.preventDefault();
-        const player = a.dataset.player;
-        const sid = playerToSession[player];
+        const sid = playerToSession[a.dataset.player];
         if (sid) openGamesModal(sid);
       };
     });
   }
 
   // --- Wire actions ---
-  $all('.stop-session').forEach((b) => (b.onclick = () => stopSession(b.dataset.id)));
-  $all('.print-session').forEach((b) => (b.onclick = () => window.printReceiptFromId(b.dataset.id)));
-  $all('.pdf-session').forEach((b) => (b.onclick = () => makePdfForSession(b.dataset.id)));
-
-  // --- Delete instantly without refresh ---
-  $all('.delete-session').forEach((b) => {
+  $all('.stop-session').forEach(b => b.onclick = () => stopSession(b.dataset.id));
+  $all('.print-session').forEach(b => b.onclick = () => window.printReceiptFromId(b.dataset.id));
+  $all('.pdf-session').forEach(b => b.onclick = () => makePdfForSession(b.dataset.id));
+  $all('.delete-session').forEach(b => {
     b.onclick = async () => {
       if (!confirm('Delete session?')) return;
       const id = b.dataset.id;
       await deleteDoc(doc(db, 'sessions', id));
       const el = document.querySelector(`[data-id="${id}"]`);
       if (el) el.remove();
-      renderAllSessions(); // refresh summary if deleted
+      renderAllSessions();
     };
   });
+  $all('.view-games').forEach(b => b.onclick = () => openGamesModal(b.dataset.id));
 
-  // --- View games modal ---
-  $all('.view-games').forEach((b) => {
-    b.onclick = () => openGamesModal(b.dataset.id);
+  // --- Mark as Paid Logic ---
+  $all('.mark-paid').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const sid = btn.dataset.id;
+      if (!confirm('Confirm mark this session as fully paid?')) return;
+
+      const ref = doc(db, 'sessions', sid);
+      const sSnap = await getDoc(ref);
+      if (!sSnap.exists()) return alert('Session not found.');
+
+      const data = sSnap.data();
+      const updatedGames = (data.gamesPlayed || []).map(g => ({ ...g, paid: true }));
+
+      await updateDoc(ref, {
+        gamesPlayed: updatedGames,
+        status: 'paid'
+      });
+
+      // --- Free station if it was ended ---
+      if (data.stationId) {
+        await setDoc(
+          doc(db, 'stations', data.stationId),
+          { status: 'free', currentSessionId: null },
+          { merge: true }
+        );
+      }
+
+      alert('Session marked as fully paid.');
+      renderAllSessions();
+    });
+  });
+  // --- UNPAID CUSTOMERS MANAGEMENT ---
+
+// --- Add management button dynamically ---
+function renderUnpaidCustomersButton() {
+  const container = document.querySelector('#allSessionsList');
+  if (!container) return;
+
+  if (!document.querySelector('#manageUnpaidBtn')) {
+    const btn = document.createElement('button');
+    btn.id = 'manageUnpaidBtn';
+    btn.className = 'btn btn-warning mt-3 w-100';
+    btn.innerHTML = '<i class="bi bi-wallet2"></i> Manage Unpaid Customers';
+    btn.onclick = openUnpaidCustomersModal;
+    container.parentElement.insertBefore(btn, container.nextSibling);
+  }
+}
+renderUnpaidCustomersButton();
+
+
+// --- Modal structure (auto injected once) ---
+function injectUnpaidCustomersModal() {
+  if (document.querySelector('#unpaidCustomersModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal fade" id="unpaidCustomersModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="bg-dark text-light modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-wallet2"></i> Unpaid Customers</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="unpaidCustomerForm" class="mb-3">
+              <input type="hidden" id="unpaidId">
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <input type="text" id="unpaidName" class="form-control" placeholder="Customer Name" required>
+                </div>
+                <div class="col-md-3">
+                  <input type="number" id="unpaidAmount" class="form-control" placeholder="Amount (KSh)" required>
+                </div>
+                <div class="col-md-3">
+                  <input type="date" id="unpaidDate" class="form-control" required>
+                </div>
+                <div class="d-grid col-md-2">
+                  <button type="submit" class="btn btn-success"><i class="bi bi-plus-lg"></i> Save</button>
+                </div>
+              </div>
+              <textarea id="unpaidNotes" class="mt-2 form-control" placeholder="Notes (optional)" rows="2"></textarea>
+            </form>
+
+            <div id="unpaidList" class="table-responsive">
+              <table class="table table-dark table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="unpaidTableBody">
+                  <tr><td colspan="6" class="text-muted text-center">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+injectUnpaidCustomersModal();
+
+
+// --- Open Modal ---
+async function openUnpaidCustomersModal() {
+  const modal = new bootstrap.Modal('#unpaidCustomersModal');
+  modal.show();
+  subscribeToUnpaidCustomers(); // now uses realtime updates
+}
+
+
+// --- Real-time listener for unpaid customers ---
+let unsubUnpaid = null;
+function subscribeToUnpaidCustomers() {
+  const tbody = document.getElementById('unpaidTableBody');
+  const ref = collection(db, 'unpaid_customers');
+
+  // Prevent multiple listeners
+  if (unsubUnpaid) unsubUnpaid();
+
+  unsubUnpaid = onSnapshot(ref, (snapshot) => {
+    tbody.innerHTML = "";
+    if (snapshot.empty) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No unpaid customers</td></tr>';
+      return;
+    }
+
+    snapshot.forEach((docSnap) => {
+      const c = docSnap.data();
+      const status = c.paid ? '<span class="bg-success badge">Paid</span>' : '<span class="bg-warning text-dark badge">Unpaid</span>';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${c.name}</td>
+        <td>KSh ${c.amount}</td>
+        <td>${c.date || '-'}</td>
+        <td>${c.notes || ''}</td>
+        <td>${status}</td>
+        <td>
+          ${!c.paid ? `<button class="btn-outline-success btn btn-sm mark-paid" data-id="${docSnap.id}"><i class="bi bi-check2-circle"></i></button>` : ''}
+          <button class="btn-outline-info btn btn-sm edit-unpaid" data-id="${docSnap.id}"><i class="bi bi-pencil"></i></button>
+          <button class="btn-outline-danger btn btn-sm delete-unpaid" data-id="${docSnap.id}"><i class="bi bi-trash"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    attachUnpaidActions();
   });
 }
 
-// --- Open Games Modal for a session ---
+
+// --- Save or update unpaid customer ---
+document.getElementById('unpaidCustomerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = document.getElementById('unpaidId').value;
+  const data = {
+    name: document.getElementById('unpaidName').value.trim(),
+    amount: Number(document.getElementById('unpaidAmount').value),
+    date: document.getElementById('unpaidDate').value,
+    notes: document.getElementById('unpaidNotes').value.trim(),
+    paid: false,
+    timestamp: new Date().toISOString()
+  };
+
+  if (!data.name || !data.amount) {
+    alert('Please fill all required fields.');
+    return;
+  }
+
+  if (id) await updateDoc(doc(db, 'unpaid_customers', id), data);
+  else await addDoc(collection(db, 'unpaid_customers'), data);
+
+  document.getElementById('unpaidCustomerForm').reset();
+  document.getElementById('unpaidId').value = '';
+});
+
+
+// --- Handle mark paid, edit, delete ---
+function attachUnpaidActions() {
+  document.querySelectorAll('.mark-paid').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      if (!confirm('Mark this customer as paid?')) return;
+      await updateDoc(doc(db, 'unpaid_customers', id), { paid: true });
+    };
+  });
+
+  document.querySelectorAll('.edit-unpaid').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      const docSnap = await getDoc(doc(db, 'unpaid_customers', id));
+      if (!docSnap.exists()) return;
+      const c = docSnap.data();
+      document.getElementById('unpaidId').value = id;
+      document.getElementById('unpaidName').value = c.name;
+      document.getElementById('unpaidAmount').value = c.amount;
+      document.getElementById('unpaidDate').value = c.date;
+      document.getElementById('unpaidNotes').value = c.notes || '';
+    };
+  });
+
+  document.querySelectorAll('.delete-unpaid').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Delete this unpaid record?')) return;
+      await deleteDoc(doc(db, 'unpaid_customers', btn.dataset.id));
+    };
+  });
+}
+
+}
+
+// --- Open Games Modal (Final Version with Mark as Paid always visible) ---
 function openGamesModal(sessionId) {
   const s = state.sessions[sessionId];
   if (!s) return alert('Session not found');
@@ -1521,106 +1746,133 @@ function openGamesModal(sessionId) {
   const g = state.games[s.gameId] || {};
   s.gamesPlayed = s.gamesPlayed || [];
 
-  const elapsed = computeElapsedSeconds(s);
+  // ✅ Use stored accumulated time for ended sessions
+  const elapsed = s.status === 'ended'
+    ? s.accumulatedSeconds || 0
+    : computeElapsedSeconds(s);
+
   const perGameSeconds = g.durationSeconds || (g.durationMinutes ? g.durationMinutes * 60 : 840);
   const totalGames = perGameSeconds > 0 ? Math.floor(elapsed / perGameSeconds) : 0;
 
-  // Auto-generate missing game entries
-  for (let i = 1; i <= totalGames; i++) {
-    if (!s.gamesPlayed.find((gm) => gm.id === `g${i}`)) {
-      s.gamesPlayed.push({
-        id: `g${i}`,
-        name: `${g.name || 'Game'} #${i}`,
-        paid: false,
-        price: g.price || 50,
-      });
+  // ✅ Only auto-generate new games if session is active or paused
+  if (s.status !== 'ended') {
+    for (let i = 1; i <= totalGames; i++) {
+      if (!s.gamesPlayed.find(gm => gm.id === `g${i}`)) {
+        s.gamesPlayed.push({
+          id: `g${i}`,
+          name: `${g.name || 'Game'} #${i}`,
+          paid: false,
+          price: g.price || 50
+        });
+      }
     }
+
+    // Save updated games while still active
+    updateDoc(doc(db, 'sessions', sessionId), {
+      gamesPlayed: s.gamesPlayed
+    });
   }
 
-  let total = 0;
-  let paid = 0;
-  const tbody = $('#gamesPlayedTableBody');
+  // --- Render Games Table ---
+  const tbody = document.getElementById('gamesPlayedTableBody');
   tbody.innerHTML = '';
+  let total = 0, paid = 0;
 
-  s.gamesPlayed.forEach((gm) => {
+  s.gamesPlayed.forEach(gm => {
     total += gm.price || 0;
     if (gm.paid) paid += gm.price || 0;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${gm.name}</td>
       <td>KSh ${gm.price || 0}</td>
+      <td>${gm.paid
+        ? '<span class="bg-success badge">Paid</span>'
+        : '<span class="bg-warning text-dark badge">Not Paid</span>'}</td>
       <td>
-        ${gm.paid
-          ? '<span class="bg-success badge">Paid</span>'
-          : '<span class="bg-danger badge">Not Paid</span>'}
-      </td>
-      <td>
-        ${gm.paid
-          ? ''
-          : `<button class="btn btn-sm btn-success mark-paid" data-sid="${s.id}" data-gid="${gm.id}">
-               Mark Paid
-             </button>`}
+        ${!gm.paid
+          ? `<button class="btn-outline-primary btn btn-sm mark-paid" data-sid="${sessionId}" data-gid="${gm.id}">
+               Mark as Paid
+             </button>`
+          : ''}
       </td>
     `;
     tbody.appendChild(tr);
   });
 
+  // --- Summary Info ---
   const remaining = total - paid;
-  $('#gamesModalTitle').textContent = `Games for ${s.playerName || 'Guest'}`;
-  $('#totalAmount').textContent = `Total: KSh ${total}`;
-  $('#amountPaid').textContent = `Paid: KSh ${paid}`;
-  $('#remainingBalance').textContent = `Remaining: KSh ${remaining}`;
+  document.getElementById('gamesModalTitle').textContent =
+    `Games for ${s.playerName || 'Guest'} (${s.status === 'ended' ? 'Session Ended' : 'Active'})`;
+  document.getElementById('totalAmount').textContent = `Total: KSh ${total}`;
+  document.getElementById('amountPaid').textContent = `Paid: KSh ${paid}`;
+  document.getElementById('remainingBalance').textContent = `Remaining: KSh ${remaining}`;
 
-  // --- Mark game as paid instantly ---
-  tbody.querySelectorAll('.mark-paid').forEach((btn) => {
+  // --- Mark Paid Logic ---
+  tbody.querySelectorAll('.mark-paid').forEach(btn => {
     btn.onclick = async () => {
       const sid = btn.dataset.sid;
       const gid = btn.dataset.gid;
       const sess = state.sessions[sid];
       if (!sess) return;
-      sess.gamesPlayed = (sess.gamesPlayed || []).map((gm) =>
+
+      // Mark the game as paid
+      sess.gamesPlayed = sess.gamesPlayed.map(gm =>
         gm.id === gid ? { ...gm, paid: true } : gm
       );
+
       await updateDoc(doc(db, 'sessions', sid), { gamesPlayed: sess.gamesPlayed });
-      openGamesModal(sid); // refresh modal instantly
-      renderAllSessions(); // refresh main list + unpaid summary
+
+      // Refresh UI instantly
+      openGamesModal(sid);
+      renderAllSessions();
+
+      // Optional: user feedback
+      alert(`Marked ${gid} as Paid ✅`);
     };
   });
 
+  // --- Show Modal ---
   new bootstrap.Modal(document.getElementById('gamesPlayedModal')).show();
 }
 
-  // printReceiptFromId: open receipt modal
-  window.printReceiptFromId = async function(sessionId){
-    const s = state.sessions[sessionId];
-    if(!s) return alert('Session not found');
-    const game = state.games[s.gameId] || {};
-    const station = state.stations[s.stationId] || {};
-    const logoHtml = state.settings?.logoData ? `<img src="${state.settings.logoData}" style="max-width:120px;display:block;margin-bottom:10px">` : '';
-    const html = `<div style="font-family:Arial;color:#000">${logoHtml}<h2>${state.settings?.businessName||'Gaming Centre'}</h2><div style="font-size:12px">${state.settings?.businessAddress||''}</div><hr/>
-      <div><strong>Receipt #:</strong> ${sessionId}</div>
-      <div><strong>Customer:</strong> ${s.playerName || s.player || 'Guest'}</div>
-      <div><strong>Station:</strong> ${station.name||''}</div>
-      <div><strong>Game:</strong> ${game.name||''}</div>
-      <div><strong>Start:</strong> ${fmtDate(s.startTime)}</div>
-      <div><strong>End:</strong> ${s.endTime?fmtDate(s.endTime):'-'}</div>
-      <div><strong>Duration:</strong> ${formatDuration(computeElapsedSeconds(s))}</div>
-      <div><strong>Price:</strong> KSh ${s.price||0}</div>
-      <hr/><div style="font-size:12px">Thank you!</div></div>`;
-    $('#receiptBody').innerHTML = html;
-    new bootstrap.Modal(document.getElementById('receiptModal')).show();
-    $('#printReceiptBtn').onclick = ()=> {
-      const w = window.open('','_blank','width=600,height=800');
-      w.document.write(`<html><head><title>Receipt</title></head><body>${html}</body></html>`);
-      w.document.close();
-      setTimeout(()=>w.print(),300);
-    };
-    $('#saveReceiptPdfBtn').onclick = ()=> {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({unit:'pt', format:'a4'});
-      doc.html(html, { x:20, y:20, callback: ()=> doc.save(`receipt-${sessionId}.pdf`) });
-    };
+
+// --- Print receipt modal ---
+window.printReceiptFromId = async function(sessionId) {
+  const s = state.sessions[sessionId];
+  if (!s) return alert('Session not found');
+  const game = state.games[s.gameId] || {};
+  const station = state.stations[s.stationId] || {};
+  const logoHtml = state.settings?.logoData ? `<img src="${state.settings.logoData}" style="max-width:120px;display:block;margin-bottom:10px">` : '';
+  const html = `<div style="font-family:Arial;color:#000">${logoHtml}<h2>${state.settings?.businessName||'Gaming Centre'}</h2><div style="font-size:12px">${state.settings?.businessAddress||''}</div><hr/>
+    <div><strong>Receipt #:</strong> ${sessionId}</div>
+    <div><strong>Customer:</strong> ${s.playerName || s.player || 'Guest'}</div>
+    <div><strong>Station:</strong> ${station.name||''}</div>
+    <div><strong>Game:</strong> ${game.name||''}</div>
+    <div><strong>Start:</strong> ${fmtDate(s.startTime)}</div>
+    <div><strong>End:</strong> ${s.endTime?fmtDate(s.endTime):'-'}</div>
+    <div><strong>Duration:</strong> ${formatDuration(computeElapsedSeconds(s))}</div>
+    <div><strong>Price:</strong> KSh ${s.price||0}</div>
+    <hr/><div style="font-size:12px">Thank you!</div></div>`;
+  $('#receiptBody').innerHTML = html;
+  new bootstrap.Modal(document.getElementById('receiptModal')).show();
+
+  $('#printReceiptBtn').onclick = () => {
+    const w = window.open('', '_blank', 'width=600,height=800');
+    w.document.write(`<html><head><title>Receipt</title></head><body>${html}</body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
   };
+
+  $('#saveReceiptPdfBtn').onclick = () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    doc.html(html, { x: 20, y: 20, callback: () => doc.save(`receipt-${sessionId}.pdf`) });
+  };
+};
+
+// --- Initialize ---
+initRealtimeSessions();
 
   // ======= Forms submit handlers (create/update) =======
 
