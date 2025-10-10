@@ -1738,7 +1738,7 @@ function attachUnpaidActions() {
 
 }
 
-// --- Open Games Modal (Final Version with Mark as Paid always visible) ---
+// --- Open Games Modal (Final Version with Mark as Paid always visible + Screen Restore) ---
 function openGamesModal(sessionId) {
   const s = state.sessions[sessionId];
   if (!s) return alert('Session not found');
@@ -1827,15 +1827,27 @@ function openGamesModal(sessionId) {
       openGamesModal(sid);
       renderAllSessions();
 
-      // Optional: user feedback
       alert(`Marked ${gid} as Paid ✅`);
     };
   });
 
   // --- Show Modal ---
-  new bootstrap.Modal(document.getElementById('gamesPlayedModal')).show();
-}
+  const modalElement = document.getElementById('gamesPlayedModal');
+  const modalInstance = new bootstrap.Modal(modalElement);
+  modalInstance.show();
 
+  // ✅ When modal closes: restore screen + refresh UI
+  modalElement.addEventListener(
+    'hidden.bs.modal',
+    () => {
+      document.body.classList.remove('modal-open');
+      document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+      document.body.style.overflow = 'auto';
+      renderAllSessions();
+    },
+    { once: true }
+  );
+}
 
 // --- Print receipt modal ---
 window.printReceiptFromId = async function(sessionId) {
