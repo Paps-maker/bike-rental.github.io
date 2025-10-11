@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hardware Store — SHMS (Firebase)</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+   <link rel="icon" type="image/png" href="img/hr.jpg">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body { padding: 18px; background:#f6f7fb; }
+    .low-stock { background:#fff3cd; }
+    .badge-low { background:#dc3545; color:white; }
+    .cursor-pointer { cursor:pointer; }
+    .small-muted { color:#6c757d; font-size:.9rem; }
+    .card-compact { padding:12px; margin-bottom:12px; }
+    .table-fixed tbody { max-height: 360px; overflow:auto; display:block; }
+    .table-fixed thead, .table-fixed tbody tr { display:table; width:100%; table-layout:fixed; }
+    .table-fixed thead { width:100%; display:table; }
+    .qty-control { width:96px; display:flex; gap:6px; align-items:center; }
+    .qty-control input { width:48px; text-align:center; }
+    .small-td { font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="mb-0">Smart Hardware Management System</h2>
+      <div>
+        <span id="userEmail" class="me-2 small-muted"></span>
+        <button id="btnSignIn" class="btn-outline-primary btn btn-sm">Sign In</button>
+        <button id="btnSignOut" class="btn-outline-secondary btn btn-sm d-none">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Top actions -->
+    <div class="mb-3 row g-2">
+      <div class="col-md-3">
+        <button id="btnAddItem" class="w-100 btn btn-primary" data-bs-toggle="modal" data-bs-target="#itemModal">+ Add Inventory Item</button>
+      </div>
+      <div class="col-md-3">
+        <button id="btnOpenPOS" class="w-100 btn btn-success" data-bs-toggle="modal" data-bs-target="#posModal">Open POS / New Sale</button>
+      </div>
+      <div class="col-md-3">
+        <button id="btnSales" class="w-100 btn btn-warning" data-bs-toggle="modal" data-bs-target="#salesModal">Manage Sales</button>
+      </div>
+      <div class="col-md-3">
+        <button id="btnRefresh" class="btn-outline-secondary w-100 btn">Refresh</button>
+      </div>
+    </div>
+
+    <div class="row g-3">
+
+      <!-- Inventory list -->
+      <div class="col-md-7">
+        <div class="card">
+          <div class="d-flex align-items-center justify-content-between card-header">
+            <div>Inventory <small id="lowStockCount" class="ms-2 text-danger"></small></div>
+            <div class="small-muted">Realtime</div>
+          </div>
+          <div class="col-md-6">
+              <input id="posSearch" class="form-control" placeholder="Search items by name..." />
+              <div id="posSearchResults" class="list-group mt-2" style="max-height:240px; overflow:auto;"></div>
+            </div>
+          <div class="p-0 card-body">
+            
+            <table class="table table-striped mb-0">
+              <thead>
+                <tr><th>Item</th><th>Category</th><th style="width:90px">Stock</th><th style="width:120px">Selling</th><th style="width:220px">Actions</th></tr>
+              </thead>
+              <tbody id="inventoryTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick POS cart -->
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-header">Cart</div>
+          <div class="card-body">
+            <div id="cartList" style="min-height:120px"></div>
+            <div class="d-flex justify-content-between mt-3">
+              <div><strong>Total:</strong></div>
+              <div><strong id="cartTotal">KSh 0</strong></div>
+            </div>
+            <div class="gap-2 d-grid mt-3">
+              <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#posModal">Open POS</button>
+              <button id="clearCart" class="btn-outline-secondary btn">Clear Cart</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sales table (replaces Unpaid Customers) -->
+    <div class="mt-3 card">
+      <div class="d-flex align-items-center justify-content-between card-header">
+        <div>Sales Records</div>
+        <div class="d-flex gap-2">
+          <button id="downloadSalesCsv" class="btn-outline-success btn btn-sm">Download CSV</button>
+          <button id="downloadSalesPdf" class="btn-outline-primary btn btn-sm">Download PDF</button>
+          <div class="align-self-center small-muted">Live — updates automatically</div>
+        </div>
+      </div>
+      <div class="p-0 card-body">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Sale ID</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Paid</th>
+                <th>Paid Amount</th>
+                <th>Payment Method</th>
+                <th>Date</th>
+                <th style="width:200px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="salesTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item Modal -->
+  <div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form id="itemForm" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Add / Edit Item</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" id="itemId">
+          <div class="mb-2"><label>Item Name</label><input id="itemName" class="form-control" required></div>
+          <div class="mb-2"><label>Category</label><input id="itemCategory" class="form-control"></div>
+          <div class="mb-2"><label>Quantity</label><input id="itemQty" type="number" class="form-control" required></div>
+          <div class="mb-2"><label>Buying Price</label><input id="itemBuy" type="number" class="form-control"></div>
+          <div class="mb-2"><label>Selling Price</label><input id="itemSell" type="number" class="form-control" required></div>
+          <div class="mb-2"><label>Supplier</label><input id="itemSupplier" class="form-control"></div>
+          <div class="mb-2"><label>Low stock threshold</label><input id="itemLow" type="number" class="form-control" value="5"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- POS Modal -->
+  <div class="modal fade" id="posModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <form id="posForm" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Point of Sale</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-2">
+            
+            <div class="col-md-6">
+              <h6>Cart</h6>
+              <div id="posCartList" style="max-height:300px; overflow:auto;"></div>
+            </div>
+          </div>
+
+          <hr/>
+          <div class="row g-2">
+            <div class="col-md-6"><label>Customer (optional)</label><input id="posCustomer" class="form-control"></div>
+            <div class="col-md-3"><label>Payment Method</label>
+              <select id="posPayment" class="form-control">
+                <option value="cash">Cash</option>
+                <option value="mpesa">M-PESA</option>
+                <option value="credit">Credit (Unpaid)</option>
+              </select>
+            </div>
+            <div class="col-md-3"><label>Amount Paid</label><input id="posPaidAmount" type="number" class="form-control" value="0" min="0"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button id="completeSaleBtn" class="btn btn-success" type="submit" disabled>Complete Sale</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sales Modal (details) -->
+  <div class="modal fade" id="salesModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">All Sales</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div id="salesModalBody" style="max-height:70vh; overflow:auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt preview modal -->
+  <div class="modal fade" id="receiptModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Receipt Preview</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body" id="receiptBody" style="white-space:pre-wrap; font-family: monospace;"></div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button id="downloadReceiptBtn" class="btn btn-primary">Download PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment prompt modal (for marking unpaid paid) -->
+  <div class="modal fade" id="paymentPromptModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form id="paymentPromptForm" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Record Payment</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="hidden" id="paymentSaleId">
+          <div class="mb-2"><label>Amount to record</label><input id="paymentAmount" type="number" class="form-control" required min="0"></div>
+          <div class="mb-2"><label>Payment Notes (optional)</label><input id="paymentNotes" class="form-control"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-success" type="submit">Record Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sign-in Modal -->
+  <div class="modal fade" id="signinModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form id="signinForm" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Sign In</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2"><label>Email</label><input id="authEmail" type="email" class="form-control" required></div>
+          <div class="mb-2"><label>Password</label><input id="authPass" type="password" class="form-control" required></div>
+          <div class="form-text small-muted">Use Firebase email/password auth (create user in console or add sign-up UI later).</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Sign In</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    // ---------- Firebase imports ----------
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore, collection, addDoc, doc, setDoc, updateDoc, deleteDoc,
+      onSnapshot, getDocs, getDoc, query, where, orderBy, writeBatch, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // ---------- PUT YOUR FIREBASE CONFIG BELOW ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
+      authDomain: "transc-eec4c.firebaseapp.com",
+      projectId: "transc-eec4c",
+      storageBucket: "transc-eec4c.firebasestorage.app",
+      messagingSenderId: "3676403115",
+      appId: "1:3676403115:web:c9901ae6365192e5614eee",
+      measurementId: "G-GMCB7ZER73"
+    };
+    // --------------------------------------------------
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ---------- Helpers ----------
+    const money = n => `KSh ${Number(n || 0).toLocaleString()}`;
+    const uidShort = (s) => (s||'').slice(0,6);
+
+    // UI elements
+    const inventoryTbody = document.getElementById('inventoryTbody');
+    const salesTbody = document.getElementById('salesTbody');
+    const salesModalBody = document.getElementById('salesModalBody');
+    const cartList = document.getElementById('cartList');
+    const cartTotalEl = document.getElementById('cartTotal');
+    const posCartList = document.getElementById('posCartList');
+    const posSearchResults = document.getElementById('posSearchResults');
+    const completeSaleBtn = document.getElementById('completeSaleBtn');
+    const downloadSalesCsvBtn = document.getElementById('downloadSalesCsv');
+    const downloadSalesPdfBtn = document.getElementById('downloadSalesPdf');
+
+    let cart = [];
+    let currentUser = null;
+
+    // ---------- Real-time Items listener ----------
+    const itemsCol = collection(db, 'items');
+    onSnapshot(itemsCol, snapshot => {
+      inventoryTbody.innerHTML = '';
+      let lowCount = 0;
+      snapshot.forEach(docSnap => {
+        const id = docSnap.id;
+        const it = docSnap.data();
+        const isLow = (it.quantity || 0) <= (it.lowThreshold || 5);
+        if (isLow) lowCount++;
+        const tr = document.createElement('tr');
+        tr.className = isLow ? 'low-stock' : '';
+        tr.innerHTML = `
+          <td>${escapeHtml(it.name)}</td>
+          <td>${escapeHtml(it.category||'')}</td>
+          <td>${it.quantity || 0} ${isLow?'<span class="ms-2 badge badge-low">Low</span>':''}</td>
+          <td>${money(it.sellingPrice)}</td>
+          <td>
+            <button class="btn-outline-primary btn btn-sm btn-add-cart" data-id="${id}">Add to Cart</button>
+            <button class="btn-outline-secondary btn btn-sm btn-edit-item" data-id="${id}">Edit</button>
+            <button class="btn-outline-danger btn btn-sm btn-delete-item" data-id="${id}">Delete</button>
+          </td>`;
+        inventoryTbody.appendChild(tr);
+      });
+      document.getElementById('lowStockCount').textContent = lowCount ? `${lowCount} low stock` : '';
+      wireInventoryButtons();
+    });
+
+    function wireInventoryButtons(){
+      document.querySelectorAll('.btn-add-cart').forEach(b => b.onclick = () => addToCart(b.dataset.id));
+      document.querySelectorAll('.btn-edit-item').forEach(b => b.onclick = () => editItem(b.dataset.id));
+      document.querySelectorAll('.btn-delete-item').forEach(b => b.onclick = () => deleteItem(b.dataset.id));
+    }
+
+    // ---------- Real-time Sales listener (UPDATED with DELETE) ----------
+const salesCol = collection(db, 'sales');
+onSnapshot(salesCol, snap => {
+  salesTbody.innerHTML = '';
+  salesModalBody.innerHTML = '';
+  const rows = [];
+
+  snap.forEach(docSnap => {
+    const id = docSnap.id;
+    const s = docSnap.data();
+    rows.push({ id, s });
+  });
+
+  // show newest first
+  rows.sort((a, b) => {
+    const ta = a.s.createdAt
+      ? new Date(a.s.createdAt.seconds ? a.s.createdAt.toDate() : a.s.createdAt).getTime()
+      : 0;
+    const tb = b.s.createdAt
+      ? new Date(b.s.createdAt.seconds ? b.s.createdAt.toDate() : b.s.createdAt).getTime()
+      : 0;
+    return tb - ta;
+  });
+
+  rows.forEach(({ id, s }) => {
+    const tr = document.createElement('tr');
+    const itemsSummary = (s.items || []).map(i => `${i.name} x${i.qty}`).join(', ');
+    const createdAt =
+      s.createdAt && s.createdAt.seconds
+        ? new Date(s.createdAt.seconds * 1000).toLocaleString()
+        : (s.createdAt || new Date().toLocaleString());
+    const paidBadge =
+      s.paid || (s.paidAmount && s.paidAmount >= s.total)
+        ? `<span class="bg-success badge">Paid</span>`
+        : `<span class="bg-danger badge">Unpaid</span>`;
+
+    tr.innerHTML = `
+      <td class="small-td">${escapeHtml(s.saleId || id)}</td>
+      <td class="small-td">${escapeHtml(s.customer || 'Guest')}</td>
+      <td class="small-td">${escapeHtml(itemsSummary)}</td>
+      <td class="small-td">${money(s.total)}</td>
+      <td class="small-td">${paidBadge}</td>
+      <td class="small-td">${money(s.paidAmount || 0)}</td>
+      <td class="small-td">${escapeHtml(s.paymentMethod || '')}</td>
+      <td class="small-td">${escapeHtml(createdAt)}</td>
+      <td class="small-td">
+        <button class="btn btn-sm btn-info btn-view-sale" data-id="${id}">View</button>
+        <button class="btn-outline-primary btn btn-sm btn-download-sale" data-id="${id}">PDF</button>
+        <button class="btn btn-sm ${s.paid || (s.paidAmount && s.paidAmount >= s.total) ? 'btn-secondary' : 'btn-warning'} btn-mark-paid"
+                data-id="${id}" ${s.paid || (s.paidAmount && s.paidAmount >= s.total) ? 'disabled' : ''}>
+          ${s.paid || (s.paidAmount && s.paidAmount >= s.total) ? 'Paid' : 'Mark as Paid'}
+        </button>
+        <button class="btn btn-sm btn-danger btn-delete-sale" data-id="${id}">Delete</button>
+      </td>
+    `;
+    salesTbody.appendChild(tr);
+
+    // Modal cards (optional summary)
+    const card = document.createElement('div');
+    card.className = 'card mb-2 p-2';
+    card.innerHTML = `
+      <div class="d-flex justify-content-between">
+        <div><strong>${escapeHtml(s.saleId || id)}</strong> — ${escapeHtml(s.customer || 'Guest')}</div>
+        <div>${escapeHtml(createdAt)}</div>
+      </div>
+      <div class="mt-1 small-muted">Items: ${escapeHtml(itemsSummary)}</div>
+      <div class="mt-1">
+        <strong>Total:</strong> ${money(s.total)} &nbsp;
+        <strong>Paid:</strong> ${money(s.paidAmount || 0)} &nbsp;
+        <strong>Status:</strong> ${s.paid || (s.paidAmount && s.paidAmount >= s.total)
+          ? '<span class="bg-success badge">Paid</span>'
+          : '<span class="bg-danger badge">Unpaid</span>'}
+      </div>
+    `;
+    salesModalBody.appendChild(card);
+  });
+
+  // ---------- Button Handlers ----------
+
+  // View Sale
+  document.querySelectorAll('.btn-view-sale').forEach(b => b.onclick = async () => {
+    const id = b.dataset.id;
+    const sDoc = await getDoc(doc(db, 'sales', id));
+    if (!sDoc.exists()) return alert('Sale not found');
+    const s = sDoc.data();
+    await generateReceiptPdf(id, s);
+  });
+
+  // Download PDF
+  document.querySelectorAll('.btn-download-sale').forEach(b => b.onclick = async () => {
+    const id = b.dataset.id;
+    const sDoc = await getDoc(doc(db, 'sales',id));
+    if (!sDoc.exists()) return alert('Sale not found');
+    const s = sDoc.data();
+    await generateReceiptPdf(id, s);
+    document.getElementById('downloadReceiptBtn').click();
+  });
+
+  // Mark as Paid
+  document.querySelectorAll('.btn-mark-paid').forEach(b => b.onclick = async () => {
+    const id = b.dataset.id;
+    if (!confirm('Mark this sale as PAID?')) return;
+    try {
+      const sRef = doc(db, 'sales', id);
+      const sDoc = await getDoc(sRef);
+      if (!sDoc.exists()) return alert('Sale not found.');
+      const s = sDoc.data();
+      await updateDoc(sRef, {
+        paid: true,
+        paidAt: serverTimestamp(),
+        paidBy: currentUser ? currentUser.email : null,
+        status: 'Paid',
+        paidAmount: s.total || 0
+      });
+      alert('Marked as paid.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to mark as paid: ' + err.message);
+    }
+  });
+
+  // 🗑️ Delete Sale
+  document.querySelectorAll('.btn-delete-sale').forEach(b => b.onclick = async () => {
+    const id = b.dataset.id;
+    if (!confirm('Are you sure you want to DELETE this sale? This action cannot be undone.')) return;
+    try {
+      await deleteDoc(doc(db, 'sales', id));
+      alert('Sale deleted successfully.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete sale: ' + err.message);
+    }
+  });
+
+});
+
+    // ---------- Item CRUD ----------
+    const itemForm = document.getElementById('itemForm');
+    itemForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const id = document.getElementById('itemId').value;
+      const data = {
+        name: document.getElementById('itemName').value.trim(),
+        category: document.getElementById('itemCategory').value.trim(),
+        quantity: Number(document.getElementById('itemQty').value || 0),
+        buyingPrice: Number(document.getElementById('itemBuy').value || 0),
+        sellingPrice: Number(document.getElementById('itemSell').value || 0),
+        supplier: document.getElementById('itemSupplier').value.trim(),
+        lowThreshold: Number(document.getElementById('itemLow').value || 5),
+        updatedAt: new Date().toISOString()
+      };
+      if (!data.name) return alert('Name required');
+      if (id) {
+        await updateDoc(doc(db, 'items', id), data);
+      } else {
+        data.createdAt = new Date().toISOString();
+        await addDoc(collection(db, 'items'), data);
+      }
+      bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
+      itemForm.reset();
+    });
+
+    async function editItem(id){
+      const d = await getDoc(doc(db,'items',id));
+      if (!d.exists()) return alert('Item not found');
+      const it = d.data();
+      document.getElementById('itemId').value = id;
+      document.getElementById('itemName').value = it.name;
+      document.getElementById('itemCategory').value = it.category;
+      document.getElementById('itemQty').value = it.quantity;
+      document.getElementById('itemBuy').value = it.buyingPrice;
+      document.getElementById('itemSell').value = it.sellingPrice;
+      document.getElementById('itemSupplier').value = it.supplier;
+      document.getElementById('itemLow').value = it.lowThreshold || 5;
+      const el = document.getElementById('itemModal');
+      let instance = bootstrap.Modal.getInstance(el);
+      if (!instance) instance = new bootstrap.Modal(el);
+      instance.show();
+    }
+
+    async function deleteItem(id){
+      if (!confirm('Delete item?')) return;
+      await deleteDoc(doc(db, 'items', id));
+    }
+
+    // ---------- Cart & POS ----------
+    function addToCart(itemId) {
+      getDoc(doc(db, 'items', itemId)).then(d => {
+        if (!d.exists()) return alert('Item missing');
+        const it = { id: itemId, ...d.data() };
+        const existing = cart.find(c => c.id === itemId);
+        if (existing) existing.qty = Math.min((d.data().quantity||0), existing.qty + 1);
+        else cart.push({ ...it, qty: 1 });
+        renderCart();
+      });
+    }
+
+    function renderCart(){
+      cartList.innerHTML = '';
+      let total = 0;
+      cart.forEach((c, idx) => {
+        const row = document.createElement('div');
+        row.className = 'd-flex justify-content-between align-items-center mb-1';
+        row.innerHTML = `<div>
+            ${escapeHtml(c.name)} <small class="text-muted">x${c.qty}</small><br/>
+            <small class="small-muted">Unit: ${money(c.sellingPrice)}</small>
+          </div>
+          <div>
+            ${money(c.sellingPrice * c.qty)}
+            <div class="mt-1">
+              <button class="me-1 btn-outline-secondary btn btn-sm btn-decrease" data-idx="${idx}">-</button>
+              <button class="me-1 btn-outline-secondary btn btn-sm btn-increase" data-idx="${idx}">+</button>
+              <button class="text-danger btn btn-sm btn-link btn-remove" data-idx="${idx}">Remove</button>
+            </div>
+          </div>`;
+        cartList.appendChild(row);
+        total += (c.sellingPrice||0) * c.qty;
+      });
+      cartTotalEl.textContent = money(total);
+      document.querySelectorAll('.btn-decrease').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.idx); cart[i].qty = Math.max(1, cart[i].qty - 1); renderCart();
+      });
+      document.querySelectorAll('.btn-increase').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.idx); cart[i].qty = cart[i].qty + 1; renderCart();
+      });
+      document.querySelectorAll('.btn-remove').forEach(b => b.onclick = () => {
+        cart.splice(Number(b.dataset.idx), 1);
+        renderCart();
+      });
+      updateCompleteButtonState();
+    }
+
+    document.getElementById('clearCart').onclick = () => { cart = []; renderCart(); };
+
+    // POS search & modal cart
+    const posSearch = document.getElementById('posSearch');
+    posSearch.addEventListener('input', async (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      posSearchResults.innerHTML = '';
+      if (!q) return;
+      const snap = await getDocs(collection(db,'items'));
+      snap.forEach(docSnap => {
+        const it = docSnap.data();
+        if (it.name.toLowerCase().includes(q)) {
+          const a = document.createElement('a');
+          a.className = 'list-group-item list-group-item-action cursor-pointer';
+          a.textContent = `${it.name} — ${money(it.sellingPrice)} — ${it.quantity} in stock`;
+          a.onclick = () => {
+            addToCart(docSnap.id);
+            posSearch.value = '';
+            posSearchResults.innerHTML = '';
+          };
+          posSearchResults.appendChild(a);
+        }
+      });
+    });
+
+    function renderPOSCartInModal(){
+      posCartList.innerHTML = '';
+      let total=0;
+      cart.forEach((c, idx) => {
+        const div = document.createElement('div');
+        div.className = 'd-flex justify-content-between align-items-center mb-1';
+        div.innerHTML = `<div>
+            ${escapeHtml(c.name)} <small class="text-muted">x${c.qty}</small><br/>
+            <small class="small-muted">Unit: ${money(c.sellingPrice)}</small>
+          </div>
+          <div>
+            ${money(c.qty*c.sellingPrice)}
+            <div class="mt-1">
+              <button class="me-1 btn-outline-secondary btn btn-sm btn-decrease-modal" data-idx="${idx}">-</button>
+              <button class="me-1 btn-outline-secondary btn btn-sm btn-increase-modal" data-idx="${idx}">+</button>
+              <button class="text-danger btn btn-sm btn-link btn-remove-modal" data-idx="${idx}">Remove</button>
+            </div>
+          </div>`;
+        posCartList.appendChild(div);
+        total += c.qty * c.sellingPrice;
+      });
+      const footer = document.createElement('div');
+      footer.className = 'mt-2 d-flex justify-content-between';
+      footer.innerHTML = `<div><strong>Total</strong></div><div><strong>${money(total)}</strong></div>`;
+      posCartList.appendChild(footer);
+
+      // wire modal controls
+      document.querySelectorAll('.btn-decrease-modal').forEach(b => b.onclick = () => { cart[Number(b.dataset.idx)].qty = Math.max(1, cart[Number(b.dataset.idx)].qty - 1); renderPOSCartInModal(); renderCart(); });
+      document.querySelectorAll('.btn-increase-modal').forEach(b => b.onclick = () => { cart[Number(b.dataset.idx)].qty++; renderPOSCartInModal(); renderCart(); });
+      document.querySelectorAll('.btn-remove-modal').forEach(b => { b.onclick = () => { cart.splice(Number(b.dataset.idx), 1); renderPOSCartInModal(); renderCart(); }});
+      updateCompleteButtonState();
+    }
+
+    document.getElementById('posModal').addEventListener('show.bs.modal', () => renderPOSCartInModal());
+
+    // POS submit -> create sale atomically, decrement stock, create unpaid if needed
+    document.getElementById('posForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!cart.length) return alert('Cart is empty');
+      if (!currentUser) {
+        // auto open signin modal
+        bootstrap.Modal.getInstance(document.getElementById('posModal'))?.hide();
+        const el = document.getElementById('signinModal'); let ins = bootstrap.Modal.getInstance(el); if(!ins) ins = new bootstrap.Modal(el); ins.show();
+        return alert('Please sign in to complete the sale.');
+      }
+
+      // validation
+      const customer = document.getElementById('posCustomer').value.trim();
+      const payment = document.getElementById('posPayment').value;
+      const paidAmount = Number(document.getElementById('posPaidAmount').value || 0);
+
+      let total = 0;
+      const items = cart.map(c => {
+        total += c.sellingPrice * c.qty;
+        return { id: c.id, name: c.name, qty: c.qty, unitPrice: c.sellingPrice, amount: c.sellingPrice * c.qty };
+      });
+
+      if (paidAmount < 0) return alert('Paid amount invalid');
+
+      // Build sale object
+      const saleId = generateSaleId();
+      const sale = {
+        saleId,
+        items,
+        total,
+        customer: customer || null,
+        paymentMethod: payment,
+        paidAmount,
+        change: Math.max(0, paidAmount - total),
+        createdAt: serverTimestamp(),
+        createdBy: currentUser.uid,
+        createdByEmail: currentUser.email || null,
+        paid: (paidAmount >= total),
+        status: (paidAmount >= total) ? 'Paid' : 'Unpaid'
+      };
+
+      // Use batched write: write sale, update items qty, create unpaid if needed
+      try {
+        completeSaleBtn.disabled = true;
+        completeSaleBtn.textContent = 'Processing...';
+
+        const batch = writeBatch(db);
+        // sale doc
+        const saleRef = doc(collection(db, 'sales'));
+        batch.set(saleRef, sale);
+
+        // stock updates - verify current stock and update
+        for (const it of items) {
+          const itemRef = doc(db, 'items', it.id);
+          const snap = await getDoc(itemRef);
+          if (!snap.exists()) throw new Error(`Item missing: ${it.name}`);
+          const currentQty = snap.data().quantity || 0;
+          if (it.qty > currentQty) {
+            throw new Error(`Insufficient stock for "${it.name}". Available: ${currentQty}, requested: ${it.qty}`);
+          }
+          batch.update(itemRef, { quantity: currentQty - it.qty, updatedAt: new Date().toISOString() });
+        }
+// --- Prevent accidental save when modal closes ---
+const posModalEl = document.getElementById('posModal');
+posModalEl.addEventListener('hide.bs.modal', (event) => {
+  // This runs when modal is closing (user presses close, clicks backdrop, or presses ESC)
+  // We only clear the cart if sale was NOT completed
+  if (!saleCompleted) {
+    // Reset the POS form & cart
+    document.getElementById('posForm').reset();
+    cart = [];
+    renderCart();
+    renderPOSCartInModal();
+    console.log('Modal closed without completing sale — nothing saved.');
+  }
+});
+
+// Flag to track if sale completed
+let saleCompleted = false;
+
+// --- POS form submit (Complete Sale) ---
+document.getElementById('posForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!cart.length) return alert('Cart is empty');
+  if (!currentUser) {
+    bootstrap.Modal.getInstance(posModalEl)?.hide();
+    const el = document.getElementById('signinModal'); 
+    let ins = bootstrap.Modal.getInstance(el); 
+    if(!ins) ins = new bootstrap.Modal(el); 
+    ins.show();
+    return alert('Please sign in to complete the sale.');
+  }
+
+  // validation
+  const customer = document.getElementById('posCustomer').value.trim();
+  const payment = document.getElementById('posPayment').value;
+  const paidAmount = Number(document.getElementById('posPaidAmount').value || 0);
+
+  let total = 0;
+  const items = cart.map(c => {
+    total += c.sellingPrice * c.qty;
+    return { id: c.id, name: c.name, qty: c.qty, unitPrice: c.sellingPrice, amount: c.sellingPrice * c.qty };
+  });
+
+  if (paidAmount < 0) return alert('Paid amount invalid');
+
+  const saleId = generateSaleId();
+  const sale = {
+    saleId,
+    items,
+    total,
+    customer: customer || null,
+    paymentMethod: payment,
+    paidAmount,
+    change: Math.max(0, paidAmount - total),
+    createdAt: serverTimestamp(),
+    createdBy: currentUser.uid,
+    createdByEmail: currentUser.email || null,
+    paid: (paidAmount >= total),
+    status: (paidAmount >= total) ? 'Paid' : 'Unpaid'
+  };
+
+  try {
+    completeSaleBtn.disabled = true;
+    completeSaleBtn.textContent = 'Processing...';
+
+    const batch = writeBatch(db);
+    const saleRef = doc(collection(db, 'sales'));
+    batch.set(saleRef, sale);
+
+    // stock updates
+    for (const it of items) {
+      const itemRef = doc(db, 'items', it.id);
+      const snap = await getDoc(itemRef);
+      if (!snap.exists()) throw new Error(`Item missing: ${it.name}`);
+      const currentQty = snap.data().quantity || 0;
+      if (it.qty > currentQty) throw new Error(`Insufficient stock for "${it.name}".`);
+      batch.update(itemRef, { quantity: currentQty - it.qty, updatedAt: new Date().toISOString() });
+    }
+
+    if (payment === 'credit' || paidAmount < total) {
+      const unpaidRef = doc(collection(db, 'unpaid_customers'));
+      batch.set(unpaidRef, {
+        saleId: saleRef.id,
+        name: customer || 'Guest',
+        amount: Math.max(0, total - paidAmount),
+        date: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+        paid: false
+      });
+    }
+
+    await batch.commit();
+
+    await generateReceiptPdf(saleRef.id, { ...sale, items });
+
+    // ✅ mark sale as completed before closing
+    saleCompleted = true;
+
+    // cleanup
+    cart = [];
+    renderCart();
+    document.getElementById('posForm').reset();
+    bootstrap.Modal.getInstance(posModalEl).hide();
+    alert('Sale recorded successfully.');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to complete sale: ' + (err.message || err));
+  } finally {
+    completeSaleBtn.disabled = false;
+    completeSaleBtn.textContent = 'Complete Sale';
+  }
+});
+
+        // create unpaid record if payment is credit or paidAmount < total
+        if (payment === 'credit' || paidAmount < total) {
+          const unpaidRef = doc(collection(db, 'unpaid_customers'));
+          const unpaid = {
+            saleId: saleRef.id,
+            name: customer || 'Guest',
+            amount: Math.max(0, total - paidAmount),
+            date: new Date().toISOString(),
+            createdAt: serverTimestamp(),
+            paid: false
+          };
+          batch.set(unpaidRef, unpaid);
+        }
+
+        // commit
+        await batch.commit();
+
+        // generate receipt (use saleRef.id)
+        await generateReceiptPdf(saleRef.id, { ...sale, items });
+
+        // cleanup
+        cart = [];
+        renderCart();
+        bootstrap.Modal.getInstance(document.getElementById('posModal')).hide();
+        document.getElementById('posForm').reset();
+        alert('Sale recorded successfully.');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to complete sale: ' + (err.message || err));
+      } finally {
+        completeSaleBtn.disabled = false;
+        completeSaleBtn.textContent = 'Complete Sale';
+      }
+    });
+
+    // ---------- Payment prompt handler (when used) ----------
+    function openPaymentPromptForSale(saleId){
+      document.getElementById('paymentSaleId').value = saleId;
+      document.getElementById('paymentAmount').value = '';
+      document.getElementById('paymentNotes').value = '';
+      const el = document.getElementById('paymentPromptModal'); let ins = bootstrap.Modal.getInstance(el); if(!ins) ins = new bootstrap.Modal(el); ins.show();
+    }
+
+    document.getElementById('paymentPromptForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const saleId = document.getElementById('paymentSaleId').value;
+      const amount = Number(document.getElementById('paymentAmount').value || 0);
+      const notes = document.getElementById('paymentNotes').value.trim();
+      if (!amount || amount <= 0) return alert('Enter a valid amount');
+
+      try {
+        const saleRef = doc(db, 'sales', saleId);
+        const saleSnap = await getDoc(saleRef);
+        if (!saleSnap.exists()) throw new Error('Sale not found');
+
+        const saleData = saleSnap.data();
+        const newPaidAmount = (saleData.paidAmount || 0) + amount;
+        const isFullyPaid = newPaidAmount >= saleData.total;
+
+        const batch = writeBatch(db);
+
+        // add payment record
+        const paymentRef = doc(collection(db,'payments'));
+        batch.set(paymentRef, {
+          saleId,
+          amount,
+          notes,
+          recordedBy: currentUser ? currentUser.email : null,
+          recordedAt: serverTimestamp()
+        });
+
+        // update sale
+        batch.update(saleRef, {
+          paidAmount: newPaidAmount,
+          paid: isFullyPaid,
+          paidAt: isFullyPaid ? serverTimestamp() : null,
+          status: isFullyPaid ? 'Paid' : 'Partially Paid'
+        });
+
+        // if there is an unpaid_customers entry tied to this sale, adjust it
+        // (best-effort: find unpaid entries for saleId)
+        const unpaidSnap = await getDocs(query(collection(db,'unpaid_customers'), where('saleId','==', saleId)));
+        unpaidSnap.forEach(u => {
+          const uRef = doc(db,'unpaid_customers', u.id);
+          const remaining = (u.data().amount || 0) - amount;
+          if (remaining <= 0) batch.update(uRef, { paid: true, paidAt: serverTimestamp(), amount: 0 });
+          else batch.update(uRef, { amount: remaining });
+        });
+
+        await batch.commit();
+        bootstrap.Modal.getInstance(document.getElementById('paymentPromptModal')).hide();
+        alert('Payment recorded.');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to record payment: ' + (err.message || err));
+      }
+    });
+
+    // ---------- Receipt (jsPDF) ----------
+    let latestReceiptText = '';
+    async function generateReceiptPdf(saleDocId, saleData) {
+      if (!saleData) {
+        const sDoc = await getDoc(doc(db, 'sales', saleDocId));
+        saleData = sDoc.data();
+      }
+      // prepare plain text preview
+      let t = `Paps Hardware\nReceipt: ${saleDocId}\nDate: ${new Date().toLocaleString()}\nCustomer: ${saleData.customer || 'Guest'}\n\nItems:\n`;
+      (saleData.items || []).forEach(it => {
+        t += `${it.name} x${it.qty} @ ${it.unitPrice} = ${money(it.amount)}\n`;
+      });
+      t += `\nTotal: ${money(saleData.total)}\nPaid: ${money(saleData.paidAmount||0)}\nChange: ${money(saleData.change || 0)}\nSold by: ${saleData.createdByEmail || saleData.createdBy || 'N/A'}`;
+      latestReceiptText = t;
+
+      // show preview modal
+      document.getElementById('receiptBody').textContent = t;
+      let ins = bootstrap.Modal.getInstance(document.getElementById('receiptModal'));
+      if (!ins) ins = new bootstrap.Modal(document.getElementById('receiptModal'));
+      ins.show();
+
+      document.getElementById('downloadReceiptBtn').onclick = () => {
+        const { jsPDF } = window.jspdf;
+        const docp = new jsPDF();
+        docp.setFontSize(12);
+        const left = 20;
+        docp.text('Paps Hardware', 105, 20, null, null, 'center');
+        docp.setFontSize(10);
+        docp.text(`Receipt: ${saleDocId}`, left, 36);
+        docp.text(`Date: ${new Date().toLocaleString()}`, left, 44);
+        docp.text(`Customer: ${saleData.customer || 'Guest'}`, left, 52);
+        let y = 66;
+        (saleData.items || []).forEach(it => {
+          docp.text(`${it.name} x${it.qty} @ ${it.unitPrice} = ${it.amount}`, left, y);
+          y += 8;
+          if (y > 270) { docp.addPage(); y = 20; }
+        });
+        docp.text(`Total: ${saleData.total}`, left, y+8);
+        docp.save(`receipt-${saleDocId}.pdf`);
+      };
+    }
+
+    // ---------- Export all sales CSV & PDF ----------
+    downloadSalesCsvBtn.onclick = async () => {
+      try {
+        const snap = await getDocs(collection(db,'sales'));
+        let csv = 'SaleID,Customer,Items,Total,Paid, PaidAmount,PaymentMethod,Date,CreatedBy\n';
+        snap.forEach(d => {
+          const s = d.data();
+          const itemsSummary = (s.items||[]).map(i=>`${i.name} x${i.qty}`).join(' | ');
+          const date = s.createdAt && s.createdAt.seconds ? new Date(s.createdAt.seconds*1000).toLocaleString() : (s.createdAt || '');
+          csv += `"${s.saleId||d.id}","${(s.customer||'Guest')}","${itemsSummary}",${s.total},${!!s.paid},${s.paidAmount||0},"${s.paymentMethod||''}","${date}","${s.createdByEmail||''}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `sales-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+        link.click();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to export CSV: ' + (err.message || err));
+      }
+    };
+
+    downloadSalesPdfBtn.onclick = async () => {
+  try {
+    const snap = await getDocs(collection(db, 'sales'));
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+
+    // ===== HEADER =====
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('BR Hardware — Sales Summary', 14, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 24);
+    doc.line(14, 27, 196, 27);
+
+    // ===== BUILD TABLE DATA =====
+    const body = [];
+    snap.forEach(d => {
+      const s = d.data();
+      const itemsSummary = (s.items || [])
+        .map(i => `${i.name} x${i.qty}`)
+        .join(', ');
+      const date = s.createdAt && s.createdAt.seconds
+        ? new Date(s.createdAt.seconds * 1000).toLocaleString()
+        : (s.createdAt || '');
+      body.push([
+        s.saleId || d.id,
+        s.customer || 'Guest',
+        itemsSummary,
+        money(s.total),
+        money(s.paidAmount || 0),
+        s.paymentMethod || '-',
+        s.paid ? 'Paid' : 'Unpaid',
+        date
+      ]);
+    });
+
+    // ===== PROFESSIONAL AUTO-TABLE =====
+    doc.autoTable({
+      head: [['Sale ID', 'Customer', 'Items', 'Total', 'Paid', 'Method', 'Status', 'Date']],
+      body,
+      startY: 32,
+      theme: 'striped',
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        halign: 'left',
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [0, 102, 204],
+        textColor: 255,
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      columnStyles: {
+        0: { cellWidth: 20 }, // Sale ID
+        1: { cellWidth: 25 }, // Customer
+        2: { cellWidth: 55 }, // Items (auto wraps)
+        3: { cellWidth: 18, halign: 'right' }, // Total
+        4: { cellWidth: 18, halign: 'right' }, // Paid
+        5: { cellWidth: 20 }, // Method
+        6: { cellWidth: 18 }, // Status
+        7: { cellWidth: 35 }, // Date
+      },
+      margin: { left: 1, right: 10 },
+      didDrawPage: function (data) {
+        const pageCount = doc.internal.getNumberOfPages();
+        const page = doc.internal.getCurrentPageInfo().pageNumber;
+
+        // Footer
+        doc.setFontSize(9);
+        doc.setTextColor(130);
+        doc.text(
+          `Page ${page} of ${pageCount}`,
+          doc.internal.pageSize.getWidth() - 14,
+          doc.internal.pageSize.getHeight() - 8,
+          { align: 'right' }
+        );
+      },
+    });
+
+    // ===== SAVE FILE =====
+    const fileName = `sales-summary-${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, '-')}.pdf`;
+    doc.save(fileName);
+  } catch (err) {
+    console.error(err);
+    alert('Failed to create PDF: ' + (err.message || err));
+  }
+};
+
+    // ---------- Simple Auth (email/password) ----------
+    const btnSignIn = document.getElementById('btnSignIn');
+    const btnSignOut = document.getElementById('btnSignOut');
+    const userEmailEl = document.getElementById('userEmail');
+
+    btnSignIn.onclick = () => {
+      const el = document.getElementById('signinModal');
+      let instance = bootstrap.Modal.getInstance(el);
+      if (!instance) instance = new bootstrap.Modal(el);
+      instance.show();
+    };
+
+    document.getElementById('signinForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('authEmail').value;
+      const pass = document.getElementById('authPass').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        bootstrap.Modal.getInstance(document.getElementById('signinModal')).hide();
+      } catch (err) {
+        alert('Sign-in failed: ' + err.message);
+      }
+    });
+
+    btnSignOut.onclick = async () => {
+      await signOut(auth);
+    };
+
+    onAuthStateChanged(auth, user => {
+      currentUser = user;
+      if (user) {
+        userEmailEl.textContent = user.email || user.uid;
+        btnSignIn.classList.add('d-none');
+        btnSignOut.classList.remove('d-none');
+      } else {
+        userEmailEl.textContent = '';
+        btnSignIn.classList.remove('d-none');
+        btnSignOut.classList.add('d-none');
+      }
+      updateCompleteButtonState();
+    });
+
+    function updateCompleteButtonState(){
+      // allow completion only when cart not empty and user signed in
+      completeSaleBtn.disabled = !(cart.length && currentUser);
+    }
+
+    // ---------- Utility & cleanup ----------
+    document.getElementById('btnRefresh').onclick = () => {
+      alert('Realtime data auto-refreshes. If data seems stale, check network or console.');
+    };
+
+    // Ensure modals cleanup on hide to avoid stuck backdrops
+    ['itemModal','posModal','salesModal','signinModal','receiptModal','paymentPromptModal'].forEach(id => {
+      const el = document.getElementById(id);
+      el?.addEventListener('hidden.bs.modal', () => {
+        document.body.classList.remove('modal-open');
+        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+        document.body.style.overflow = 'auto';
+      }, { once: false });
+    });
+
+    // small helper to avoid XSS
+    function escapeHtml(s){ return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // generate sale id - readable timestamp
+    function generateSaleId(){
+      const d = new Date();
+      const y = d.getFullYear().toString();
+      const mo = String(d.getMonth()+1).padStart(2,'0');
+      const da = String(d.getDate()).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      const ss = String(d.getSeconds()).padStart(2,'0');
+      return `S${y}${mo}${da}-${hh}${mm}${ss}-${Math.random().toString(36).slice(2,6)}`;
+    }
+
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+</body>
+</html>
