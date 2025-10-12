@@ -9,20 +9,202 @@
    <link rel="icon" type="image/png" href="img/hr.jpg">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-  <style>
-    body { padding: 18px; background:#f6f7fb; }
-    .low-stock { background:#fff3cd; }
-    .badge-low { background:#dc3545; color:white; }
-    .cursor-pointer { cursor:pointer; }
-    .small-muted { color:#6c757d; font-size:.9rem; }
-    .card-compact { padding:12px; margin-bottom:12px; }
-    .table-fixed tbody { max-height: 360px; overflow:auto; display:block; }
-    .table-fixed thead, .table-fixed tbody tr { display:table; width:100%; table-layout:fixed; }
-    .table-fixed thead { width:100%; display:table; }
-    .qty-control { width:96px; display:flex; gap:6px; align-items:center; }
-    .qty-control input { width:48px; text-align:center; }
-    .small-td { font-size: .9rem; }
-  </style>
+ <style>
+  /* ===== BASE ===== */
+  body {
+    padding: 18px;
+    background: #f6f7fb;
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+  }
+
+  .low-stock {
+    background: #fff3cd;
+  }
+
+  .badge-low {
+    background: #dc3545;
+    color: white;
+    border-radius: 6px;
+    padding: 3px 7px;
+    font-size: 0.8rem;
+  }
+
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  .small-muted {
+    color: #6c757d;
+    font-size: 0.9rem;
+  }
+
+  .card-compact {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .card-compact:hover {
+    transform: scale(1.01);
+  }
+
+  /* ===== TABLE STYLING ===== */
+  .table-fixed {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .table-fixed thead th {
+    background: #f1f3f5;
+    font-weight: 600;
+    padding: 10px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .table-fixed tbody {
+    display: block;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+
+  .table-fixed thead,
+  .table-fixed tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .table-fixed td {
+    padding: 8px;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: middle;
+    font-size: 0.9rem;
+    word-wrap: break-word;
+  }
+
+  /* ===== QUANTITY CONTROL ===== */
+  .qty-control {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 120px;
+  }
+
+  .qty-control button {
+    background: #007bff;
+    border: none;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .qty-control button:hover {
+    background: #0056b3;
+  }
+
+  .qty-control input {
+    width: 48px;
+    text-align: center;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 4px;
+  }
+
+  /* ===== RESPONSIVENESS ===== */
+
+  /* Tablets */
+  @media (max-width: 992px) {
+    body {
+      padding: 12px;
+    }
+
+    .card-compact {
+      padding: 10px;
+    }
+
+    .table-fixed thead {
+      display: none;
+    }
+
+    .table-fixed,
+    .table-fixed tbody,
+    .table-fixed tr,
+    .table-fixed td {
+      display: block;
+      width: 100%;
+    }
+
+    .table-fixed tr {
+      margin-bottom: 12px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+      padding: 10px;
+    }
+
+    .table-fixed td {
+      border: none;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+    }
+
+    .table-fixed td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .qty-control {
+      justify-content: flex-end;
+    }
+  }
+
+  /* Mobile Phones */
+  @media (max-width: 576px) {
+    body {
+      padding: 10px;
+    }
+
+    .small-muted {
+      font-size: 0.8rem;
+    }
+
+    .qty-control {
+      max-width: 100px;
+      gap: 4px;
+    }
+
+    .qty-control button {
+      padding: 3px 6px;
+      font-size: 0.8rem;
+    }
+
+    .qty-control input {
+      width: 40px;
+      font-size: 0.85rem;
+    }
+
+    .card-compact {
+      padding: 8px;
+    }
+  }
+</style>
+
 </head>
 <body>
   <div class="container">
