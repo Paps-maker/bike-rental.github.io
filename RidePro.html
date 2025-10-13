@@ -410,19 +410,19 @@
       directionsRenderer.set('directions', null);
     };
 
-   // ---------------- Realtime: recent requests ----------------
-const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
-localStorage.setItem('browserId', browserId);
+   // ---------------- Browser ID setup ----------------
+let browserId = localStorage.getItem('browserId');
+if (!browserId) {
+  browserId = crypto.randomUUID();
+  localStorage.setItem('browserId', browserId);
+}
 
+// ---------------- Realtime: recent requests ----------------
 onSnapshot(collection(db, 'rides'), (snap) => {
   const rides = [];
   snap.forEach(s => {
     const data = { id: s.id, ...s.data() };
-    // Only show rides for this browser (or all if you want)
-    if (!data.browserId) {
-      // Assign browserId to old rides (optional)
-      updateDoc(doc(db, 'rides', s.id), { browserId });
-    }
+    // Only include rides created in this browser
     if (data.browserId === browserId) {
       rides.push(data);
     }
@@ -462,7 +462,12 @@ function renderRequests(list){
     const id = b.dataset.id;
     const pays = await getDocs(collection(db, 'payments'));
     let pDoc = null;
-    pays.forEach(p => { if (p.data().rideId === id && (p.data().browserId === browserId || !p.data().browserId)) pDoc = { id: p.id, ...p.data() }; });
+    pays.forEach(p => { 
+      const data = p.data();
+      if (data.rideId === id && data.browserId === browserId) {
+        pDoc = { id: p.id, ...data }; 
+      }
+    });
     if (!pDoc) return alert('No payment / receipt found yet.');
     showReceipt(pDoc);
   });
@@ -505,19 +510,8 @@ function showReceipt(pay){
 
   document.getElementById('downloadReceipt').onclick = async () => {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: 'a4'
-    });
-
-    await doc.html(html, {
-      x: 20,
-      y: 20,
-      html2canvas: { scale: 1 },
-      windowWidth: 800
-    });
-
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    await doc.html(html, { x: 20, y: 20, html2canvas: { scale: 1 }, windowWidth: 800 });
     doc.save(`receipt-${pay.id}.pdf`);
   };
 }
