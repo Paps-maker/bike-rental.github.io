@@ -410,19 +410,19 @@
       directionsRenderer.set('directions', null);
     };
 
-   // ---------------- Generate unique browser ID ----------------
-let browserId = localStorage.getItem('rideBrowserId');
-if (!browserId) {
-  browserId = 'b_' + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem('rideBrowserId', browserId);
-}
+   // ---------------- Realtime: recent requests ----------------
+const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
+localStorage.setItem('browserId', browserId);
 
-// ---------------- Realtime: recent requests ----------------
 onSnapshot(collection(db, 'rides'), (snap) => {
   const rides = [];
   snap.forEach(s => {
     const data = { id: s.id, ...s.data() };
-    // Only include rides created from this browser
+    // Only show rides for this browser (or all if you want)
+    if (!data.browserId) {
+      // Assign browserId to old rides (optional)
+      updateDoc(doc(db, 'rides', s.id), { browserId });
+    }
     if (data.browserId === browserId) {
       rides.push(data);
     }
@@ -458,17 +458,11 @@ function renderRequests(list){
     requestsList.appendChild(el);
   });
 
-  // Only allow viewing receipts from this browser
   document.querySelectorAll('.view-receipt').forEach(b => b.onclick = async () => {
     const id = b.dataset.id;
     const pays = await getDocs(collection(db, 'payments'));
     let pDoc = null;
-    pays.forEach(p => { 
-      const data = p.data();
-      if (data.rideId === id && data.browserId === browserId) {
-        pDoc = { id: p.id, ...data };
-      }
-    });
+    pays.forEach(p => { if (p.data().rideId === id && (p.data().browserId === browserId || !p.data().browserId)) pDoc = { id: p.id, ...p.data() }; });
     if (!pDoc) return alert('No payment / receipt found yet.');
     showReceipt(pDoc);
   });
@@ -527,21 +521,6 @@ function showReceipt(pay){
     doc.save(`receipt-${pay.id}.pdf`);
   };
 }
-
-// ---------------- Optional: Ride submission ----------------
-// Example of adding browserId automatically when creating a ride
-async function submitRide(pickup, destination, estimateFare) {
-  await addDoc(collection(db, 'rides'), {
-    pickup,
-    destination,
-    status: 'requested',
-    requestedAt: new Date(),
-    estimate: { fare: estimateFare },
-    browserId, // attach this browser
-  });
-  alert('Ride requested successfully!');
-}
-
 
     // ---------------- Loyalty aggregated info ----------------
     onSnapshot(collection(db, 'loyalty'), snap => {
