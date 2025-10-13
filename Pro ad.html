@@ -343,10 +343,21 @@ function renderRides(list) {
         ? '<span class="bg-success text-white badge">Completed</span>'
         : '<span class="bg-secondary text-white badge">Unknown</span>';
 
-    const assigned =
+    const assignedVehicle =
       r.vehicleId
-        ? `<div class="opacity-75 mt-1 text-light small">🚗 Vehicle: ${escapeHtml(r.assignedVehicleName || '')}</div>`
+        ? `<div class="opacity-75 mt-1 text-light small">🚗 Vehicle Name: ${escapeHtml(r.assignedVehicleName || '')}</div>`
         : '';
+
+    const assignedVehicleType =
+      r.vehicleType
+        ? `<div class="opacity-75 mt-1 text-light small">🚘 Vehicle Type: ${escapeHtml(r.vehicleType || '')}</div>`
+        : '';
+
+    // ✅ Updated: Properly display the driver picked by the customer
+    const driverName = r.assignedDriverName || r.driverName || r.driverFullName || r.driver || '';
+    const assignedDriver = driverName
+      ? `<div class="opacity-75 mt-1 text-light small">🧍‍♂️ Driver: ${escapeHtml(driverName)}</div>`
+      : `<div class="opacity-75 mt-1 text-warning small">🧍‍♂️ Driver: Not yet assigned</div>`;
 
     el.innerHTML = `
       <div>
@@ -358,7 +369,9 @@ function renderRides(list) {
           <i class="text-success bi bi-flag-fill"></i> Destination: <span class="text-white">${escapeHtml(r.destination)}</span><br>
           <i class="text-warning bi bi-clock"></i> <span class="text-white">${new Date(r.requestedAt).toLocaleString()}</span>
         </div>
-        ${assigned}
+        ${assignedVehicle}
+        ${assignedVehicleType}
+        ${assignedDriver}
         <div class="mt-2 text-success small fw-semibold">
           💰 Fare: <span class="text-light">KSh ${Number(r.estimate?.fare || 0).toLocaleString()}</span>
         </div>
@@ -400,6 +413,7 @@ function renderRides(list) {
     };
   });
 }
+
 
     // --- Plot rides on map (pickup/destination markers) ---
     function plotRides(list){
