@@ -410,35 +410,47 @@
       directionsRenderer.set('directions', null);
     };
 
-   // ---------------- Browser ID Setup ----------------
-let browserId = localStorage.getItem('browserId');
+   // ---------------- Browser ID setup ----------------
+let browserId = localStorage.getItem('rideproBrowserId');
 if (!browserId) {
-  browserId = crypto.randomUUID();
-  localStorage.setItem('browserId', browserId);
+  browserId = crypto.randomUUID(); // generate unique ID for this browser
+  localStorage.setItem('rideproBrowserId', browserId);
 }
 
-// ---------------- Realtime: recent requests ----------------
-onSnapshot(collection(db, 'rides'), (snap) => {
-  const rides = [];
-  snap.forEach(s => {
-    const data = { id: s.id, ...s.data() };
-    // Only show rides for this browser
-    if (data.browserId === browserId) rides.push(data);
+// ---------------- Create a new ride ----------------
+async function createRide(pickup, destination, estimate = {}) {
+  const ridesRef = collection(db, 'rides');
+  await addDoc(ridesRef, {
+    pickup,
+    destination,
+    requestedAt: new Date(),
+    status: 'requested',
+    estimate,
+    browserId  // save browser ID for filtering
   });
-  rides.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+}
+
+// ---------------- Realtime: recent requests (current browser) ----------------
+const ridesRef = collection(db, 'rides');
+const q = query(ridesRef, where("browserId", "==", browserId));
+
+onSnapshot(q, (snap) => {
+  const rides = [];
+  snap.forEach(s => rides.push({ id: s.id, ...s.data() }));
+  rides.sort((a,b) => new Date(b.requestedAt) - new Date(a.requestedAt));
   renderRequests(rides.slice(0, 20));
 });
 
-// ---------------- Render requests ----------------
-function renderRequests(list) {
+function renderRequests(list){
   requestsList.innerHTML = '';
   list.forEach(r => {
     const el = document.createElement('div');
     el.className = 'list-group-item bg-transparent border-0 p-2 mb-1';
 
-    const driverInfo = r.driverId ? `<div class="small-muted">Driver: ${escapeHtml(r.assignedDriverName || r.assignedDriver || '')}</div>` : '';
-    const vehicleInfo = r.vehicleId ? `<div class="small-muted">Vehicle: ${escapeHtml(r.assignedVehicleName || r.vehicle || '')}</div>` : '';
-    const receiptBtn = (r.status === 'accepted' || r.status === 'ongoing' || r.status === 'completed') ? `<button class="mt-1 btn-outline-light btn btn-sm view-receipt" data-id="${r.id}">Receipt</button>` : '';
+    const driverInfo = r.driverId ? `<div class="small-muted">Driver: ${escapeHtml(r.assignedDriverName||r.assignedDriver||'')}</div>` : '';
+    const vehicleInfo = r.vehicleId ? `<div class="small-muted">Vehicle: ${escapeHtml(r.assignedVehicleName||r.vehicle||'')}</div>` : '';
+    const receiptBtn = (r.status === 'accepted' || r.status === 'ongoing' || r.status === 'completed') 
+      ? `<button class="mt-1 btn-outline-light btn btn-sm view-receipt" data-id="${r.id}">Receipt</button>` : '';
 
     el.innerHTML = `<div class="d-flex justify-content-between">
       <div>
@@ -446,7 +458,7 @@ function renderRequests(list) {
         <div class="small-muted">${new Date(r.requestedAt).toLocaleString()}</div>
         ${driverInfo}
         ${vehicleInfo}
-        <div class="small-muted">Fare: KSh ${Number(r.estimate?.fare || 0).toLocaleString()}</div>
+        <div class="small-muted">Fare: KSh ${Number(r.estimate?.fare||0).toLocaleString()}</div>
       </div>
       <div class="text-end">
         <div class="badge ${badgeForStatus(r.status)}">${r.status}</div>
@@ -459,36 +471,33 @@ function renderRequests(list) {
 
   document.querySelectorAll('.view-receipt').forEach(b => b.onclick = async () => {
     const id = b.dataset.id;
-    const pays = await getDocs(collection(db, 'payments'));
+
+    // Only fetch payments for this browser
+    const paysSnap = await getDocs(query(collection(db, 'payments'), where("browserId", "==", browserId)));
     let pDoc = null;
-    pays.forEach(p => {
-      const data = p.data();
-      // Only show payments for rides from this browser
-      if (data.rideId === id && data.browserId === browserId) pDoc = { id: p.id, ...data };
-    });
+    paysSnap.forEach(p => { if (p.data().rideId === id) pDoc = { id: p.id, ...p.data() }; });
     if (!pDoc) return alert('No payment / receipt found yet.');
     showReceipt(pDoc);
   });
 }
 
-// ---------------- Badge colors ----------------
-function badgeForStatus(status) {
-  return status === 'requested' ? 'bg-warning text-dark' :
-         status === 'accepted' ? 'bg-info' :
-         status === 'ongoing' ? 'bg-primary' :
+function badgeForStatus(status){
+  return status === 'requested' ? 'bg-warning text-dark' : 
+         status === 'accepted' ? 'bg-info' : 
+         status === 'ongoing' ? 'bg-primary' : 
          status === 'completed' ? 'bg-success' : 'bg-secondary';
 }
 
 // ---------------- Receipt UI ----------------
 const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
 
-function showReceipt(pay) {
+function showReceipt(pay){
   const html = `<div style="font-family:Arial, sans-serif; color:#000; padding:10px;">
     <h4 style="color:#2c3e50;">RidePro Receipt</h4>
     <hr/>
     <div><strong>Receipt #: </strong>${escapeHtml(pay.id)}</div>
     <div><strong>Date: </strong>${new Date(pay.createdAt).toLocaleString()}</div>
-    <div><strong>Driver: </strong>${escapeHtml(pay.driver || '')}</div>
+    <div><strong>Driver: </strong>${escapeHtml(pay.driver||'')}</div>
     <div><strong>Vehicle: </strong>${escapeHtml(pay.vehicle || pay.assignedVehicleName || '')}</div>
     <div><strong>Pickup: </strong>${escapeHtml(pay.pickup || '')}</div>
     <div><strong>Destination: </strong>${escapeHtml(pay.destination || '')}</div>
@@ -500,7 +509,6 @@ function showReceipt(pay) {
   document.getElementById('receiptBody').innerHTML = html;
   receiptModal.show();
 
-  // Print
   document.getElementById('printReceipt').onclick = () => {
     const w = window.open('', '_blank', 'width=600,height=800');
     w.document.write(`<html><head><title>Receipt</title></head><body>${html}</body></html>`);
@@ -508,33 +516,23 @@ function showReceipt(pay) {
     setTimeout(() => w.print(), 250);
   };
 
-  // Download PDF
   document.getElementById('downloadReceipt').onclick = async () => {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    await doc.html(html, { x: 20, y: 20, html2canvas: { scale: 1 }, windowWidth: 800 });
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'a4'
+    });
+
+    await doc.html(html, {
+      x: 20,
+      y: 20,
+      html2canvas: { scale: 1 },
+      windowWidth: 800
+    });
+
     doc.save(`receipt-${pay.id}.pdf`);
   };
-}
-
-// ---------------- Create ride request ----------------
-async function requestRide(pickup, destination, estimate, driverId=null, vehicleId=null) {
-  try {
-    await addDoc(collection(db, 'rides'), {
-      pickup: pickup,
-      destination: destination,
-      estimate: estimate,
-      driverId: driverId,
-      vehicleId: vehicleId,
-      status: 'requested',
-      requestedAt: new Date().toISOString(),
-      browserId: browserId  // Track the request per browser
-    });
-    alert('Ride requested successfully!');
-  } catch (err) {
-    console.error('Error requesting ride:', err);
-    alert('Failed to request ride.');
-  }
 }
 
     // ---------------- Loyalty aggregated info ----------------
