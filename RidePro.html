@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -284,55 +285,145 @@
     });
   }
 
-  // ---------------- PAY & REQUEST RIDE ----------------
-  const MPESA_SERVER_ENDPOINT = "https://YOUR_SERVER_DOMAIN/mpesa/stkpush";
-  async function initiateMpesaPayment(phone, amount, metadata={}) {
-    if(!MPESA_SERVER_ENDPOINT.includes('YOUR_SERVER_DOMAIN')) {
-      const resp = await fetch(MPESA_SERVER_ENDPOINT, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, amount, metadata }) });
-      return resp.json();
-    }
-    console.warn('Simulated MPESA (DEV).'); return { success:true, simulated:true, checkoutRequestID:'SIM_'+Date.now() };
+ // ---------------- PAY & REQUEST RIDE (with driver selection + driver name) ----------------
+const MPESA_SERVER_ENDPOINT = "https://YOUR_SERVER_DOMAIN/mpesa/stkpush";
+
+// --- M-PESA Payment ---
+async function initiateMpesaPayment(phone, amount, metadata = {}) {
+  if (!MPESA_SERVER_ENDPOINT.includes('YOUR_SERVER_DOMAIN')) {
+    const resp = await fetch(MPESA_SERVER_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, amount, metadata })
+    });
+    return resp.json();
+  }
+  console.warn('Simulated MPESA (DEV).');
+  return { success: true, simulated: true, checkoutRequestID: 'SIM_' + Date.now() };
+}
+
+// --- Fetch available drivers ---
+async function getAvailableDrivers() {
+  const snap = await getDocs(query(collection(db, 'vehicles'), where('status', '==', 'available')));
+  return snap.docs.map(d => ({
+    id: d.id,
+    name: d.data().name || d.data().driverName || d.data().type || 'Driver'
+  }));
+}
+
+// --- Driver selection modal ---
+async function selectDriver() {
+  const drivers = await getAvailableDrivers();
+  if (drivers.length === 0) {
+    alert('No available drivers at the moment.');
+    return null;
   }
 
-  btnProceedPayment.onclick = async () => {
-    if(!window._estimate) return alert('Get estimate first');
-    const phone = (custPhone.value||'').trim();
-    const name = (custName.value||'').trim()||'Guest';
-    if(!phone.match(/^07\d{8}$/)) return alert('Enter valid Kenyan phone number');
-    const estimate = window._estimate;
-    const loyaltyCode = promo.value.trim();
+  const sel = document.createElement('select');
+  sel.className = 'form-select mb-2';
+  sel.innerHTML = `<option value="">Select a driver (optional)</option>` +
+    drivers.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
 
-    let discount = 0;
-    try {
-      const q = query(collection(db,'loyalty'), where('phone','==',phone));
-      const snap = await getDocs(q); if(!snap.empty){ let pts=0; snap.forEach(s=>pts+=Number(s.data().points||0)); discount=Math.floor(pts/10)*50; }
-    } catch(e){ console.warn(e); }
+  const container = document.createElement('div');
+  container.appendChild(sel);
 
-    const payable = Math.max(0, estimate.fare - discount);
-    if(!confirm(`Pay KSh ${payable} now?`)) return;
-    const mpresp = await initiateMpesaPayment(phone,payable,{ pickup: estimate.pickupText, dest: estimate.destText, type: estimate.type });
-    if(!mpresp?.success) return alert('Payment failed');
+  const res = await new Promise(resolve => {
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn-primary btn-sm';
+    okBtn.textContent = 'Confirm';
+    container.appendChild(okBtn);
 
-    const rideDoc = {
-      pickup: estimate.pickupText,
-      destination: estimate.destText,
-      estimate,
-      requestedAt: new Date().toISOString(),
-      status:'requested',
-      customerName:name,
-      customerPhone:phone,
-      payment:{ payable, mpesa: mpresp },
-      loyaltyDiscount: discount,
-      createdByGuest:true,
-      browserId
+    const modalDiv = document.createElement('div');
+    modalDiv.className = 'modal fade';
+    modalDiv.tabIndex = -1;
+    modalDiv.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="p-3 modal-content"></div></div>`;
+    modalDiv.querySelector('.modal-content').appendChild(container);
+    document.body.appendChild(modalDiv);
+    const modal = new bootstrap.Modal(modalDiv);
+    modal.show();
+
+    okBtn.onclick = () => {
+      const selectedId = sel.value;
+      const selectedName = drivers.find(d => d.id === selectedId)?.name || null;
+      resolve({ id: selectedId, name: selectedName });
+      modal.hide();
+      modalDiv.remove();
     };
-    const docRef = await addDoc(collection(db,'rides'), rideDoc);
-    alert('Ride requested. Ref: '+docRef.id);
+  });
 
-    custName.value=''; custPhone.value=''; promo.value=''; pickupInput.value=''; destInput.value='';
-    estDistance.textContent='—'; estDuration.textContent='—'; estFare.textContent='KSh 0';
-    if(routeControl) map.removeControl(routeControl);
+  return res; // {id, name} or null
+}
+
+// --- Proceed payment + create ride ---
+btnProceedPayment.onclick = async () => {
+  if (!window._estimate) return alert('Get estimate first');
+
+  const phone = (custPhone.value || '').trim();
+  const name = (custName.value || '').trim() || 'Guest';
+  if (!phone.match(/^07\d{8}$/)) return alert('Enter valid Kenyan phone number');
+
+  const estimate = window._estimate;
+
+  // 🧍 Select driver
+  const selectedDriver = await selectDriver();
+
+  // 🔹 Loyalty discount check
+  let discount = 0;
+  try {
+    const q = query(collection(db, 'loyalty'), where('phone', '==', phone));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      let pts = 0;
+      snap.forEach(s => pts += Number(s.data().points || 0));
+      discount = Math.floor(pts / 10) * 50;
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+
+  const payable = Math.max(0, estimate.fare - discount);
+  if (!confirm(`Pay KSh ${payable} now?`)) return;
+
+  const mpresp = await initiateMpesaPayment(phone, payable, {
+    pickup: estimate.pickupText,
+    dest: estimate.destText,
+    type: estimate.type,
+    driverId: selectedDriver?.id || null
+  });
+
+  if (!mpresp?.success) return alert('Payment failed');
+
+  // ✅ Save ride with both driver ID & name
+  const rideDoc = {
+    pickup: estimate.pickupText,
+    destination: estimate.destText,
+    estimate,
+    requestedAt: new Date().toISOString(),
+    status: 'requested',
+    customerName: name,
+    customerPhone: phone,
+    payment: { payable, mpesa: mpresp },
+    loyaltyDiscount: discount,
+    createdByGuest: true,
+    browserId,
+    assignedDriverId: selectedDriver?.id || null,
+    assignedDriverName: selectedDriver?.name || null
   };
+
+  const docRef = await addDoc(collection(db, 'rides'), rideDoc);
+  alert('Ride requested successfully. Ref: ' + docRef.id);
+
+  // Reset form
+  custName.value = '';
+  custPhone.value = '';
+  promo.value = '';
+  pickupInput.value = '';
+  destInput.value = '';
+  estDistance.textContent = '—';
+  estDuration.textContent = '—';
+  estFare.textContent = 'KSh 0';
+  if (routeControl) map.removeControl(routeControl);
+};
 
   // ---------------- RECENT REQUESTS (per browser) ----------------
   onSnapshot(collection(db,'rides'), snap=>{
