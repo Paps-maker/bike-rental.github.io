@@ -459,7 +459,7 @@ function startBeeping(rideId) {
   currentBeepingRideId = rideId;
 
   const audio = document.getElementById("rideSound");
-  alert("🚗 New Ride Request Received!"); // optional popup
+  
 
   alertInterval = setInterval(() => {
     audio.currentTime = 0;
