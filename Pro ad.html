@@ -24,6 +24,14 @@
     .small-muted{color:var(--muted)}
   </style>
 </head>
+<!-- 🔊 Ride Request Alert (Loud & Repeating) -->
+<audio id="rideSound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
+<!-- 🔇 Sound Toggle Button -->
+<div style="position: fixed; top: 10px; right: 10px; z-index: 9999;">
+  <button id="toggleSound" class="btn btn-sm btn-secondary">🔊 Sound On</button>
+</div>
+
 <body>
   <div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between mb-3">
@@ -157,6 +165,33 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    .then(reg => console.log('Service Worker registered:', reg))
+    .catch(err => console.error('SW registration failed:', err));
+}
+const messaging = getMessaging(app);
+
+Notification.requestPermission().then(permission => {
+  if (permission === 'granted') {
+    console.log('Notification permission granted.');
+    getToken(messaging, {
+      vapidKey: 'BMHq0uN0pS8LZyqaphCho2D9TLrDs-gPpY-p-9SFoafX1QbwlF71hw83pEY_DQoP5AD633nt0O6tOtG0GgWiVQ0'
+    }).then(currentToken => {
+      if (currentToken) {
+        console.log('FCM Token:', currentToken);
+        // ✅ Optionally save this token to Firestore for sending messages later
+      } else {
+        console.warn('No registration token available.');
+      }
+    });
+  } else {
+    console.warn('Notification permission denied.');
+  }
+});
+
 
     // UI refs
     const vehiclesList = document.getElementById('vehiclesList');
@@ -412,8 +447,65 @@ function renderRides(list) {
       }
     };
   });
+  
 }
 
+// --- SOUND & VIBRATION ALERT SYSTEM ---
+let soundEnabled = true;
+let previousRideIds = new Set();
+
+const toggleBtn = document.getElementById('toggleSound');
+toggleBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  toggleBtn.textContent = soundEnabled ? '🔊 Sound On' : '🔇 Mute';
+});
+
+// --- Function: play sound & vibration 3 times ---
+function notifyNewRide() {
+  if (!soundEnabled) return;
+
+  const audio = document.getElementById('rideSound');
+  let repeatCount = 0;
+
+  function playAlert() {
+    if (!soundEnabled) return; // stop if muted mid-way
+    if (audio) {
+      audio.currentTime = 0;
+      audio.volume = 1.0; // full volume
+      audio.play().catch(err => console.log('Autoplay blocked:', err));
+    }
+
+    // Vibrate pattern (3 short bursts)
+    if (navigator.vibrate) {
+      navigator.vibrate([400, 200, 400, 200, 400]);
+    }
+
+    repeatCount++;
+    if (repeatCount < 3) {
+      setTimeout(playAlert, 2000); // wait 2 seconds, then repeat
+    }
+  }
+
+  playAlert();
+}
+
+// --- REALTIME FIREBASE LISTENER ---
+onSnapshot(collection(db, 'rides'), (snap) => {
+  const rides = [];
+  snap.forEach(s => rides.push({ id: s.id, ...s.data() }));
+  rides.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+
+  const currentIds = new Set(rides.map(r => r.id));
+  rides.forEach(r => {
+    const isNew = !previousRideIds.has(r.id);
+    if (isNew && r.status === 'requested') {
+      notifyNewRide();
+    }
+  });
+
+  previousRideIds = currentIds;
+  renderRides(rides);
+});
 
     // --- Plot rides on map (pickup/destination markers) ---
     function plotRides(list){
