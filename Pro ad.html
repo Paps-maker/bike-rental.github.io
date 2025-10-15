@@ -24,14 +24,13 @@
     .small-muted{color:var(--muted)}
   </style>
 </head>
-<!-- 🔊 Ride Request Alert (Loud & Repeating) -->
+<!-- 🔊 Ride Request Alert (Loud & Continuous) -->
 <audio id="rideSound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
 
 <!-- 🔇 Sound Toggle Button -->
 <div style="position: fixed; top: 10px; right: 10px; z-index: 9999;">
   <button id="toggleSound" class="btn btn-sm btn-secondary">🔊 Sound On</button>
 </div>
-
 <body>
   <div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between mb-3">
@@ -358,7 +357,7 @@ Notification.requestPermission().then(permission => {
       });
     }
 
-   // --- Rides UI ---
+  // --- Rides UI ---
 function renderRides(list) {
   ridesList.innerHTML = '';
 
@@ -388,7 +387,6 @@ function renderRides(list) {
         ? `<div class="opacity-75 mt-1 text-light small">🚘 Vehicle Type: ${escapeHtml(r.vehicleType || '')}</div>`
         : '';
 
-    // ✅ Updated: Properly display the driver picked by the customer
     const driverName = r.assignedDriverName || r.driverName || r.driverFullName || r.driver || '';
     const assignedDriver = driverName
       ? `<div class="opacity-75 mt-1 text-light small">🧍‍♂️ Driver: ${escapeHtml(driverName)}</div>`
@@ -447,65 +445,78 @@ function renderRides(list) {
       }
     };
   });
-  
 }
 
-// --- SOUND & VIBRATION ALERT SYSTEM ---
-let soundEnabled = true;
-let previousRideIds = new Set();
+// ============================================================
+// 🔔 RIDE ALERT SYSTEM
+// ============================================================
+let alertInterval = null;
+let currentBeepingRideId = null;
 
-const toggleBtn = document.getElementById('toggleSound');
-toggleBtn.addEventListener('click', () => {
-  soundEnabled = !soundEnabled;
-  toggleBtn.textContent = soundEnabled ? '🔊 Sound On' : '🔇 Mute';
-});
+// --- Function: Start Beeping for new ride ---
+function startBeeping(rideId) {
+  if (alertInterval) clearInterval(alertInterval);
+  currentBeepingRideId = rideId;
 
-// --- Function: play sound & vibration 3 times ---
-function notifyNewRide() {
-  if (!soundEnabled) return;
+  const audio = document.getElementById("rideSound");
+  alert("🚗 New Ride Request Received!"); // optional popup
 
-  const audio = document.getElementById('rideSound');
-  let repeatCount = 0;
-
-  function playAlert() {
-    if (!soundEnabled) return; // stop if muted mid-way
-    if (audio) {
-      audio.currentTime = 0;
-      audio.volume = 1.0; // full volume
-      audio.play().catch(err => console.log('Autoplay blocked:', err));
-    }
-
-    // Vibrate pattern (3 short bursts)
-    if (navigator.vibrate) {
-      navigator.vibrate([400, 200, 400, 200, 400]);
-    }
-
-    repeatCount++;
-    if (repeatCount < 3) {
-      setTimeout(playAlert, 2000); // wait 2 seconds, then repeat
-    }
-  }
-
-  playAlert();
+  alertInterval = setInterval(() => {
+    audio.currentTime = 0;
+    audio.volume = 1.0;
+    audio.play().catch(() => {});
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
+  }, 2000);
 }
 
-// --- REALTIME FIREBASE LISTENER ---
-onSnapshot(collection(db, 'rides'), (snap) => {
+// --- Function: Stop Beeping ---
+function stopBeeping() {
+  if (alertInterval) clearInterval(alertInterval);
+  currentBeepingRideId = null;
+  const audio = document.getElementById("rideSound");
+  audio.pause();
+  audio.currentTime = 0;
+  navigator.vibrate(0);
+}
+
+// --- Realtime Firebase Listener for New Rides ---
+let previousRides = new Set();
+
+onSnapshot(collection(db, "rides"), (snap) => {
   const rides = [];
-  snap.forEach(s => rides.push({ id: s.id, ...s.data() }));
+  snap.forEach((s) => rides.push({ id: s.id, ...s.data() }));
   rides.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
 
-  const currentIds = new Set(rides.map(r => r.id));
-  rides.forEach(r => {
-    const isNew = !previousRideIds.has(r.id);
-    if (isNew && r.status === 'requested') {
-      notifyNewRide();
+  // Detect new ride requests
+  rides.forEach((r) => {
+    const isNew = !previousRides.has(r.id);
+    if (isNew && r.status === "requested") {
+      startBeeping(r.id);
+    }
+
+    // Stop beeping if ride was marked/changed
+    if (currentBeepingRideId === r.id && r.status !== "requested") {
+      stopBeeping();
     }
   });
 
-  previousRideIds = currentIds;
+  previousRides = new Set(rides.map((r) => r.id));
   renderRides(rides);
 });
+
+// --- Stop beeping when user clicks action buttons ---
+document.addEventListener("click", (e) => {
+  if (
+    e.target &&
+    (e.target.classList.contains("btn-assign") ||
+     e.target.classList.contains("btn-start") ||
+     e.target.classList.contains("btn-complete") ||
+     e.target.classList.contains("btn-cancel"))
+  ) {
+    stopBeeping();
+  }
+});
+
 
     // --- Plot rides on map (pickup/destination markers) ---
     function plotRides(list){
@@ -757,5 +768,6 @@ onSnapshot(collection(db, 'rides'), (snap) => {
     // helpers
     function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   </script>
+  
 </body>
 </html>
