@@ -24,591 +24,259 @@
     .status-orange{background:#f39c12;color:#2d1700;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-gray{background:#95a5a6;color:#07121a;padding:4px 8px;border-radius:6px;font-weight:700}
 
-    /* Spinner overlay */
-    .map-spinner {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      z-index: 999;
-      display: none;
-      align-items: center;
-      gap: 8px;
-      background: rgba(0,0,0,0.55);
-      padding: 8px 10px;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 13px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-    }
+    .map-spinner { position: absolute; top: 12px; right: 12px; z-index: 999; display: none; align-items: center; gap: 8px; background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 8px; color: #fff; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
     .map-spinner.show { display:flex; }
-
     .clear-btn { margin-left: 6px; }
-
-    /* Small spinner icon */
-    .spinner-dot {
-      width:14px; height:14px;
-      border:2px solid rgba(255,255,255,0.25);
-      border-top-color:#fff;
-      border-radius:50%;
-      animation: spin 1s linear infinite;
-    }
+    .spinner-dot { width:14px; height:14px; border:2px solid rgba(255,255,255,0.25); border-top-color:#fff; border-radius:50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header class="d-flex align-items-center justify-content-between mb-3">
-      <div>
-        <h3 class="mb-0 brand">RidePro</h3>
-        <div class="small-muted">Fast, safe rides </div>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <span id="userEmail" class="small-muted"></span>
-        <button id="btnOpenAuth" class="btn-outline-light btn btn-sm d-none">Sign In</button>
-      </div>
-    </header>
+<div class="container">
+  <header class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h3 class="mb-0 brand">RidePro</h3>
+      <div class="small-muted">Fast, safe rides </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span id="userEmail" class="small-muted"></span>
+      <button id="btnOpenAuth" class="btn-outline-light btn btn-sm d-none">Sign In</button>
+    </div>
+  </header>
 
-    <div class="row g-3">
-      <div class="col-lg-7">
-        <div class="mb-3 panel">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <div>
-              <h5 class="mb-0">Book a Ride</h5>
-              <div class="small-muted"></div>
-            </div>
-            <div>
-              <select id="vehicleType" class="form-select-sm form-select">
-                <option value="car" selected>Car — Standard (1-2 People)</option>
-                <option value="premium">Car — Premium (4 People)</option>
-                <option value="bike">Motorbike</option>
-                <option value="van">Van Group of 6-8</option>
-              </select>
-            </div>
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="mb-3 panel">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div>
+            <h5 class="mb-0">Book a Ride</h5>
+            <div class="small-muted"></div>
           </div>
-
-          <div class="mb-2">
-            <label class="form-label small-muted">Pickup</label>
-            <input id="pickup" class="form-control" placeholder="Enter pickup location"/>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small-muted">Destination</label>
-            <input id="destination" class="form-control" placeholder="Enter destination"/>
-          </div>
-
-          <div id="map" class="mb-3">
-            <div id="mapSpinner" class="map-spinner" aria-hidden="true">
-              <div class="spinner-dot" role="img" aria-label="loading"></div>
-              <div class="small-muted">Calculating route…</div>
-            </div>
-          </div>
-
-          <div class="d-flex align-items-center gap-3">
-            <div>
-              <div class="small-muted">Distance</div>
-              <div id="estDistance" class="fw-bold">—</div>
-            </div>
-            <div>
-              <div class="small-muted">Duration</div>
-              <div id="estDuration" class="fw-bold">—</div>
-            </div>
-            <div>
-              <div class="small-muted">Fare</div>
-              <div id="estFare" class="h4 brand">KSh 0</div>
-            </div>
-            <div class="d-flex gap-2 ms-auto">
-              <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
-              <button id="btnClearRoute" class="clear-btn btn-outline-light btn btn btn-sm" title="Clear route">Clear Route</button>
-              <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
-            </div>
-          </div>
-
-          <hr/>
-
-          <div class="row g-2">
-            <div class="col-md-4">
-              <label class="form-label small-muted">Customer name (optional)</label>
-              <input id="custName" class="form-control" placeholder="Full name"/>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small-muted">Phone for M-Pesa (07XX...)</label>
-              <input id="custPhone" class="form-control" placeholder="e.g., 07XXXXXXXX"/>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small-muted">Promo / Loyalty code</label>
-              <input id="promo" class="form-control" placeholder="Optional"/>
-            </div>
+          <div>
+            <select id="vehicleType" class="form-select-sm form-select">
+              <option value="car" selected>Car — Standard (1-2 People)</option>
+              <option value="premium">Car — Premium (4 People)</option>
+              <option value="bike">Motorbike</option>
+              <option value="van">Van Group of 6-8</option>
+            </select>
           </div>
         </div>
 
-        <div class="panel">
-          <h6 class="mb-2">Recent Requests</h6>
-          <div id="requestsList" class="list-group"></div>
+        <div class="mb-2">
+          <label class="form-label small-muted">Pickup</label>
+          <input id="pickup" class="form-control" placeholder="Enter pickup location"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small-muted">Destination</label>
+          <input id="destination" class="form-control" placeholder="Enter destination"/>
+        </div>
+
+        <div id="map" class="mb-3">
+          <div id="mapSpinner" class="map-spinner" aria-hidden="true">
+            <div class="spinner-dot" role="img" aria-label="loading"></div>
+            <div class="small-muted">Calculating route…</div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          <div>
+            <div class="small-muted">Distance</div>
+            <div id="estDistance" class="fw-bold">—</div>
+          </div>
+          <div>
+            <div class="small-muted">Duration</div>
+            <div id="estDuration" class="fw-bold">—</div>
+          </div>
+          <div>
+            <div class="small-muted">Fare</div>
+            <div id="estFare" class="h4 brand">KSh 0</div>
+          </div>
+          <div class="d-flex gap-2 ms-auto">
+            <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
+            <button id="btnClearRoute" class="clear-btn btn-outline-light btn btn btn-sm" title="Clear route">Clear Route</button>
+            <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
+          </div>
+        </div>
+
+        <hr/>
+
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small-muted">Customer name (optional)</label>
+            <input id="custName" class="form-control" placeholder="Full name"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small-muted">Phone for M-Pesa (07XX...)</label>
+            <input id="custPhone" class="form-control" placeholder="e.g., 07XXXXXXXX"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small-muted">Promo / Loyalty code</label>
+            <input id="promo" class="form-control" placeholder="Optional"/>
+          </div>
         </div>
       </div>
 
-      <div class="col-lg-5">
-        <div class="mb-3 panel">
-          <h6>Available Vehicles</h6>
-          <div class="mt-2" id="vehiclesGrid"></div>
-        </div>
+      <div class="panel">
+        <h6 class="mb-2">Recent Requests</h6>
+        <div id="requestsList" class="list-group"></div>
+      </div>
+    </div>
 
-        <div class="panel">
-          <h6>Loyalty</h6>
-          <div id="loyaltyInfo" class="small-muted">Earn points after ride completion. Points reduce fare on next rides.</div>
-        </div>
+    <div class="col-lg-5">
+      <div class="mb-3 panel">
+        <h6>Available Vehicles</h6>
+        <div class="mt-2" id="vehiclesGrid"></div>
+      </div>
+
+      <div class="panel">
+        <h6>Loyalty</h6>
+        <div id="loyaltyInfo" class="small-muted">Earn points after ride completion. Points reduce fare on next rides.</div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Receipt modal -->
-  <div class="modal fade" id="receiptModal" tabindex="-1"><div class="modal-dialog modal-md"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Receipt</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="receiptBody"></div><div class="modal-footer"><button id="printReceipt" class="btn-outline-light btn btn-sm">Print</button><button id="downloadReceipt" class="btn btn-gold btn btn-sm">Download PDF</button></div></div></div></div>
+<!-- Receipt modal -->
+<div class="modal fade" id="receiptModal" tabindex="-1"><div class="modal-dialog modal-md"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Receipt</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="receiptBody"></div><div class="modal-footer"><button id="printReceipt" class="btn-outline-light btn btn-sm">Print</button><button id="downloadReceipt" class="btn btn-gold btn btn-sm">Download PDF</button></div></div></div></div>
 
-  <!-- Bootstrap -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Bootstrap -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Google Maps (real API key included) -->
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&callback=initMap&libraries=places"></script>
+<!-- Google Maps API -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&libraries=places&callback=initMap"></script>
 
-  <script type="module">
-    // ---------------- Firebase imports ----------------
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import {
-      getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, getDocs, query, where, orderBy
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-    // ---------------- CONFIG ----------------
-    const firebaseConfig = {
-      apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
-      authDomain: "transc-eec4c.firebaseapp.com",
-      projectId: "transc-eec4c",
-      storageBucket: "transc-eec4c.firebasestorage.app",
-      messagingSenderId: "3676403115",
-      appId: "1:3676403115:web:4da31c41de4b990b614eee",
-      measurementId: "G-R29NT412SJ"
-    };
+// ---------------- CONFIG ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
+  authDomain: "transc-eec4c.firebaseapp.com",
+  projectId: "transc-eec4c",
+  storageBucket: "transc-eec4c.appspot.com",
+  messagingSenderId: "3676403115",
+  appId: "1:3676403115:web:example"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
+// ---------------- UI ----------------
+const pickupInput = document.getElementById('pickup');
+const destInput = document.getElementById('destination');
+const btnEstimate = document.getElementById('btnEstimate');
+const btnClearRoute = document.getElementById('btnClearRoute');
+const estDistance = document.getElementById('estDistance');
+const estDuration = document.getElementById('estDuration');
+const estFare = document.getElementById('estFare');
+const vehicleType = document.getElementById('vehicleType');
+const mapSpinner = document.getElementById('mapSpinner');
+const btnProceedPayment = document.getElementById('btnProceedPayment');
+const custName = document.getElementById('custName');
+const custPhone = document.getElementById('custPhone');
+const promo = document.getElementById('promo');
+const requestsList = document.getElementById('requestsList');
+const vehiclesGrid = document.getElementById('vehiclesGrid');
 
-    // ---------------- UI refs ----------------
-    const pickupInput = document.getElementById('pickup');
-    const destInput = document.getElementById('destination');
-    const btnEstimate = document.getElementById('btnEstimate');
-    const btnClearRoute = document.getElementById('btnClearRoute');
-    const btnProceedPayment = document.getElementById('btnProceedPayment');
-    const estDistance = document.getElementById('estDistance');
-    const estDuration = document.getElementById('estDuration');
-    const estFare = document.getElementById('estFare');
-    const vehicleType = document.getElementById('vehicleType');
-    const requestsList = document.getElementById('requestsList');
-    const custName = document.getElementById('custName');
-    const custPhone = document.getElementById('custPhone');
-    const promo = document.getElementById('promo');
-    const vehiclesGrid = document.getElementById('vehiclesGrid');
-    const mapSpinner = document.getElementById('mapSpinner');
+let map, directionsService, directionsRenderer, vehicleMarkers = [];
 
-    // ---------------- Browser ID ----------------
-    const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
-    localStorage.setItem('browserId', browserId);
+// ---------------- HELPERS ----------------
+function showSpinner(show=true){ mapSpinner.classList.toggle('show', show); }
+function clearRouteAndEstimates(){ estDistance.textContent='—'; estDuration.textContent='—'; estFare.textContent='KSh 0'; if(directionsRenderer) directionsRenderer.setDirections({ routes: [] }); }
+const FARE_RATES={ car:{base:120,perKm:30,perMin:6}, premium:{base:200,perKm:60,perMin:8}, bike:{base:12,perKm:6,perMin:4}, van:{base:200,perKm:35,perMin:7} };
+function calcFare(km,mins,type){ const rate = FARE_RATES[type]||FARE_RATES.car; return Math.round(rate.base+km*rate.perKm+mins*rate.perMin); }
 
-    // ---------------- MAP INITIALIZATION ----------------
-    let map, directionsService, directionsRenderer;
-    let vehicleMarkers = {}; // google maps markers
-    let currentRouteBounds = null;
+// ---------------- MAP ----------------
+window.initMap = function(){
+  map = new google.maps.Map(document.getElementById('map'), { center:{ lat:-1.286389, lng:36.817223 }, zoom:13, mapTypeControl:false, streetViewControl:false, fullscreenControl:false });
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers:false, polylineOptions:{ strokeColor:'#007bff', strokeWeight:5 } });
+  new google.maps.places.Autocomplete(pickupInput);
+  new google.maps.places.Autocomplete(destInput);
 
-    function initMap() {
-      const center = { lat: -1.286389, lng: 36.817223 }; // Nairobi
+  pickupInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); btnEstimate.click(); }});
+  destInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); btnEstimate.click(); }});
+};
 
-      map = new google.maps.Map(document.getElementById('map'), {
-        center,
-        zoom: 13,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false
-      });
+// ---------------- ESTIMATE ----------------
+btnEstimate.onclick = async ()=>{
+  const origin = pickupInput.value.trim();
+  const dest = destInput.value.trim();
+  if(!origin||!dest) return alert('Enter both pickup and destination.');
+  showSpinner(true); btnEstimate.disabled=true; btnClearRoute.disabled=true;
 
-      directionsService = new google.maps.DirectionsService();
-      directionsRenderer = new google.maps.DirectionsRenderer({
-        map,
-        suppressMarkers: false,
-        polylineOptions: { strokeColor: '#007bff', strokeWeight: 5 }
-      });
+  directionsService.route({ origin, destination: dest, travelMode: google.maps.TravelMode.DRIVING, drivingOptions:{ departureTime:new Date() } }, (result,status)=>{
+    showSpinner(false); btnEstimate.disabled=false; btnClearRoute.disabled=false;
+    if(status==='OK' && result.routes.length){
+      directionsRenderer.setDirections(result);
+      const leg = result.routes[0].legs[0];
+      const km = leg.distance.value/1000;
+      const mins = Math.ceil(leg.duration.value/60);
+      const type = vehicleType.value||'car';
+      const fare = calcFare(km,mins,type);
+      estDistance.textContent = `${km.toFixed(2)} km`;
+      estDuration.textContent = `${mins} min`;
+      estFare.textContent = `KSh ${fare.toLocaleString()}`;
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(leg.start_location);
+      bounds.extend(leg.end_location);
+      map.fitBounds(bounds,60);
+      window._estimate={ pickupText:origin, destText:dest, km, mins, fare, type };
+    } else { alert('Error calculating route: ' + status); clearRouteAndEstimates(); }
+  });
+};
+btnClearRoute.onclick = ()=>{
+  clearRouteAndEstimates();
+  map.setCenter({ lat:-1.286389, lng:36.817223 });
+  map.setZoom(13);
+};
 
-      // Autocomplete inputs
-      new google.maps.places.Autocomplete(pickupInput);
-      new google.maps.places.Autocomplete(destInput);
+// ---------------- VEHICLES ----------------
+onSnapshot(collection(db,'vehicles'), snapshot=>{
+  vehiclesGrid.innerHTML=''; vehicleMarkers.forEach(m=>m.setMap(null)); vehicleMarkers=[];
+  snapshot.forEach(doc=>{
+    const v = doc.data();
+    const div = document.createElement('div'); div.className='d-flex align-items-center gap-2 mb-2';
+    div.innerHTML=`<img class="vehicle-img" src="${v.image||'https://via.placeholder.com/80x56'}"><div><div>${v.name}</div><div class="small-muted">${v.type}</div></div><div class="ms-auto status-${v.status||'gray'}">${v.status||'Idle'}</div>`;
+    vehiclesGrid.appendChild(div);
 
-      // If user types both and presses Enter, estimate
-      pickupInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); btnEstimate.click(); }});
-      destInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); btnEstimate.click(); }});
+    if(v.location){ 
+      const marker = new google.maps.Marker({ position:{ lat:v.location.lat, lng:v.location.lng }, map, title:v.name });
+      vehicleMarkers.push(marker);
     }
-    window.initMap = initMap;
+  });
+});
 
-    // ---------------- helpers ----------------
-    function showSpinner(show = true) {
-      if (show) mapSpinner.classList.add('show');
-      else mapSpinner.classList.remove('show');
-    }
+// ---------------- REQUESTS ----------------
+onSnapshot(collection(db,'rides'), snapshot=>{
+  requestsList.innerHTML='';
+  snapshot.forEach(doc=>{
+    const r = doc.data();
+    const div = document.createElement('div'); div.className='list-group-item bg-transparent d-flex justify-content-between align-items-start border rounded mb-2 p-2 text-light';
+    div.innerHTML=`<div><div>${r.pickup} → ${r.destination}</div><div class="small-muted">${r.type} • ${r.fare?`KSh ${r.fare}`:'Pending'}</div></div><div class="status-${r.status||'gray'}">${r.status||'Requested'}</div>`;
+    requestsList.appendChild(div);
+  });
+});
 
-    function clearRouteAndEstimates() {
-      estDistance.textContent = '—';
-      estDuration.textContent = '—';
-      estFare.textContent = 'KSh 0';
-      window._estimate = null;
-      if (directionsRenderer) {
-        directionsRenderer.setDirections({ routes: [] });
-      }
-      currentRouteBounds = null;
-    }
+// ---------------- SUBMIT RIDE ----------------
+btnProceedPayment.onclick = async ()=>{
+  if(!window._estimate) return alert('Please estimate fare first.');
+  const name = custName.value.trim()||'Anonymous';
+  const phone = custPhone.value.trim();
+  if(!phone) return alert('Enter phone for payment.');
+  const docRef = await addDoc(collection(db,'rides'),{ pickup:window._estimate.pickupText, destination:window._estimate.destText, km:window._estimate.km, mins:window._estimate.mins, fare:window._estimate.fare, type:window._estimate.type, name, phone, status:'requested', requestedAt:new Date() });
+  alert('Ride requested!'); custName.value=''; custPhone.value=''; pickupInput.value=''; destInput.value=''; clearRouteAndEstimates();
+};
 
-    // ---------------- FARE CALCULATION ----------------
-    const FARE_RATES = {
-      car: { base: 120, perKm: 30, perMin: 6 },
-      premium: { base: 200, perKm: 60, perMin: 8 },
-      bike: { base: 12, perKm: 6, perMin: 4 },
-      van: { base: 200, perKm: 35, perMin: 7 },
-    };
-    function calcFare(km, mins, type) {
-      const rate = FARE_RATES[type] || FARE_RATES.car;
-      return Math.round(rate.base + km * rate.perKm + mins * rate.perMin);
-    }
+// ---------------- LOYALTY ----------------
+let userPoints = parseInt(localStorage.getItem("loyaltyPoints")||"0");
+function updatePointsInfo(){ document.getElementById("loyaltyInfo").innerHTML = `You have <strong>${userPoints}</strong> points.`; }
+updatePointsInfo();
 
-    // ---------------- ESTIMATE FUNCTION ----------------
-    btnEstimate.onclick = async () => {
-      const a = pickupInput.value.trim();
-      const b = destInput.value.trim();
-      if (!a || !b) return alert('Enter both pickup and destination.');
-
-      // UI: spinner + disable button
-      showSpinner(true);
-      btnEstimate.disabled = true;
-      btnClearRoute.disabled = true;
-
-      try {
-        directionsService.route({
-          origin: a,
-          destination: b,
-          travelMode: google.maps.TravelMode.DRIVING,
-          drivingOptions: { departureTime: new Date() }
-        }, (result, status) => {
-          showSpinner(false);
-          btnEstimate.disabled = false;
-          btnClearRoute.disabled = false;
-
-          if (status === 'OK' && result.routes && result.routes.length) {
-            directionsRenderer.setDirections(result);
-
-            const leg = result.routes[0].legs[0];
-            const km = (leg.distance.value || 0) / 1000;
-            const mins = Math.ceil((leg.duration.value || 0) / 60);
-            const type = vehicleType.value || 'car';
-            const fare = calcFare(km, mins, type);
-
-            estDistance.textContent = `${km.toFixed(2)} km`;
-            estDuration.textContent = `${mins} min`;
-            estFare.textContent = `KSh ${fare.toLocaleString()}`;
-
-            // Save estimate globally
-            window._estimate = { pickupText: a, destText: b, km, mins, fare, type };
-
-            // Fit map to route bounds
-            try {
-              const bounds = new google.maps.LatLngBounds();
-              const route = result.routes[0];
-              if (route.bounds) {
-                // use provided bounds
-                currentRouteBounds = route.bounds;
-                map.fitBounds(route.bounds, 60);
-              } else {
-                // fallback: union of leg start/end
-                bounds.extend(leg.start_location);
-                bounds.extend(leg.end_location);
-                currentRouteBounds = bounds;
-                map.fitBounds(bounds, 60);
-              }
-            } catch (e) {
-              console.warn('Could not fit bounds:', e);
-            }
-          } else {
-            console.error('Directions error', status, result);
-            alert('Error calculating route. ' + status);
-            clearRouteAndEstimates();
-          }
-        });
-      } catch (err) {
-        console.error(err);
-        showSpinner(false);
-        btnEstimate.disabled = false;
-        btnClearRoute.disabled = false;
-        alert('Error calculating route.');
-      }
-    };
-
-    // Clear route button
-    btnClearRoute.onclick = () => {
-      clearRouteAndEstimates();
-      // optionally re-center to default
-      if (map) map.setCenter({ lat: -1.286389, lng: 36.817223 });
-      map.setZoom(13);
-    };
-
-    // ---------------- VEHICLES: realtime ----------------
-    onSnapshot(collection(db, 'vehicles'), snap => {
-      const list = []; snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-      renderVehiclesGrid(list);
-      plotVehicleMarkers(list);
-    });
-
-    function renderVehiclesGrid(list){
-      vehiclesGrid.innerHTML = '';
-      list.filter(v => ['available','busy','offline'].includes(v.status||'available')).forEach(v=>{
-        const col = document.createElement('div'); col.className='mb-2';
-        const img = v.image?`<img src="${escapeHtml(v.image)}" class="me-2 vehicle-img">`:'';
-        const statusTag = v.status==='available'?'<span class="status-green">Available</span>':
-                          v.status==='busy'?'<span class="status-orange">Busy</span>':'<span class="status-gray">Offline</span>';
-        col.innerHTML = `<div class="d-flex align-items-center justify-content-between p-2" style="background:rgba(255,255,255,0.02);border-radius:8px">
-          <div class="d-flex align-items-center">${img}<div><div class="fw-bold">${escapeHtml(v.name||v.type||'Vehicle')}</div><div class="small-muted">${escapeHtml(v.type||'')}</div></div></div>
-          <div class="text-end">${statusTag}<div class="mt-1 muted small">${(typeof v.latitude==='number'&&typeof v.longitude==='number')?'Live':'No GPS'}</div></div>
-        </div>`;
-        vehiclesGrid.appendChild(col);
-      });
-    }
-
-    function plotVehicleMarkers(list){
-      const present = new Set(list.map(l=>l.id));
-      // remove markers no longer present
-      for(const id of Object.keys(vehicleMarkers)){
-        if(!present.has(id)){
-          try { vehicleMarkers[id].setMap(null); } catch(e){}
-          delete vehicleMarkers[id];
-        }
-      }
-      list.forEach(v=>{
-        if(typeof v.latitude!=='number'||typeof v.longitude!=='number') return;
-        const pos = { lat: v.latitude, lng: v.longitude };
-        if(vehicleMarkers[v.id]) {
-          vehicleMarkers[v.id].setPosition(pos);
-          vehicleMarkers[v.id].setTitle(v.name || v.type || 'Vehicle');
-        } else {
-          const marker = new google.maps.Marker({
-            position: pos,
-            map,
-            title: v.name || v.type || 'Vehicle',
-            label: { text: (v.type||'').toUpperCase().slice(0,2), color: '#081019' }
-          });
-          const info = new google.maps.InfoWindow({ content: `<strong>${escapeHtml(v.name||v.type)}</strong><br>${escapeHtml(v.type||'')}<br>${escapeHtml(v.status||'')}` });
-          marker.addListener('click', ()=> info.open(map, marker));
-          vehicleMarkers[v.id] = marker;
-        }
-      });
-    }
-
-    // ---------------- PAY & REQUEST RIDE (with driver selection + driver name) ----------------
-    const MPESA_SERVER_ENDPOINT = "https://YOUR_SERVER_DOMAIN/mpesa/stkpush";
-
-    // --- M-PESA Payment ---
-    async function initiateMpesaPayment(phone, amount, metadata = {}) {
-      if (!MPESA_SERVER_ENDPOINT.includes('YOUR_SERVER_DOMAIN')) {
-        const resp = await fetch(MPESA_SERVER_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, amount, metadata })
-        });
-        return resp.json();
-      }
-      console.warn('Simulated MPESA (DEV).');
-      return { success: true, simulated: true, checkoutRequestID: 'SIM_' + Date.now() };
-    }
-
-    // --- Fetch available drivers ---
-    async function getAvailableDrivers() {
-      const snap = await getDocs(query(collection(db, 'vehicles'), where('status', '==', 'available')));
-      return snap.docs.map(d => ({
-        id: d.id,
-        name: d.data().name || d.data().driverName || d.data().type || 'Driver'
-      }));
-    }
-
-    // --- Driver selection modal ---
-    async function selectDriver() {
-      const drivers = await getAvailableDrivers();
-      if (drivers.length === 0) {
-        alert('No available drivers at the moment.');
-        return null;
-      }
-
-      const sel = document.createElement('select');
-      sel.className = 'form-select mb-2';
-      sel.innerHTML = `<option value="">Select a driver (optional)</option>` +
-        drivers.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
-
-      const container = document.createElement('div');
-      container.appendChild(sel);
-
-      const res = await new Promise(resolve => {
-        const okBtn = document.createElement('button');
-        okBtn.className = 'btn btn-primary btn-sm';
-        okBtn.textContent = 'Confirm';
-        container.appendChild(okBtn);
-
-        const modalDiv = document.createElement('div');
-        modalDiv.className = 'modal fade';
-        modalDiv.tabIndex = -1;
-        modalDiv.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="p-3 modal-content"></div></div>`;
-        modalDiv.querySelector('.modal-content').appendChild(container);
-        document.body.appendChild(modalDiv);
-        const modal = new bootstrap.Modal(modalDiv);
-        modal.show();
-
-        okBtn.onclick = () => {
-          const selectedId = sel.value;
-          const selectedName = drivers.find(d => d.id === selectedId)?.name || null;
-          resolve({ id: selectedId, name: selectedName });
-          modal.hide();
-          modalDiv.remove();
-        };
-      });
-
-      return res; // {id, name} or null
-    }
-
-    // --- Proceed payment + create ride ---
-    btnProceedPayment.onclick = async () => {
-      if (!window._estimate) return alert('Get estimate first');
-
-      const phone = (custPhone.value || '').trim();
-      const name = (custName.value || '').trim() || 'Guest';
-      if (!phone.match(/^07\d{8}$/)) return alert('Enter valid Kenyan phone number');
-
-      const estimate = window._estimate;
-
-      // 🧍 Select driver
-      const selectedDriver = await selectDriver();
-
-      // 🔹 Loyalty discount check
-      let discount = 0;
-      try {
-        const q = query(collection(db, 'loyalty'), where('phone', '==', phone));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          let pts = 0;
-          snap.forEach(s => pts += Number(s.data().points || 0));
-          discount = Math.floor(pts / 10) * 50;
-        }
-      } catch (e) {
-        console.warn(e);
-      }
-
-      const payable = Math.max(0, estimate.fare - discount);
-      if (!confirm(`Pay KSh ${payable} now?`)) return;
-
-      const mpresp = await initiateMpesaPayment(phone, payable, {
-        pickup: estimate.pickupText,
-        dest: estimate.destText,
-        type: estimate.type,
-        driverId: selectedDriver?.id || null
-      });
-
-      if (!mpresp?.success) return alert('Payment failed');
-
-      // ✅ Save ride with both driver ID & name
-      const rideDoc = {
-        pickup: estimate.pickupText,
-        destination: estimate.destText,
-        estimate,
-        requestedAt: new Date().toISOString(),
-        status: 'requested',
-        customerName: name,
-        customerPhone: phone,
-        payment: { payable, mpesa: mpresp },
-        loyaltyDiscount: discount,
-        createdByGuest: true,
-        browserId,
-        assignedDriverId: selectedDriver?.id || null,
-        assignedDriverName: selectedDriver?.name || null
-      };
-
-      const docRef = await addDoc(collection(db, 'rides'), rideDoc);
-      alert('Ride requested successfully. Ref: ' + docRef.id);
-
-      // Reset form
-      custName.value = '';
-      custPhone.value = '';
-      promo.value = '';
-      pickupInput.value = '';
-      destInput.value = '';
-      clearRouteAndEstimates();
-    };
-
-    // ---------------- RECENT REQUESTS (per browser) ----------------
-    onSnapshot(collection(db,'rides'), snap=>{
-      const rides=[]; snap.forEach(s=>{ const d={id:s.id,...s.data()}; if(d.browserId===browserId) rides.push(d); });
-      rides.sort((a,b)=>new Date(b.requestedAt)-new Date(a.requestedAt));
-      renderRequests(rides.slice(0,20));
-    });
-
-    function renderRequests(list){
-      requestsList.innerHTML='';
-      list.forEach(r=>{
-        const el=document.createElement('div'); el.className='list-group-item bg-transparent border-0 p-2 mb-1';
-        const driverInfo=r.driverId?`<div class="small-muted">Driver: ${escapeHtml(r.assignedDriverName||r.assignedDriver||'')}</div>`:'';
-        const vehicleInfo=r.vehicleId?`<div class="small-muted">Vehicle: ${escapeHtml(r.assignedVehicleName||r.vehicle||'')}</div>`:'';
-        const receiptBtn=(r.status==='accepted'||r.status==='ongoing'||r.status==='completed')?`<button class="mt-1 btn-outline-light btn btn-sm view-receipt" data-id="${r.id}">Receipt</button>`:'';
-        el.innerHTML=`<div class="d-flex justify-content-between">
-          <div>
-            <div class="fw-bold">${escapeHtml(r.pickup)} → ${escapeHtml(r.destination)}</div>
-            <div class="small-muted">${new Date(r.requestedAt).toLocaleString()}</div>
-            ${driverInfo}
-            ${vehicleInfo}
-            <div class="small-muted">Fare: KSh ${Number(r.estimate?.fare||0).toLocaleString()}</div>
-          </div>
-          <div class="text-end">
-            <div class="badge ${badgeForStatus(r.status)}">${r.status}</div>
-            <div class="mt-2">${receiptBtn}</div>
-          </div>
-        </div>`;
-        requestsList.appendChild(el);
-      });
-
-      document.querySelectorAll('.view-receipt').forEach(b=>b.onclick=async ()=>{
-        const id=b.dataset.id;
-        const pays=await getDocs(collection(db,'payments'));
-        let pDoc=null; pays.forEach(p=>{ if(p.data().rideId===id) pDoc={id:p.id,...p.data()}; });
-        if(!pDoc) return alert('No payment/receipt yet.');
-        showReceipt(pDoc);
-      });
-    }
-
-    function badgeForStatus(status){ return status==='requested'?'bg-warning text-dark':status==='accepted'?'bg-info':status==='ongoing'?'bg-primary':status==='completed'?'bg-success':'bg-secondary'; }
-
-    const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
-    function showReceipt(pay){
-      const html=`<div style="font-family:Arial,sans-serif;color:#000;padding:10px;">
-        <h4 style="color:#2c3e50;">RidePro Receipt</h4>
-        <hr/>
-        <div><strong>Receipt #: </strong>${escapeHtml(pay.id)}</div>
-        <div><strong>Date: </strong>${new Date(pay.createdAt).toLocaleString()}</div>
-        <div><strong>Driver: </strong>${escapeHtml(pay.driver||'')}</div>
-        <div><strong>Vehicle: </strong>${escapeHtml(pay.vehicle||pay.assignedVehicleName||'')}</div>
-        <div><strong>Pickup: </strong>${escapeHtml(pay.pickup||'')}</div>
-        <div><strong>Destination: </strong>${escapeHtml(pay.destination||'')}</div>
-        <div><strong>Fare: </strong>KSh ${Number(pay.amount).toLocaleString()}</div>
-        <hr/><div style="text-align:center;font-size:0.9em;color:#555;">Thank you for using RidePro!</div>
-      </div>`;
-      document.getElementById('receiptBody').innerHTML=html;
-      receiptModal.show();
-      document.getElementById('printReceipt').onclick=()=>{ const w=window.open('','_blank','width=600,height=800'); w.document.write(`<html><head><title>Receipt</title></head><body>${html}</body></html>`); w.document.close(); setTimeout(()=>w.print(),250); };
-      document.getElementById('downloadReceipt').onclick=async()=>{ const { jsPDF }=window.jspdf; const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'}); await doc.html(html,{x:20,y:20,html2canvas:{scale:1},windowWidth:800}); doc.save(`receipt-${pay.id}.pdf`); };
-    }
-
-    onSnapshot(collection(db,'loyalty'),snap=>{ document.getElementById('loyaltyInfo').textContent=`Total loyalty entries: ${snap.size}. Points awarded automatically when admin marks rides completed.`; });
-
-    function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-
-  </script>
+</script>
 </body>
 </html>
