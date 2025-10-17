@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,8 +6,9 @@
   <title>RidePro — Customer (Live Vehicles)</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
-   <link rel="icon" type="image/png" href="img/ridepro.png">
+  <link rel="icon" type="image/png" href="img/ridepro.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <style>
     :root{--bg:#071226;--card:#0f1720;--accent:#c79a2f;--muted:#9aa6b2}
     body{background:linear-gradient(180deg,#071226,#081826);color:#e7eef6;font-family:Inter,system-ui,Arial;padding:18px}
@@ -17,12 +17,42 @@
     .driver-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.06)}
     .btn-gold{background:var(--accent);border-color:var(--accent);color:#081019}
     .small-muted{color:var(--muted)}
-    #map{height:360px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.03)}
+    #map{height:360px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.03);position:relative}
     @media (max-width:767px){#map{height:220px}}
     .vehicle-img{width:84px;height:56px;border-radius:6px;object-fit:cover}
     .status-green{background:#2ecc71;color:#04210b;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-orange{background:#f39c12;color:#2d1700;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-gray{background:#95a5a6;color:#07121a;padding:4px 8px;border-radius:6px;font-weight:700}
+
+    /* Spinner overlay */
+    .map-spinner {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 999;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.55);
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+    .map-spinner.show { display:flex; }
+
+    .clear-btn { margin-left: 6px; }
+
+    /* Small spinner icon */
+    .spinner-dot {
+      width:14px; height:14px;
+      border:2px solid rgba(255,255,255,0.25);
+      border-top-color:#fff;
+      border-radius:50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -58,14 +88,19 @@
 
           <div class="mb-2">
             <label class="form-label small-muted">Pickup</label>
-            <input id="pickup" class="form-control" placeholder="Enter pickup location"/>
+            <gmpx-place-picker id="pickup"></gmpx-place-picker>
           </div>
           <div class="mb-2">
             <label class="form-label small-muted">Destination</label>
-            <input id="destination" class="form-control" placeholder="Enter destination"/>
+            <gmpx-place-picker id="destination"></gmpx-place-picker>
           </div>
 
-          <div id="map" class="mb-3"></div>
+          <div id="map" class="mb-3">
+            <div id="mapSpinner" class="map-spinner" aria-hidden="true">
+              <div class="spinner-dot" role="img" aria-label="loading"></div>
+              <div class="small-muted">Calculating route…</div>
+            </div>
+          </div>
 
           <div class="d-flex align-items-center gap-3">
             <div>
@@ -82,6 +117,7 @@
             </div>
             <div class="d-flex gap-2 ms-auto">
               <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
+              <button id="btnClearRoute" class="clear-btn btn-outline-light btn btn btn-sm" title="Clear route">Clear Route</button>
               <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
             </div>
           </div>
@@ -130,29 +166,22 @@
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Google Maps (replace YOUR_GOOGLE_MAPS_API_KEY_HERE with your actual key) -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=places"></script>
+  <!-- Google Maps Web Components -->
+  <script type="module" src="https://unpkg.com/@googlemaps/web-components@1.0.2/dist/index.min.js"></script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&libraries=places"></script>
 
- <script type="module">
+  <!-- Your full RidePro JS logic -->
+  <script type="module">
   // ---------------- Firebase imports ----------------
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, getDocs, query, where, orderBy
+    getFirestore, collection, addDoc, onSnapshot, getDocs, query, where
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+  import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
   // ---------------- CONFIG ----------------
-  const firebaseConfig = {
-    apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
-    authDomain: "transc-eec4c.firebaseapp.com",
-    projectId: "transc-eec4c",
-    storageBucket: "transc-eec4c.firebasestorage.app",
-    messagingSenderId: "3676403115",
-    appId: "1:3676403115:web:4da31c41de4b990b614eee",
-    measurementId: "G-R29NT412SJ"
-  };
-
+  const firebaseConfig = {apiKey:"AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",authDomain:"transc-eec4c.firebaseapp.com",projectId:"transc-eec4c",storageBucket:"transc-eec4c.firebasestorage.app",messagingSenderId:"3676403115",appId:"1:3676403115:web:4da31c41de4b990b614eee",measurementId:"G-R29NT412SJ"};
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
@@ -162,6 +191,7 @@
   const pickupInput = document.getElementById('pickup');
   const destInput = document.getElementById('destination');
   const btnEstimate = document.getElementById('btnEstimate');
+  const btnClearRoute = document.getElementById('btnClearRoute');
   const btnProceedPayment = document.getElementById('btnProceedPayment');
   const estDistance = document.getElementById('estDistance');
   const estDuration = document.getElementById('estDuration');
@@ -172,101 +202,59 @@
   const custPhone = document.getElementById('custPhone');
   const promo = document.getElementById('promo');
   const vehiclesGrid = document.getElementById('vehiclesGrid');
+  const mapSpinner = document.getElementById('mapSpinner');
 
   // ---------------- Browser ID ----------------
   const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
   localStorage.setItem('browserId', browserId);
 
-  // ---------------- MAP INITIALIZATION ----------------
-  let map, routeControl;
-  let vehicleMarkers = {}; // placeholder for vehicle markers
+  // ---------------- MAP ----------------
+  let map, directionsService, directionsRenderer, vehicleMarkers = {};
   function initMap() {
-    const center = [-1.286389, 36.817223]; // Nairobi
-    map = L.map('map').setView(center, 13);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(map);
+    const center = {lat:-1.286389,lng:36.817223};
+    map = new google.maps.Map(document.getElementById('map'),{center,zoom:13,mapTypeControl:false,streetViewControl:false,fullscreenControl:false});
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({map, suppressMarkers:false, polylineOptions:{strokeColor:'#007bff', strokeWeight:5}});
   }
+  window.initMap = initMap;
 
-  document.addEventListener('DOMContentLoaded', initMap);
+  function showSpinner(show=true){ mapSpinner.classList.toggle('show',show); }
+  function clearRouteAndEstimates(){ estDistance.textContent='—'; estDuration.textContent='—'; estFare.textContent='KSh 0'; window._estimate=null; directionsRenderer?.setDirections({routes:[]}); }
 
-  // ---------------- FARE CALCULATION ----------------
-  const FARE_RATES = {
-   car: { base: 120, perKm: 30, perMin: 6 },
-    premium: { base: 200, perKm: 60, perMin: 8 },
-    bike: { base: 12, perKm: 6, perMin: 4 },
-    van: { base: 200, perKm: 35, perMin: 7 },
-  };
-  function calcFare(km, mins, type) {
-    const rate = FARE_RATES[type] || FARE_RATES.car;
-    return Math.round(rate.base + km * rate.perKm + mins * rate.perMin);
-  }
+  const FARE_RATES={car:{base:120,perKm:30,perMin:6},premium:{base:200,perKm:60,perMin:8},bike:{base:12,perKm:6,perMin:4},van:{base:200,perKm:35,perMin:7}};
+  function calcFare(km,mins,type){ const rate=FARE_RATES[type]||FARE_RATES.car; return Math.round(rate.base+km*rate.perKm+mins*rate.perMin); }
 
-  // ---------------- ESTIMATE FUNCTION ----------------
-  btnEstimate.onclick = async () => {
-    const a = pickupInput.value.trim();
-    const b = destInput.value.trim();
-    if (!a || !b) return alert('Enter both pickup and destination.');
-
-    estDistance.textContent = 'Calculating...';
-    estDuration.textContent = 'Calculating...';
-    estFare.textContent = 'Calculating...';
-
-    try {
-      const [pickupRes, destRes] = await Promise.all([
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`),
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(b)}`)
-      ]);
-      const pickupData = await pickupRes.json();
-      const destData = await destRes.json();
-      if (!pickupData.length || !destData.length) { alert('Locations not found.'); return; }
-
-      const pickup = [parseFloat(pickupData[0].lat), parseFloat(pickupData[0].lon)];
-      const dest = [parseFloat(destData[0].lat), parseFloat(destData[0].lon)];
-
-      if (routeControl) map.removeControl(routeControl);
-
-      routeControl = L.Routing.control({
-        waypoints: [L.latLng(...pickup), L.latLng(...dest)],
-        lineOptions: { styles: [{ color: '#007bff', weight: 5 }] },
-        showAlternatives: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-      })
-      .on('routesfound', e => {
-        const route = e.routes[0];
-        const km = route.summary.totalDistance / 1000;
-        const mins = Math.ceil(route.summary.totalTime / 60);
-        const type = vehicleType.value || 'car';
-        const fare = calcFare(km, mins, type);
-
-        estDistance.textContent = `${km.toFixed(2)} km`;
-        estDuration.textContent = `${mins} min`;
-        estFare.textContent = `KSh ${fare.toLocaleString()}`;
-
-        window._estimate = { pickupText: a, destText: b, km, mins, fare, type };
-      })
-      .addTo(map);
-
-    } catch (err) { console.error(err); alert('Error calculating route.'); }
+  btnEstimate.onclick=async()=>{
+    const a=pickupInput.value?.place?.name||pickupInput.value?.displayName||pickupInput.value;
+    const b=destInput.value?.place?.name||destInput.value?.displayName||destInput.value;
+    if(!a||!b)return alert('Enter both pickup and destination.');
+    showSpinner(true); btnEstimate.disabled=true; btnClearRoute.disabled=true;
+    directionsService.route({origin:a,destination:b,travelMode:google.maps.TravelMode.DRIVING,drivingOptions:{departureTime:new Date()}},(result,status)=>{
+      showSpinner(false); btnEstimate.disabled=false; btnClearRoute.disabled=false;
+      if(status==='OK'&&result.routes?.length){
+        directionsRenderer.setDirections(result);
+        const leg=result.routes[0].legs[0];
+        const km=(leg.distance.value||0)/1000;
+        const mins=Math.ceil((leg.duration.value||0)/60);
+        const type=vehicleType.value||'car';
+        const fare=calcFare(km,mins,type);
+        estDistance.textContent=`${km.toFixed(2)} km`; estDuration.textContent=`${mins} min`; estFare.textContent=`KSh ${fare.toLocaleString()}`;
+        window._estimate={pickupText:a,destText:b,km,mins,fare,type};
+      } else { alert('Error calculating route. '+status); clearRouteAndEstimates(); }
+    });
   };
 
-  // ---------------- VEHICLES: realtime ----------------
-  onSnapshot(collection(db, 'vehicles'), snap => {
-    const list = []; snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-    renderVehiclesGrid(list); plotVehicleMarkers(list);
-  });
+  btnClearRoute.onclick=()=>{ clearRouteAndEstimates(); map.setCenter({lat:-1.286389,lng:36.817223}); map.setZoom(13); };
+
+  // ---------------- VEHICLES ----------------
+  onSnapshot(collection(db,'vehicles'),snap=>{ const list=[]; snap.forEach(d=>list.push({id:d.id,...d.data()})); renderVehiclesGrid(list); });
 
   function renderVehiclesGrid(list){
-    vehiclesGrid.innerHTML = '';
-    list.filter(v => ['available','busy','offline'].includes(v.status||'available')).forEach(v=>{
-      const col = document.createElement('div'); col.className='mb-2';
-      const img = v.image?`<img src="${escapeHtml(v.image)}" class="me-2 vehicle-img">`:'';
-      const statusTag = v.status==='available'?'<span class="status-green">Available</span>':
-                        v.status==='busy'?'<span class="status-orange">Busy</span>':'<span class="status-gray">Offline</span>';
-      col.innerHTML = `<div class="d-flex align-items-center justify-content-between p-2" style="background:rgba(255,255,255,0.02);border-radius:8px">
+    vehiclesGrid.innerHTML=''; list.filter(v=>['available','busy','offline'].includes(v.status||'available')).forEach(v=>{
+      const col=document.createElement('div'); col.className='mb-2';
+      const img=v.image?`<img src="${escapeHtml(v.image)}" class="me-2 vehicle-img">`:'';
+      const statusTag=v.status==='available'?'<span class="status-green">Available</span>':v.status==='busy'?'<span class="status-orange">Busy</span>':'<span class="status-gray">Offline</span>';
+      col.innerHTML=`<div class="d-flex align-items-center justify-content-between p-2" style="background:rgba(255,255,255,0.02);border-radius:8px">
         <div class="d-flex align-items-center">${img}<div><div class="fw-bold">${escapeHtml(v.name||v.type||'Vehicle')}</div><div class="small-muted">${escapeHtml(v.type||'')}</div></div></div>
         <div class="text-end">${statusTag}<div class="mt-1 muted small">${(typeof v.latitude==='number'&&typeof v.longitude==='number')?'Live':'No GPS'}</div></div>
       </div>`;
@@ -274,231 +262,7 @@
     });
   }
 
-  function plotVehicleMarkers(list){
-    const present = new Set(list.map(l=>l.id));
-    for(const id of Object.keys(vehicleMarkers)){ if(!present.has(id)) { map.removeLayer(vehicleMarkers[id]); delete vehicleMarkers[id]; } }
-    list.forEach(v=>{
-      if(typeof v.latitude!=='number'||typeof v.longitude!=='number') return;
-      const pos = [v.latitude, v.longitude];
-      if(vehicleMarkers[v.id]) vehicleMarkers[v.id].setLatLng(pos);
-      else vehicleMarkers[v.id] = L.marker(pos).addTo(map).bindPopup(`<strong>${escapeHtml(v.name||v.type)}</strong><br>${escapeHtml(v.type||'')}<br>${escapeHtml(v.status||'')}`);
-    });
-  }
-
- // ---------------- PAY & REQUEST RIDE (with driver selection + driver name) ----------------
-const MPESA_SERVER_ENDPOINT = "https://YOUR_SERVER_DOMAIN/mpesa/stkpush";
-
-// --- M-PESA Payment ---
-async function initiateMpesaPayment(phone, amount, metadata = {}) {
-  if (!MPESA_SERVER_ENDPOINT.includes('YOUR_SERVER_DOMAIN')) {
-    const resp = await fetch(MPESA_SERVER_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, amount, metadata })
-    });
-    return resp.json();
-  }
-  console.warn('Simulated MPESA (DEV).');
-  return { success: true, simulated: true, checkoutRequestID: 'SIM_' + Date.now() };
-}
-
-// --- Fetch available drivers ---
-async function getAvailableDrivers() {
-  const snap = await getDocs(query(collection(db, 'vehicles'), where('status', '==', 'available')));
-  return snap.docs.map(d => ({
-    id: d.id,
-    name: d.data().name || d.data().driverName || d.data().type || 'Driver'
-  }));
-}
-
-// --- Driver selection modal ---
-async function selectDriver() {
-  const drivers = await getAvailableDrivers();
-  if (drivers.length === 0) {
-    alert('No available drivers at the moment.');
-    return null;
-  }
-
-  const sel = document.createElement('select');
-  sel.className = 'form-select mb-2';
-  sel.innerHTML = `<option value="">Select a driver (optional)</option>` +
-    drivers.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
-
-  const container = document.createElement('div');
-  container.appendChild(sel);
-
-  const res = await new Promise(resolve => {
-    const okBtn = document.createElement('button');
-    okBtn.className = 'btn btn-primary btn-sm';
-    okBtn.textContent = 'Confirm';
-    container.appendChild(okBtn);
-
-    const modalDiv = document.createElement('div');
-    modalDiv.className = 'modal fade';
-    modalDiv.tabIndex = -1;
-    modalDiv.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="p-3 modal-content"></div></div>`;
-    modalDiv.querySelector('.modal-content').appendChild(container);
-    document.body.appendChild(modalDiv);
-    const modal = new bootstrap.Modal(modalDiv);
-    modal.show();
-
-    okBtn.onclick = () => {
-      const selectedId = sel.value;
-      const selectedName = drivers.find(d => d.id === selectedId)?.name || null;
-      resolve({ id: selectedId, name: selectedName });
-      modal.hide();
-      modalDiv.remove();
-    };
-  });
-
-  return res; // {id, name} or null
-}
-
-// --- Proceed payment + create ride ---
-btnProceedPayment.onclick = async () => {
-  if (!window._estimate) return alert('Get estimate first');
-
-  const phone = (custPhone.value || '').trim();
-  const name = (custName.value || '').trim() || 'Guest';
-  if (!phone.match(/^07\d{8}$/)) return alert('Enter valid Kenyan phone number');
-
-  const estimate = window._estimate;
-
-  // 🧍 Select driver
-  const selectedDriver = await selectDriver();
-
-  // 🔹 Loyalty discount check
-  let discount = 0;
-  try {
-    const q = query(collection(db, 'loyalty'), where('phone', '==', phone));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      let pts = 0;
-      snap.forEach(s => pts += Number(s.data().points || 0));
-      discount = Math.floor(pts / 10) * 50;
-    }
-  } catch (e) {
-    console.warn(e);
-  }
-
-  const payable = Math.max(0, estimate.fare - discount);
-  if (!confirm(`Pay KSh ${payable} now?`)) return;
-
-  const mpresp = await initiateMpesaPayment(phone, payable, {
-    pickup: estimate.pickupText,
-    dest: estimate.destText,
-    type: estimate.type,
-    driverId: selectedDriver?.id || null
-  });
-
-  if (!mpresp?.success) return alert('Payment failed');
-
-  // ✅ Save ride with both driver ID & name
-  const rideDoc = {
-    pickup: estimate.pickupText,
-    destination: estimate.destText,
-    estimate,
-    requestedAt: new Date().toISOString(),
-    status: 'requested',
-    customerName: name,
-    customerPhone: phone,
-    payment: { payable, mpesa: mpresp },
-    loyaltyDiscount: discount,
-    createdByGuest: true,
-    browserId,
-    assignedDriverId: selectedDriver?.id || null,
-    assignedDriverName: selectedDriver?.name || null
-  };
-
-  const docRef = await addDoc(collection(db, 'rides'), rideDoc);
-  alert('Ride requested successfully. Ref: ' + docRef.id);
-
-  // Reset form
-  custName.value = '';
-  custPhone.value = '';
-  promo.value = '';
-  pickupInput.value = '';
-  destInput.value = '';
-  estDistance.textContent = '—';
-  estDuration.textContent = '—';
-  estFare.textContent = 'KSh 0';
-  if (routeControl) map.removeControl(routeControl);
-};
-
-  // ---------------- RECENT REQUESTS (per browser) ----------------
-  onSnapshot(collection(db,'rides'), snap=>{
-    const rides=[]; snap.forEach(s=>{ const d={id:s.id,...s.data()}; if(d.browserId===browserId) rides.push(d); });
-    rides.sort((a,b)=>new Date(b.requestedAt)-new Date(a.requestedAt));
-    renderRequests(rides.slice(0,20));
-  });
-
-  function renderRequests(list){
-    requestsList.innerHTML='';
-    list.forEach(r=>{
-      const el=document.createElement('div'); el.className='list-group-item bg-transparent border-0 p-2 mb-1';
-      const driverInfo=r.driverId?`<div class="small-muted">Driver: ${escapeHtml(r.assignedDriverName||r.assignedDriver||'')}</div>`:'';
-      const vehicleInfo=r.vehicleId?`<div class="small-muted">Vehicle: ${escapeHtml(r.assignedVehicleName||r.vehicle||'')}</div>`:'';
-      const receiptBtn=(r.status==='accepted'||r.status==='ongoing'||r.status==='completed')?`<button class="mt-1 btn-outline-light btn btn-sm view-receipt" data-id="${r.id}">Receipt</button>`:'';
-      el.innerHTML=`<div class="d-flex justify-content-between">
-        <div>
-          <div class="fw-bold">${escapeHtml(r.pickup)} → ${escapeHtml(r.destination)}</div>
-          <div class="small-muted">${new Date(r.requestedAt).toLocaleString()}</div>
-          ${driverInfo}
-          ${vehicleInfo}
-          <div class="small-muted">Fare: KSh ${Number(r.estimate?.fare||0).toLocaleString()}</div>
-        </div>
-        <div class="text-end">
-          <div class="badge ${badgeForStatus(r.status)}">${r.status}</div>
-          <div class="mt-2">${receiptBtn}</div>
-        </div>
-      </div>`;
-      requestsList.appendChild(el);
-    });
-
-    document.querySelectorAll('.view-receipt').forEach(b=>b.onclick=async ()=>{
-      const id=b.dataset.id;
-      const pays=await getDocs(collection(db,'payments'));
-      let pDoc=null; pays.forEach(p=>{ if(p.data().rideId===id) pDoc={id:p.id,...p.data()}; });
-      if(!pDoc) return alert('No payment/receipt yet.');
-      showReceipt(pDoc);
-    });
-  }
-
-  function badgeForStatus(status){ return status==='requested'?'bg-warning text-dark':status==='accepted'?'bg-info':status==='ongoing'?'bg-primary':status==='completed'?'bg-success':'bg-secondary'; }
-
-  const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
-  function showReceipt(pay){
-    const html=`<div style="font-family:Arial,sans-serif;color:#000;padding:10px;">
-      <h4 style="color:#2c3e50;">RidePro Receipt</h4>
-      <hr/>
-      <div><strong>Receipt #: </strong>${escapeHtml(pay.id)}</div>
-      <div><strong>Date: </strong>${new Date(pay.createdAt).toLocaleString()}</div>
-      <div><strong>Driver: </strong>${escapeHtml(pay.driver||'')}</div>
-      <div><strong>Vehicle: </strong>${escapeHtml(pay.vehicle||pay.assignedVehicleName||'')}</div>
-      <div><strong>Pickup: </strong>${escapeHtml(pay.pickup||'')}</div>
-      <div><strong>Destination: </strong>${escapeHtml(pay.destination||'')}</div>
-      <div><strong>Fare: </strong>KSh ${Number(pay.amount).toLocaleString()}</div>
-      <hr/><div style="text-align:center;font-size:0.9em;color:#555;">Thank you for using RidePro!</div>
-    </div>`;
-    document.getElementById('receiptBody').innerHTML=html;
-    receiptModal.show();
-    document.getElementById('printReceipt').onclick=()=>{ const w=window.open('','_blank','width=600,height=800'); w.document.write(`<html><head><title>Receipt</title></head><body>${html}</body></html>`); w.document.close(); setTimeout(()=>w.print(),250); };
-    document.getElementById('downloadReceipt').onclick=async()=>{ const { jsPDF }=window.jspdf; const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'}); await doc.html(html,{x:20,y:20,html2canvas:{scale:1},windowWidth:800}); doc.save(`receipt-${pay.id}.pdf`); };
-  }
-
-  onSnapshot(collection(db,'loyalty'),snap=>{ document.getElementById('loyaltyInfo').textContent=`Total loyalty entries: ${snap.size}. Points awarded automatically when admin marks rides completed.`; });
   function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-
-</script>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initMap"></script>
-
-<!-- Leaflet CSS + JS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- Leaflet Routing Machine -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
-<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-
+  </script>
 </body>
 </html>
