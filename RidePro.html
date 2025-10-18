@@ -22,6 +22,9 @@
     .status-green{background:#2ecc71;color:#04210b;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-orange{background:#f39c12;color:#2d1700;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-gray{background:#95a5a6;color:#07121a;padding:4px 8px;border-radius:6px;font-weight:700}
+    /* small helper for map controls */
+    .map-top-controls { position: absolute; left: 12px; top: 12px; z-index: 10; background: rgba(255,255,255,0.95); padding:8px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); }
+    .map-top-controls input { width:220px; max-width: calc(100vw - 200px); }
   </style>
 </head>
 <body>
@@ -38,7 +41,7 @@
     </header>
 
     <div class="row g-3">
-      <div class="col-lg-7">
+      <div class="position-relative col-lg-7">
         <div class="mb-3 panel">
           <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -55,13 +58,22 @@
             </div>
           </div>
 
-          <div class="mb-2">
-            <label class="form-label small-muted">Pickup</label>
-            <input id="pickup" class="form-control" placeholder="Enter pickup location"/>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small-muted">Destination</label>
-            <input id="destination" class="form-control" placeholder="Enter destination"/>
+          <div class="map-top-controls d-flex align-items-start gap-2">
+            <div style="display:flex;flex-direction:column;">
+              <label class="small-muted" style="font-size:12px;margin:0 0 4px 0">Pickup</label>
+              <input id="pickup" class="form-control form-control-sm" placeholder="Enter pickup location"/>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+              <label class="small-muted" style="font-size:12px;margin:0 0 4px 0">Destination</label>
+              <input id="destination" class="form-control form-control-sm" placeholder="Enter destination"/>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+              <button id="btnUseLocation" class="btn-outline-secondary btn btn-sm" title="Use my location">Use my location</button>
+              <div style="display:flex;gap:8px">
+                <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
+                <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
+              </div>
+            </div>
           </div>
 
           <div id="map" class="mb-3"></div>
@@ -79,15 +91,11 @@
               <div class="small-muted">Fare</div>
               <div id="estFare" class="h4 brand">KSh 0</div>
             </div>
-            <div class="d-flex gap-2 ms-auto">
-              <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
-              <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
-            </div>
           </div>
 
           <hr/>
 
-          <div class="row g-2">
+          <div class="mt-3 row g-2">
             <div class="col-md-4">
               <label class="form-label small-muted">Customer name (optional)</label>
               <input id="custName" class="form-control" placeholder="Full name"/>
@@ -129,15 +137,22 @@
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Google Maps (your real API key and libraries) -->
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&callback=initMap&libraries=places"></script>
+ <!-- ✅ Google Maps: fully configured with your API key and Map ID -->
+<script async defer 
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&map_ids=be09314611473507241a937c&libraries=places&callback=initMap">
+</script>
+
+ <!-- audio notification for new rides -->
+<audio id="newRideSound" preload="auto" style="display:none">
+  <source src="data:audio/mpeg;base64,//uQZAAAAAAAAAAAAAAAAAAAAAA..." type="audio/mpeg">
+</audio>
 
  <script type="module">
   // ---------------- Firebase imports ----------------
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, getDocs, query, where, orderBy
+    getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, getDocs, query, where, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
@@ -171,44 +186,14 @@
   const custPhone = document.getElementById('custPhone');
   const promo = document.getElementById('promo');
   const vehiclesGrid = document.getElementById('vehiclesGrid');
+  const btnUseLocation = document.getElementById('btnUseLocation');
+  const newRideSound = document.getElementById('newRideSound');
 
   // ---------------- Browser ID ----------------
   const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
   localStorage.setItem('browserId', browserId);
 
-  // ---------------- MAP INITIALIZATION (Google Maps) ----------------
-  let map, directionsService, directionsRenderer;
-  let vehicleMarkers = {}; // placeholder for vehicle markers (google maps markers)
-
-  function initMap() {
-    // center Nairobi
-    const center = { lat: -1.286389, lng: 36.817223 };
-
-    // create map
-    map = new google.maps.Map(document.getElementById('map'), {
-      center,
-      zoom: 13,
-      mapTypeControl: false,
-      streetViewControl: false
-    });
-
-    // directions service + renderer
-    directionsService = new google.maps.DirectionsService();
-    directionsRenderer = new google.maps.DirectionsRenderer({
-      map,
-      suppressMarkers: false,
-      polylineOptions: { strokeColor: '#007bff', strokeWeight: 5 }
-    });
-
-    // autocomplete
-    new google.maps.places.Autocomplete(pickupInput);
-    new google.maps.places.Autocomplete(destInput);
-  }
-
-  // expose for google maps callback
-  window.initMap = initMap;
-
-  // ---------------- FARE CALCULATION ----------------
+  // ---------------- FARE RATES ----------------
   const FARE_RATES = {
    car: { base: 120, perKm: 30, perMin: 6 },
     premium: { base: 200, perKm: 60, perMin: 8 },
@@ -220,8 +205,87 @@
     return Math.round(rate.base + km * rate.perKm + mins * rate.perMin);
   }
 
-  // ---------------- ESTIMATE FUNCTION (uses Google Directions) ----------------
-  btnEstimate.onclick = async () => {
+  // ---------------- Google Maps variables ----------------
+  let map, directionsService, directionsRenderer;
+  let pickupAutocomplete, destAutocomplete;
+  let pickupPlace = null, destPlace = null;
+  let userMarker = null;
+  let vehicleMarkers = {}; // id -> google.maps.Marker
+
+  // For notifications of new rides
+  const knownRideIds = new Set();
+
+  // Expose initMap for Google callback
+  window.initMap = function initMap() {
+    // Map options: use your Map ID
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: -1.286389, lng: 36.817223 },
+      zoom: 13,
+      mapId: "be09314611473507241a937c",
+      mapTypeControl: false
+    });
+
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: true, preserveViewport: true });
+
+    // Places Autocomplete
+    pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, { fields: ["place_id","geometry","formatted_address","name"] });
+    destAutocomplete = new google.maps.places.Autocomplete(destInput, { fields: ["place_id","geometry","formatted_address","name"] });
+
+    pickupAutocomplete.addListener('place_changed', () => {
+      pickupPlace = pickupAutocomplete.getPlace();
+      if (pickupPlace?.geometry?.location) map.panTo(pickupPlace.geometry.location);
+    });
+    destAutocomplete.addListener('place_changed', () => {
+      destPlace = destAutocomplete.getPlace();
+      if (destPlace?.geometry?.location) map.panTo(destPlace.geometry.location);
+    });
+
+    // Try to auto-detect user location and set a user marker + optionally fill pickup
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map.setCenter(loc);
+        map.setZoom(15);
+        setUserMarker(loc);
+      }, err => {
+        console.warn('Geolocation failed or permission denied', err);
+      }, { timeout: 8000 });
+    }
+
+    // wire Use my location button
+    btnUseLocation.onclick = () => {
+      if (!navigator.geolocation) return alert('Geolocation not supported by your browser.');
+      navigator.geolocation.getCurrentPosition(pos => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map.panTo(loc);
+        map.setZoom(15);
+        setUserMarker(loc);
+
+        // reverse geocode to fill pickup (optional)
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: loc }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            pickupInput.value = results[0].formatted_address;
+            // set a "fake" pickupPlace so Directions can use geometry
+            pickupPlace = { geometry: { location: new google.maps.LatLng(loc.lat, loc.lng) }, formatted_address: results[0].formatted_address, name: results[0].address_components?.[0]?.short_name || 'Current location' };
+          }
+        });
+      }, err => {
+        alert('Unable to get location: ' + (err.message || 'permission denied'));
+      });
+    };
+  };
+
+  function setUserMarker(pos) {
+    if (!map) return;
+    if (!userMarker) {
+      userMarker = new google.maps.Marker({ position: pos, map, title: 'You are here', icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7 } });
+    } else userMarker.setPosition(pos);
+  }
+
+  // ---------------- Estimate (Directions) ----------------
+  async function estimateRoute() {
     const a = pickupInput.value.trim();
     const b = destInput.value.trim();
     if (!a || !b) return alert('Enter both pickup and destination.');
@@ -230,47 +294,52 @@
     estDuration.textContent = 'Calculating...';
     estFare.textContent = 'Calculating...';
 
-    try {
-      if (!directionsService || !directionsRenderer) {
-        alert('Map is not ready yet. Try refreshing the page.');
+    const origin = pickupPlace?.geometry?.location || a;
+    const destination = destPlace?.geometry?.location || b;
+
+    const req = { origin, destination, travelMode: google.maps.TravelMode.DRIVING, provideRouteAlternatives: false };
+
+    directionsService.route(req, (result, status) => {
+      if (status !== 'OK' || !result?.routes?.length) {
+        console.error('Directions failed', status, result);
+        alert('Could not calculate route: ' + status);
         return;
       }
+      directionsRenderer.setDirections(result);
+      const leg = result.routes[0].legs[0];
+      const km = (leg.distance?.value || 0) / 1000;
+      const mins = Math.ceil((leg.duration?.value || 0) / 60);
+      const type = vehicleType.value || 'car';
+      const fare = calcFare(km, mins, type);
 
-      directionsService.route({
-        origin: a,
-        destination: b,
-        travelMode: google.maps.TravelMode.DRIVING,
-        drivingOptions: { departureTime: new Date() }
-      }, (result, status) => {
-        if (status === 'OK' && result.routes && result.routes.length) {
-          directionsRenderer.setDirections(result);
-          const leg = result.routes[0].legs[0];
-          const km = (leg.distance.value || 0) / 1000;
-          const mins = Math.ceil((leg.duration.value || 0) / 60);
-          const type = vehicleType.value || 'car';
-          const fare = calcFare(km, mins, type);
+      estDistance.textContent = `${km.toFixed(2)} km`;
+      estDuration.textContent = `${mins} min`;
+      estFare.textContent = `KSh ${fare.toLocaleString()}`;
 
-          estDistance.textContent = `${km.toFixed(2)} km`;
-          estDuration.textContent = `${mins} min`;
-          estFare.textContent = `KSh ${fare.toLocaleString()}`;
+      window._estimate = { pickupText: a, destText: b, km, mins, fare, type, route: result.routes[0] };
 
-          window._estimate = { pickupText: a, destText: b, km, mins, fare, type };
-        } else {
-          console.error('Directions error', status, result);
-          alert('Error calculating route. ' + status);
-          estDistance.textContent = '—';
-          estDuration.textContent = '—';
-          estFare.textContent = 'KSh 0';
-        }
-      });
-    } catch (err) { console.error(err); alert('Error calculating route.'); }
-  };
+      // place simple markers at origin & destination
+      placeOriginDestMarkers(leg.start_location, leg.end_location);
+    });
+  }
 
-  // ---------------- VEHICLES: realtime (Google Maps markers) ----------------
+  let originMarker = null, destMarker = null;
+  function placeOriginDestMarkers(originLatLng, destLatLng) {
+    if (!originLatLng || !destLatLng) return;
+    if (!originMarker) {
+      originMarker = new google.maps.Marker({ position: originLatLng, map, label: 'P' });
+    } else originMarker.setPosition(originLatLng);
+    if (!destMarker) {
+      destMarker = new google.maps.Marker({ position: destLatLng, map, label: 'D' });
+    } else destMarker.setPosition(destLatLng);
+  }
+
+  btnEstimate.onclick = estimateRoute;
+
+  // ---------------- VEHICLES: realtime ----------------
   onSnapshot(collection(db, 'vehicles'), snap => {
     const list = []; snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-    renderVehiclesGrid(list);
-    plotVehicleMarkers(list);
+    renderVehiclesGrid(list); plotVehicleMarkers(list);
   });
 
   function renderVehiclesGrid(list){
@@ -290,28 +359,30 @@
 
   function plotVehicleMarkers(list){
     const present = new Set(list.map(l=>l.id));
-    // remove markers no longer present
-    for(const id of Object.keys(vehicleMarkers)){
-      if(!present.has(id)){
-        try { vehicleMarkers[id].setMap(null); } catch(e){}
+    // remove markers not present
+    for (const id of Object.keys(vehicleMarkers)) {
+      if (!present.has(id)) {
+        vehicleMarkers[id].setMap(null);
         delete vehicleMarkers[id];
       }
     }
+
     list.forEach(v=>{
-      if(typeof v.latitude!=='number'||typeof v.longitude!=='number') return;
+      if (typeof v.latitude !== 'number' || typeof v.longitude !== 'number') return;
       const pos = { lat: v.latitude, lng: v.longitude };
-      if(vehicleMarkers[v.id]) {
+      if (vehicleMarkers[v.id]) {
         vehicleMarkers[v.id].setPosition(pos);
-        vehicleMarkers[v.id].setTitle(v.name || v.type || 'Vehicle');
       } else {
         const marker = new google.maps.Marker({
           position: pos,
           map,
           title: v.name || v.type || 'Vehicle',
-          label: { text: (v.type||'').toUpperCase().slice(0,2), color: '#081019' }
+          icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 5 }
         });
-        const info = new google.maps.InfoWindow({ content: `<strong>${escapeHtml(v.name||v.type)}</strong><br>${escapeHtml(v.type||'')}<br>${escapeHtml(v.status||'')}` });
-        marker.addListener('click', ()=> info.open(map, marker));
+        const info = new google.maps.InfoWindow({
+          content: `<strong>${escapeHtml(v.name||v.type||'Vehicle')}</strong><br>${escapeHtml(v.type||'')}<br>Status: ${escapeHtml(v.status||'')}`
+        });
+        marker.addListener('click', () => info.open(map, marker));
         vehicleMarkers[v.id] = marker;
       }
     });
@@ -425,7 +496,7 @@ btnProceedPayment.onclick = async () => {
 
   if (!mpresp?.success) return alert('Payment failed');
 
-  // ✅ Save ride with both driver ID & name
+  // ✅ Save ride with both driver ID & name and include customer name & phone
   const rideDoc = {
     pickup: estimate.pickupText,
     destination: estimate.destText,
@@ -443,7 +514,7 @@ btnProceedPayment.onclick = async () => {
   };
 
   const docRef = await addDoc(collection(db, 'rides'), rideDoc);
-  alert('Ride requested successfully. Ref: ' + docRef.id);
+  alert('✅ Ride requested successfully. Ref: ' + docRef.id);
 
   // Reset form
   custName.value = '';
@@ -454,12 +525,29 @@ btnProceedPayment.onclick = async () => {
   estDistance.textContent = '—';
   estDuration.textContent = '—';
   estFare.textContent = 'KSh 0';
-  if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+  if (directionsRenderer) directionsRenderer.setDirections(null);
+  window._estimate = null;
+  if (originMarker) { originMarker.setMap(null); originMarker = null; }
+  if (destMarker) { destMarker.setMap(null); destMarker = null; }
 };
 
   // ---------------- RECENT REQUESTS (per browser) ----------------
+  // Play sound when there's a new ride created by others
   onSnapshot(collection(db,'rides'), snap=>{
-    const rides=[]; snap.forEach(s=>{ const d={id:s.id,...s.data()}; if(d.browserId===browserId) rides.push(d); });
+    const rides=[]; 
+    snap.forEach(s=>{
+      const d={id:s.id,...s.data()};
+      // collect seen ids
+      if (!knownRideIds.has(d.id)) {
+        // new ride detected
+        if (d.browserId !== browserId) {
+          // play sound for rides created by others
+          try { newRideSound.play().catch(()=>{}); } catch(e){}
+        }
+        knownRideIds.add(d.id);
+      }
+      if(d.browserId===browserId) rides.push(d);
+    });
     rides.sort((a,b)=>new Date(b.requestedAt)-new Date(a.requestedAt));
     renderRequests(rides.slice(0,20));
   });
@@ -468,8 +556,8 @@ btnProceedPayment.onclick = async () => {
     requestsList.innerHTML='';
     list.forEach(r=>{
       const el=document.createElement('div'); el.className='list-group-item bg-transparent border-0 p-2 mb-1';
-      const driverInfo=r.driverId?`<div class="small-muted">Driver: ${escapeHtml(r.assignedDriverName||r.assignedDriver||'')}</div>`:'';
-      const vehicleInfo=r.vehicleId?`<div class="small-muted">Vehicle: ${escapeHtml(r.assignedVehicleName||r.vehicle||'')}</div>`:'';
+      const driverInfo=r.assignedDriverId?`<div class="small-muted">Driver: ${escapeHtml(r.assignedDriverName||r.assignedDriver||'')}</div>`:'';
+      const vehicleInfo=r.assignedVehicleId?`<div class="small-muted">Vehicle: ${escapeHtml(r.assignedVehicleName||r.vehicle||'')}</div>`:'';
       const receiptBtn=(r.status==='accepted'||r.status==='ongoing'||r.status==='completed')?`<button class="mt-1 btn-outline-light btn btn-sm view-receipt" data-id="${r.id}">Receipt</button>`:'';
       el.innerHTML=`<div class="d-flex justify-content-between">
         <div>
@@ -480,7 +568,7 @@ btnProceedPayment.onclick = async () => {
           <div class="small-muted">Fare: KSh ${Number(r.estimate?.fare||0).toLocaleString()}</div>
         </div>
         <div class="text-end">
-          <div class="badge ${badgeForStatus(r.status)}">${r.status}</div>
+          <div class="badge ${badgeForStatus(r.status)}">${escapeHtml(r.status || '')}</div>
           <div class="mt-2">${receiptBtn}</div>
         </div>
       </div>`;
@@ -519,17 +607,10 @@ btnProceedPayment.onclick = async () => {
   }
 
   onSnapshot(collection(db,'loyalty'),snap=>{ document.getElementById('loyaltyInfo').textContent=`Total loyalty entries: ${snap.size}. Points awarded automatically when admin marks rides completed.`; });
+
   function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 </script>
-
-<!-- Leaflet CSS + JS (left in place to not remove anything from original file) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- Leaflet Routing Machine (left in place) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
-<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 </body>
 </html>
