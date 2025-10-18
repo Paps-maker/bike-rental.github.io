@@ -131,7 +131,10 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- Google Maps (replace YOUR_GOOGLE_MAPS_API_KEY_HERE with your actual key) -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=places"></script>
+ <!-- ✅ Google Maps: fully configured with your API key and Map ID -->
+<script async defer 
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&map_ids=be09314611473507241a937c&libraries=places&callback=initMap">
+</script>
 
  <script type="module">
   // ---------------- Firebase imports ----------------
@@ -177,19 +180,15 @@
   const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
   localStorage.setItem('browserId', browserId);
 
-  // ---------------- MAP INITIALIZATION ----------------
-  let map, routeControl;
-  let vehicleMarkers = {}; // placeholder for vehicle markers
-  function initMap() {
-    const center = [-1.286389, 36.817223]; // Nairobi
-    map = L.map('map').setView(center, 13);
+  // ---------------- Google Maps variables ----------------
+  let map, directionsService, directionsRenderer;
+  let pickupAutocomplete, destAutocomplete;
+  let pickupPlace = null, destPlace = null;
+  let userMarker = null;
+  let vehicleMarkers = {}; // id -> google.maps.Marker
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(map);
-  }
-
-  document.addEventListener('DOMContentLoaded', initMap);
+  // For notifications of new rides
+  const knownRideIds = new Set();
 
   // ---------------- FARE CALCULATION ----------------
   const FARE_RATES = {
@@ -203,8 +202,8 @@
     return Math.round(rate.base + km * rate.perKm + mins * rate.perMin);
   }
 
-  // ---------------- ESTIMATE FUNCTION ----------------
-  btnEstimate.onclick = async () => {
+// ---------------- Estimate (Directions) ----------------
+  async function estimateRoute() {
     const a = pickupInput.value.trim();
     const b = destInput.value.trim();
     if (!a || !b) return alert('Enter both pickup and destination.');
@@ -213,46 +212,55 @@
     estDuration.textContent = 'Calculating...';
     estFare.textContent = 'Calculating...';
 
-    try {
-      const [pickupRes, destRes] = await Promise.all([
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`),
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(b)}`)
-      ]);
-      const pickupData = await pickupRes.json();
-      const destData = await destRes.json();
-      if (!pickupData.length || !destData.length) { alert('Locations not found.'); return; }
+    const origin = pickupPlace?.geometry?.location || a;
+    const destination = destPlace?.geometry?.location || b;
 
-      const pickup = [parseFloat(pickupData[0].lat), parseFloat(pickupData[0].lon)];
-      const dest = [parseFloat(destData[0].lat), parseFloat(destData[0].lon)];
+    const req = { origin, destination, travelMode: google.maps.TravelMode.DRIVING, provideRouteAlternatives: false };
 
-      if (routeControl) map.removeControl(routeControl);
+    directionsService.route(req, (result, status) => {
+      if (status !== 'OK' || !result?.routes?.length) {
+        console.error('Directions failed', status, result);
+        alert('Could not calculate route: ' + status);
+        return;
+      }
+      directionsRenderer.setDirections(result);
+      const leg = result.routes[0].legs[0];
+      const km = (leg.distance?.value || 0) / 1000;
+      const mins = Math.ceil((leg.duration?.value || 0) / 60);
+      const type = vehicleType.value || 'car';
+      const fare = calcFare(km, mins, type);
 
-      routeControl = L.Routing.control({
-        waypoints: [L.latLng(...pickup), L.latLng(...dest)],
-        lineOptions: { styles: [{ color: '#007bff', weight: 5 }] },
-        showAlternatives: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-      })
-      .on('routesfound', e => {
-        const route = e.routes[0];
-        const km = route.summary.totalDistance / 1000;
-        const mins = Math.ceil(route.summary.totalTime / 60);
-        const type = vehicleType.value || 'car';
-        const fare = calcFare(km, mins, type);
+      estDistance.textContent = `${km.toFixed(2)} km`;
+      estDuration.textContent = `${mins} min`;
+      estFare.textContent = `KSh ${fare.toLocaleString()}`;
 
-        estDistance.textContent = `${km.toFixed(2)} km`;
-        estDuration.textContent = `${mins} min`;
-        estFare.textContent = `KSh ${fare.toLocaleString()}`;
+      window._estimate = { pickupText: a, destText: b, km, mins, fare, type, route: result.routes[0] };
 
-        window._estimate = { pickupText: a, destText: b, km, mins, fare, type };
-      })
-      .addTo(map);
+      // Place origin & destination markers
+      placeOriginDestMarkers(leg.start_location, leg.end_location);
+    });
+  }
 
-    } catch (err) { console.error(err); alert('Error calculating route.'); }
-  };
+  let originMarker = null, destMarker = null;
+  function placeOriginDestMarkers(originLatLng, destLatLng) {
+    if (!originLatLng || !destLatLng) return;
+    if (!originMarker) originMarker = new google.maps.Marker({ position: originLatLng, map, label: 'P' });
+    else originMarker.setPosition(originLatLng);
 
+    if (!destMarker) destMarker = new google.maps.Marker({ position: destLatLng, map, label: 'D' });
+    else destMarker.setPosition(destLatLng);
+  }
+ // ---------------- Ensure initMap runs after Google Maps is loaded ----------------
+  if (typeof google !== 'undefined' && google.maps) {
+    initMap();
+  } else {
+    const mapsCheck = setInterval(() => {
+      if (typeof google !== 'undefined' && google.maps) {
+        clearInterval(mapsCheck);
+        initMap();
+      }
+    }, 100);
+  }
   // ---------------- VEHICLES: realtime ----------------
   onSnapshot(collection(db, 'vehicles'), snap => {
     const list = []; snap.forEach(d => list.push({ id: d.id, ...d.data() }));
