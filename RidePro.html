@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -9,7 +10,7 @@
    <link rel="icon" type="image/png" href="img/ridepro.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-     :root{--bg:#071226;--card:#0f1720;--accent:#c79a2f;--muted:#9aa6b2}
+    :root{--bg:#071226;--card:#0f1720;--accent:#c79a2f;--muted:#9aa6b2}
     body{background:linear-gradient(180deg,#071226,#081826);color:#e7eef6;font-family:Inter,system-ui,Arial;padding:18px}
     .brand{color:var(--accent);font-weight:700}
     .panel{background:rgba(255,255,255,0.03);border-radius:10px;padding:16px}
@@ -22,9 +23,7 @@
     .status-green{background:#2ecc71;color:#04210b;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-orange{background:#f39c12;color:#2d1700;padding:4px 8px;border-radius:6px;font-weight:700}
     .status-gray{background:#95a5a6;color:#07121a;padding:4px 8px;border-radius:6px;font-weight:700}
-    
   </style>
-  
 </head>
 <body>
   <div class="container">
@@ -40,129 +39,102 @@
     </header>
 
     <div class="row g-3">
-  <!-- Left: Book a Ride + Map + Recent Requests -->
-  <div class="position-relative col-lg-7">
-    <div class="mb-3 panel">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <div>
-          <h5 class="mb-0">Book a Ride</h5>
-        </div>
-        <div>
-          <select id="vehicleType" class="form-select-sm form-select">
-            <option value="car" selected>Car — Standard (1-2 People)</option>
-            <option value="premium">Car — Premium (4 People)</option>
-            <option value="bike">Motorbike</option>
-            <option value="van">Van Group of 6-8</option>
-          </select>
-        </div>
-      </div>
+      <div class="col-lg-7">
+        <div class="mb-3 panel">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <h5 class="mb-0">Book a Ride</h5>
+              <div class="small-muted"></div>
+            </div>
+            <div>
+              <select id="vehicleType" class="form-select-sm form-select">
+                <option value="car" selected>Car — Standard (1-2 People)</option>
+                <option value="premium">Car — Premium (4 People)</option>
+                <option value="bike">Motorbike</option>
+                <option value="van">Van Group of 6-8</option>
+              </select>
+            </div>
+          </div>
 
-      <!-- PICKUP / DESTINATION + BUTTONS -->
-      <div class="d-flex flex-wrap align-items-start gap-2 mb-3"
-           style="background: rgba(0,0,0,0.05); padding:10px; border-radius:8px;">
-        <div style="flex:1 1 200px; display:flex;flex-direction:column;">
-          <label class="small-muted" style="font-size:12px;margin:0 0 4px 0">Pickup</label>
-          <input id="pickup" class="form-control form-control-sm" placeholder="Enter pickup location"/>
-        </div>
-        <div style="flex:1 1 200px; display:flex;flex-direction:column;">
-          <label class="small-muted" style="font-size:12px;margin:0 0 4px 0">Destination</label>
-          <input id="destination" class="form-control form-control-sm" placeholder="Enter destination"/>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px; flex-shrink:0;">
-          <button id="btnUseLocation" class="btn-outline-secondary btn btn-sm" title="Use my location">Use my location</button>
-          <div style="display:flex;gap:8px; flex-wrap:wrap; margin-top:4px;">
-            <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
-           <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
+          <div class="mb-2">
+            <label class="form-label small-muted">Pickup</label>
+            <input id="pickup" class="form-control" placeholder="Enter pickup location"/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small-muted">Destination</label>
+            <input id="destination" class="form-control" placeholder="Enter destination"/>
+          </div>
+
+          <div id="map" class="mb-3"></div>
+
+          <div class="d-flex align-items-center gap-3">
+            <div>
+              <div class="small-muted">Distance</div>
+              <div id="estDistance" class="fw-bold">—</div>
+            </div>
+            <div>
+              <div class="small-muted">Duration</div>
+              <div id="estDuration" class="fw-bold">—</div>
+            </div>
+            <div>
+              <div class="small-muted">Fare</div>
+              <div id="estFare" class="h4 brand">KSh 0</div>
+            </div>
+            <div class="d-flex gap-2 ms-auto">
+              <button id="btnEstimate" class="btn-outline-light btn btn-sm">Estimate</button>
+              <button id="btnProceedPayment" class="btn btn-gold btn-sm">Request a ride</button>
+            </div>
+          </div>
+
+          <hr/>
+
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label small-muted">Customer name (optional)</label>
+              <input id="custName" class="form-control" placeholder="Full name"/>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small-muted">Phone for M-Pesa (07XX...)</label>
+              <input id="custPhone" class="form-control" placeholder="e.g., 07XXXXXXXX"/>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small-muted">Promo / Loyalty code</label>
+              <input id="promo" class="form-control" placeholder="Optional"/>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- MAP -->
-      <div id="map" class="mb-3" style="height:280px; border-radius:8px;"></div>
-
-      <!-- ESTIMATES: Distance, Duration, Fare -->
-      <div class="d-flex align-items-center gap-3 mb-3">
-        <div>
-          <div class="small-muted">Distance</div>
-          <div id="estDistance" class="fw-bold">—</div>
-        </div>
-        <div>
-          <div class="small-muted">Duration</div>
-          <div id="estDuration" class="fw-bold">—</div>
-        </div>
-        <div>
-          <div class="small-muted">Fare</div>
-          <div id="estFare" class="h4 brand">KSh 0</div>
+        <div class="panel">
+          <h6 class="mb-2">Recent Requests</h6>
+          <div id="requestsList" class="list-group"></div>
         </div>
       </div>
 
-      <hr/>
-
-      <!-- CUSTOMER DETAILS -->
-      <div class="mt-3 row g-2">
-        <div class="col-md-4">
-          <label class="form-label small-muted">Customer name (optional)</label>
-          <input id="custName" class="form-control" placeholder="Full name"/>
+      <div class="col-lg-5">
+        <div class="mb-3 panel">
+          <h6>Available Vehicles</h6>
+          <div class="mt-2" id="vehiclesGrid"></div>
         </div>
-        <div class="col-md-4">
-          <label class="form-label small-muted">Phone for M-Pesa (07XX...)</label>
-          <input id="custPhone" class="form-control" placeholder="e.g., 07XXXXXXXX"/>
+
+        <div class="panel">
+          <h6>Loyalty</h6>
+          <div id="loyaltyInfo" class="small-muted">Earn points after ride completion. Points reduce fare on next rides.</div>
         </div>
-        <div class="col-md-4">
-          <label class="form-label small-muted">Promo / Loyalty code</label>
-          <input id="promo" class="form-control" placeholder="Optional"/>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recent Requests -->
-    <div class="panel">
-      <h6 class="mb-2">Recent Requests</h6>
-      <div id="requestsList" class="list-group"></div>
-    </div>
-  </div>
-
-  <!-- Right: Available Vehicles + Loyalty -->
-  <div class="col-lg-5">
-    <div class="mb-3 panel">
-      <h6>Available Vehicles</h6>
-      <div class="mt-2" id="vehiclesGrid"></div>
-    </div>
-
-    <div class="panel">
-      <h6>Loyalty</h6>
-      <div id="loyaltyInfo" class="small-muted">Earn points after ride completion. Points reduce fare on next rides.</div>
-    </div>
-  </div>
-</div>
-
-<!-- Receipt Modal -->
-<div class="modal fade" id="receiptModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="p-3 modal-content">
-      <div id="receiptBody"></div>
-      <div class="mt-2 text-end">
-        <button id="printReceipt" class="btn-outline-secondary btn btn-sm">Print</button>
-        <button id="downloadReceipt" class="btn-outline-primary btn btn-sm">Download PDF</button>
       </div>
     </div>
   </div>
-</div>
+
   <!-- Receipt modal -->
   <div class="modal fade" id="receiptModal" tabindex="-1"><div class="modal-dialog modal-md"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Receipt</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="receiptBody"></div><div class="modal-footer"><button id="printReceipt" class="btn-outline-light btn btn-sm">Print</button><button id="downloadReceipt" class="btn btn-gold btn btn-sm">Download PDF</button></div></div></div></div>
 
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
- <!-- ✅ Google Maps: fully configured with your API key and Map ID -->
-<script async defer 
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAAOQyp4Y7DmN2SFGR6RVFHcn6gzY-vTdw&map_ids=be09314611473507241a937c&libraries=places&callback=initMap">
-</script>
-
- 
+  <!-- Google Maps (replace YOUR_GOOGLE_MAPS_API_KEY_HERE with your actual key) -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=places"></script>
 
  <script type="module">
- // ---------------- Firebase imports ----------------
+  // ---------------- Firebase imports ----------------
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
@@ -186,7 +158,7 @@
   const db = getFirestore(app);
   const storage = getStorage(app);
 
- // ---------------- UI refs ----------------
+  // ---------------- UI refs ----------------
   const pickupInput = document.getElementById('pickup');
   const destInput = document.getElementById('destination');
   const btnEstimate = document.getElementById('btnEstimate');
@@ -204,9 +176,22 @@
   // ---------------- Browser ID ----------------
   const browserId = localStorage.getItem('browserId') || crypto.randomUUID();
   localStorage.setItem('browserId', browserId);
-  
 
-  // ---------------- FARE RATES ----------------
+  // ---------------- MAP INITIALIZATION ----------------
+  let map, routeControl;
+  let vehicleMarkers = {}; // placeholder for vehicle markers
+  function initMap() {
+    const center = [-1.286389, 36.817223]; // Nairobi
+    map = L.map('map').setView(center, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(map);
+  }
+
+  document.addEventListener('DOMContentLoaded', initMap);
+
+  // ---------------- FARE CALCULATION ----------------
   const FARE_RATES = {
    car: { base: 120, perKm: 30, perMin: 6 },
     premium: { base: 200, perKm: 60, perMin: 8 },
@@ -218,84 +203,8 @@
     return Math.round(rate.base + km * rate.perKm + mins * rate.perMin);
   }
 
-  // ---------------- Google Maps variables ----------------
-  let map, directionsService, directionsRenderer;
-  let pickupAutocomplete, destAutocomplete;
-  let pickupPlace = null, destPlace = null;
-  let userMarker = null;
-  let vehicleMarkers = {}; // id -> google.maps.Marker
-
-  // For notifications of new rides
-  const knownRideIds = new Set();
-
-  // ---------------- Map Init ----------------
-  function initMap() {
-    map = new google.maps.Map(document.getElementById('map'), {
-      center: { lat: -1.286389, lng: 36.817223 },
-      zoom: 13,
-      mapId: "be09314611473507241a937c",
-      mapTypeControl: false
-    });
-
-    directionsService = new google.maps.DirectionsService();
-    directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: true, preserveViewport: true });
-
-    // Places Autocomplete
-    pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, { fields: ["place_id","geometry","formatted_address","name"] });
-    destAutocomplete = new google.maps.places.Autocomplete(destInput, { fields: ["place_id","geometry","formatted_address","name"] });
-
-    pickupAutocomplete.addListener('place_changed', () => {
-      pickupPlace = pickupAutocomplete.getPlace();
-      if (pickupPlace?.geometry?.location) map.panTo(pickupPlace.geometry.location);
-    });
-    destAutocomplete.addListener('place_changed', () => {
-      destPlace = destAutocomplete.getPlace();
-      if (destPlace?.geometry?.location) map.panTo(destPlace.geometry.location);
-    });
-
-    // Auto-detect user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        map.setCenter(loc);
-        map.setZoom(15);
-        setUserMarker(loc);
-      }, err => console.warn('Geolocation failed or permission denied', err), { timeout: 8000 });
-    }
-
-    // Use my location button
-    btnUseLocation.onclick = () => {
-      if (!navigator.geolocation) return alert('Geolocation not supported.');
-      navigator.geolocation.getCurrentPosition(pos => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        map.panTo(loc);
-        map.setZoom(15);
-        setUserMarker(loc);
-
-        // Reverse geocode to fill pickup
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ location: loc }, (results, status) => {
-          if (status === 'OK' && results && results[0]) {
-            pickupInput.value = results[0].formatted_address;
-            pickupPlace = { geometry: { location: new google.maps.LatLng(loc.lat, loc.lng) }, formatted_address: results[0].formatted_address, name: results[0].address_components?.[0]?.short_name || 'Current location' };
-          }
-        });
-      }, err => alert('Unable to get location: ' + (err.message || 'permission denied')));
-    };
-
-    // Wire estimate button
-    btnEstimate.onclick = estimateRoute;
-  }
-
-  function setUserMarker(pos) {
-    if (!map) return;
-    if (!userMarker) {
-      userMarker = new google.maps.Marker({ position: pos, map, title: 'You are here', icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7 } });
-    } else userMarker.setPosition(pos);
-  }
-
-  // ---------------- Estimate (Directions) ----------------
-  async function estimateRoute() {
+  // ---------------- ESTIMATE FUNCTION ----------------
+  btnEstimate.onclick = async () => {
     const a = pickupInput.value.trim();
     const b = destInput.value.trim();
     if (!a || !b) return alert('Enter both pickup and destination.');
@@ -304,56 +213,46 @@
     estDuration.textContent = 'Calculating...';
     estFare.textContent = 'Calculating...';
 
-    const origin = pickupPlace?.geometry?.location || a;
-    const destination = destPlace?.geometry?.location || b;
+    try {
+      const [pickupRes, destRes] = await Promise.all([
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(a)}`),
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(b)}`)
+      ]);
+      const pickupData = await pickupRes.json();
+      const destData = await destRes.json();
+      if (!pickupData.length || !destData.length) { alert('Locations not found.'); return; }
 
-    const req = { origin, destination, travelMode: google.maps.TravelMode.DRIVING, provideRouteAlternatives: false };
+      const pickup = [parseFloat(pickupData[0].lat), parseFloat(pickupData[0].lon)];
+      const dest = [parseFloat(destData[0].lat), parseFloat(destData[0].lon)];
 
-    directionsService.route(req, (result, status) => {
-      if (status !== 'OK' || !result?.routes?.length) {
-        console.error('Directions failed', status, result);
-        alert('Could not calculate route: ' + status);
-        return;
-      }
-      directionsRenderer.setDirections(result);
-      const leg = result.routes[0].legs[0];
-      const km = (leg.distance?.value || 0) / 1000;
-      const mins = Math.ceil((leg.duration?.value || 0) / 60);
-      const type = vehicleType.value || 'car';
-      const fare = calcFare(km, mins, type);
+      if (routeControl) map.removeControl(routeControl);
 
-      estDistance.textContent = `${km.toFixed(2)} km`;
-      estDuration.textContent = `${mins} min`;
-      estFare.textContent = `KSh ${fare.toLocaleString()}`;
+      routeControl = L.Routing.control({
+        waypoints: [L.latLng(...pickup), L.latLng(...dest)],
+        lineOptions: { styles: [{ color: '#007bff', weight: 5 }] },
+        showAlternatives: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+      })
+      .on('routesfound', e => {
+        const route = e.routes[0];
+        const km = route.summary.totalDistance / 1000;
+        const mins = Math.ceil(route.summary.totalTime / 60);
+        const type = vehicleType.value || 'car';
+        const fare = calcFare(km, mins, type);
 
-      window._estimate = { pickupText: a, destText: b, km, mins, fare, type, route: result.routes[0] };
+        estDistance.textContent = `${km.toFixed(2)} km`;
+        estDuration.textContent = `${mins} min`;
+        estFare.textContent = `KSh ${fare.toLocaleString()}`;
 
-      // Place origin & destination markers
-      placeOriginDestMarkers(leg.start_location, leg.end_location);
-    });
-  }
+        window._estimate = { pickupText: a, destText: b, km, mins, fare, type };
+      })
+      .addTo(map);
 
-  let originMarker = null, destMarker = null;
-  function placeOriginDestMarkers(originLatLng, destLatLng) {
-    if (!originLatLng || !destLatLng) return;
-    if (!originMarker) originMarker = new google.maps.Marker({ position: originLatLng, map, label: 'P' });
-    else originMarker.setPosition(originLatLng);
+    } catch (err) { console.error(err); alert('Error calculating route.'); }
+  };
 
-    if (!destMarker) destMarker = new google.maps.Marker({ position: destLatLng, map, label: 'D' });
-    else destMarker.setPosition(destLatLng);
-  }
-
-  // ---------------- Ensure initMap runs after Google Maps is loaded ----------------
-  if (typeof google !== 'undefined' && google.maps) {
-    initMap();
-  } else {
-    const mapsCheck = setInterval(() => {
-      if (typeof google !== 'undefined' && google.maps) {
-        clearInterval(mapsCheck);
-        initMap();
-      }
-    }, 100);
-  }
   // ---------------- VEHICLES: realtime ----------------
   onSnapshot(collection(db, 'vehicles'), snap => {
     const list = []; snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -377,36 +276,16 @@
 
   function plotVehicleMarkers(list){
     const present = new Set(list.map(l=>l.id));
-    // remove markers not present
-    for (const id of Object.keys(vehicleMarkers)) {
-      if (!present.has(id)) {
-        vehicleMarkers[id].setMap(null);
-        delete vehicleMarkers[id];
-      }
-    }
-
+    for(const id of Object.keys(vehicleMarkers)){ if(!present.has(id)) { map.removeLayer(vehicleMarkers[id]); delete vehicleMarkers[id]; } }
     list.forEach(v=>{
-      if (typeof v.latitude !== 'number' || typeof v.longitude !== 'number') return;
-      const pos = { lat: v.latitude, lng: v.longitude };
-      if (vehicleMarkers[v.id]) {
-        vehicleMarkers[v.id].setPosition(pos);
-      } else {
-        const marker = new google.maps.Marker({
-          position: pos,
-          map,
-          title: v.name || v.type || 'Vehicle',
-          icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 5 }
-        });
-        const info = new google.maps.InfoWindow({
-          content: `<strong>${escapeHtml(v.name||v.type||'Vehicle')}</strong><br>${escapeHtml(v.type||'')}<br>Status: ${escapeHtml(v.status||'')}`
-        });
-        marker.addListener('click', () => info.open(map, marker));
-        vehicleMarkers[v.id] = marker;
-      }
+      if(typeof v.latitude!=='number'||typeof v.longitude!=='number') return;
+      const pos = [v.latitude, v.longitude];
+      if(vehicleMarkers[v.id]) vehicleMarkers[v.id].setLatLng(pos);
+      else vehicleMarkers[v.id] = L.marker(pos).addTo(map).bindPopup(`<strong>${escapeHtml(v.name||v.type)}</strong><br>${escapeHtml(v.type||'')}<br>${escapeHtml(v.status||'')}`);
     });
   }
 
-  // ---------------- PAY & REQUEST RIDE (with driver selection + driver name) ----------------
+ // ---------------- PAY & REQUEST RIDE (with driver selection + driver name) ----------------
 const MPESA_SERVER_ENDPOINT = "https://YOUR_SERVER_DOMAIN/mpesa/stkpush";
 
 // --- M-PESA Payment ---
@@ -422,7 +301,6 @@ async function initiateMpesaPayment(phone, amount, metadata = {}) {
   console.warn('Simulated MPESA (DEV).');
   return { success: true, simulated: true, checkoutRequestID: 'SIM_' + Date.now() };
 }
-
 
 // --- Fetch available drivers ---
 async function getAvailableDrivers() {
@@ -547,7 +425,6 @@ btnProceedPayment.onclick = async () => {
   if (routeControl) map.removeControl(routeControl);
 };
 
-
   // ---------------- RECENT REQUESTS (per browser) ----------------
   onSnapshot(collection(db,'rides'), snap=>{
     const rides=[]; snap.forEach(s=>{ const d={id:s.id,...s.data()}; if(d.browserId===browserId) rides.push(d); });
@@ -612,9 +489,16 @@ btnProceedPayment.onclick = async () => {
   onSnapshot(collection(db,'loyalty'),snap=>{ document.getElementById('loyaltyInfo').textContent=`Total loyalty entries: ${snap.size}. Points awarded automatically when admin marks rides completed.`; });
   function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-
-
 </script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initMap"></script>
+
+<!-- Leaflet CSS + JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Leaflet Routing Machine -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 </body>
 </html>
