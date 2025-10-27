@@ -3,53 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> BLADE Bicycle Rental</title>
+<title>Bicycle Rental</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 <link rel="icon" href="img/cycling-logo-by-dkm721-brandcrowd.png" type="image/png">
 <style>
+/* --- your styles kept the same --- */
 body { font-family: 'Roboto', sans-serif; background:#f0f0f0; margin:0; padding:20px; }
 h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
-
-/* Responsive bike grid */
-.bike-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
-  justify-content: center;
-}
-
-.bike-card {
-  max-width: 250px;
-  width: 100%;
-  background:white;
-  border-radius:10px;
-  overflow:hidden;
-  box-shadow:0 6px 15px rgba(0,0,0,0.1);
-  display:flex;
-  flex-direction:column;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.bike-card:hover { transform:translateY(-5px); box-shadow:0 12px 25px rgba(0,0,0,0.2); }
-
-.bike-card img {
-  width:100%;
-  height:auto;
-  max-height:300px;
-  object-fit:cover;
-  display:block;
-  border-bottom:1px solid #ddd;
-}
-
-@media(max-width:768px){
-  .bike-card img { max-height:300px; } /* same as desktop */
-}
-
-@media(max-width:480px){
-  .bike-card img { max-height:300px; } /* keep same height */
-}
-
-.bike-info { padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+.bike-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; justify-content: center; }
+.bike-card { max-width: 250px; width:100%; background:white; border-radius:10px; overflow:hidden; box-shadow:0 6px 15px rgba(0,0,0,0.1); display:flex; flex-direction:column; transition: transform 0.3s, box-shadow 0.3s;}
+.bike-card:hover { transform:translateY(-5px); box-shadow:0 12px 25px rgba(0,0,0,0.2);}
+.bike-card img { width:100%; height:auto; max-height:300px; object-fit:cover; display:block; border-bottom:1px solid #ddd;}
+@media(max-width:768px){.bike-card img{max-height:250px;}} 
+@media(max-width:480px){.bike-card img{max-height:200px;}}
+.bike-info { padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between;}
 .bike-info h3{margin:0 0 5px 0;color:#2c3e50;font-size:1.1em;}
 .bike-info p{margin:0 0 10px 0;color:#7f8c8d;font-size:0.9em;}
 .bike-info button { padding:8px 12px; width:auto; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; align-self:flex-start;}
@@ -57,7 +24,6 @@ h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
 .status-text{margin-top:10px; font-size:0.9em;}
 .status-upcoming{color:#e67e22; font-weight:bold;}
 .status-riding{color:#27ae60; font-weight:bold;}
-
 .popup{display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;}
 .popup-content{background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; position:relative;}
 .popup-content h2{margin-top:0;}
@@ -72,11 +38,10 @@ h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
 <body>
 
 <div class="container">
-  <h1>🚲 BLADE Bicycle Rental</h1>
+  <h1>🚲 Bicycle Rental</h1>
   <div class="bike-grid" id="bikeGrid">
-    <!-- Bike cards -->
-    <div class="bike-card" data-name="Hummer">
-      <img src="img/1.jpg" alt="Hummer">
+    <div class="bike-card" data-name="Mountain Bike">
+      <img src="img/1.jpg" alt="Mountain Bike">
       <div class="bike-info">
         <h3>Mountain Bike</h3>
         <p>Perfect for rough trails and adventurous rides.</p>
@@ -84,88 +49,24 @@ h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
         <div class="status-text" id="status-Mountain Bike"></div>
       </div>
     </div>
-    <div class="bike-card" data-name="precision">
+    <div class="bike-card" data-name="Road Bike">
       <img src="img/2.jpg" alt="Road Bike">
       <div class="bike-info">
         <h3>Road Bike</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
+        <p>Great for city rides and smooth speed.</p>
         <button onclick="openPopup('Road Bike')">Reserve</button>
         <div class="status-text" id="status-Road Bike"></div>
       </div>
     </div>
-    <div class="bike-card" data-name="nitro">
-      <img src="img/3.jpg" alt="nitro">
+    <div class="bike-card" data-name="Electric Bike">
+      <img src="img/3.jpg" alt="Electric Bike">
       <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
+        <h3>Electric Bike</h3>
+        <p>Easy riding with electric boost.</p>
+        <button onclick="openPopup('Electric Bike')">Reserve</button>
+        <div class="status-text" id="status-Electric Bike"></div>
       </div>
     </div>
-    <div class="bike-card" data-name="Carsia">
-      <img src="img/4.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX 2</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX 2')">Reserve</button>
-        <div class="status-text" id="status-BMX 2"></div>
-      </div>
-    </div>
-    <div class="bike-card" data-name="BMX">
-      <img src="img/5.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
-      </div>
-    </div>
-    <div class="bike-card" data-name="BMX">
-      <img src="img/6.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
-      </div>
-    </div>
-    <div class="bike-card" data-name="BMX">
-      <img src="img/7.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
-      </div>
-    </div>
-    <div class="bike-card" data-name="BMX">
-      <img src="img/8.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
-      </div>
-    </div>
-    <div class="bike-card" data-name="BMX">
-      <img src="img/9.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
-      </div>
-    </div>
-    <div class="bike-card" data-name="BMX">
-      <img src="img/10.jpg" alt="BMX">
-      <div class="bike-info">
-        <h3>BMX</h3>
-        <p>Perfect for rough trails and adventurous rides.</p>
-        <button onclick="openPopup('BMX')">Reserve</button>
-        <div class="status-text" id="status-BMX"></div>
-      </div>
-    </div>
-    <!-- add more bike cards as needed -->
   </div>
 </div>
 
@@ -189,98 +90,115 @@ h1 { text-align:center; color:#2c3e50; margin-bottom:30px; }
 
 <!-- Firebase + App Logic -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import { getFirestore, collection, addDoc, query, onSnapshot } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, query, onSnapshot } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyB8d4sLlqCZ4bQxlUBEYT3axhz1wbJjHaI",
-  authDomain: "bicycle-rental-5ca9f.firebaseapp.com",
-  projectId: "bicycle-rental-5ca9f",
-  storageBucket: "bicycle-rental-5ca9f.firebasestorage.app",
-  messagingSenderId: "244319467774",
-  appId: "1:244319467774:web:e2a2c790663ea3e7200daf",
-  measurementId: "G-XFS1MNQ15W"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyB8d4sLlqCZ4bQxlUBEYT3axhz1wbJjHaI",
+    authDomain: "bicycle-rental-5ca9f.firebaseapp.com",
+    projectId: "bicycle-rental-5ca9f",
+    storageBucket: "bicycle-rental-5ca9f.firebasestorage.app",
+    messagingSenderId: "244319467774",
+    appId: "1:244319467774:web:e2a2c790663ea3e7200daf",
+    measurementId: "G-XFS1MNQ15W"
+  };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
- let selectedBike = null;
-  const ratePerMinute = 1; // cost per minute
+  let selectedBike = null;
 
-function openPopup(bikeName){
-  selectedBike = bikeName;
-  document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName}`;
-  document.getElementById('popup').style.display = 'flex';
-  document.getElementById('customerName').value='';
-  document.getElementById('customerPhone').value='';
-  document.getElementById('pickupTime').value='';
-  document.getElementById('duration').value='';
-  document.getElementById('costDisplay').innerText = 'Estimated Cost: 0 Ksh';
-}
+  // 🔹 Per-bike rate map
+  const bikeRates = {
+    "Mountain Bike": 2,   // 2 Ksh/min
+    "Road Bike": 3,       // 3 Ksh/min
+    "Electric Bike": 5    // 5 Ksh/min
+  };
 
-function closePopup(){
-  document.getElementById('popup').style.display='none';
-}
+  function openPopup(bikeName){
+    selectedBike = bikeName;
+    document.getElementById('popupBikeName').innerText = `Selected Bicycle: ${bikeName} (Rate: ${bikeRates[bikeName]} Ksh/min)`;
+    document.getElementById('popup').style.display = 'flex';
+    document.getElementById('customerName').value='';
+    document.getElementById('customerPhone').value='';
+    document.getElementById('pickupTime').value='';
+    document.getElementById('duration').value='';
+    document.getElementById('costDisplay').innerText = 'Estimated Cost: 0 Ksh';
+  }
 
-async function reserveBike(){
-  const name=document.getElementById('customerName').value.trim();
-  const phone=document.getElementById('customerPhone').value.trim();
-  const pickup=document.getElementById('pickupTime').value;
-  const duration=parseInt(document.getElementById('duration').value);
-  if(!name||!phone||!pickup||!duration){ alert('Fill all fields'); return; }
+  function closePopup(){
+    document.getElementById('popup').style.display='none';
+  }
 
-  const start = new Date(pickup);
-  const end = new Date(start.getTime()+duration*60000);
+  async function reserveBike(){
+    const name=document.getElementById('customerName').value.trim();
+    const phone=document.getElementById('customerPhone').value.trim();
+    const pickup=document.getElementById('pickupTime').value;
+    const duration=parseInt(document.getElementById('duration').value);
+    if(!name||!phone||!pickup||!duration){ alert('Fill all fields'); return; }
 
-  try {
-    await addDoc(collection(db, "reservations"), {
-      bike: selectedBike,
-      customerName: name,
-      phone: phone,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      picked: false,
-      returned: false,
-      cancelled: false
-    });
-    closePopup();
-  } catch (e) { console.error("Error adding reservation:", e); }
-}
+    const start = new Date(pickup);
+    const end = new Date(start.getTime()+duration*60000);
 
-window.reserveBike = reserveBike;
-window.openPopup = openPopup;
-window.closePopup = closePopup;
+    const rate = bikeRates[selectedBike] || 0;
+    const estimatedCost = duration * rate;
 
-document.getElementById('duration').addEventListener('input', ()=>{
-  const dur = parseInt(document.getElementById('duration').value);
-  document.getElementById('costDisplay').innerText = dur>0 ? `Estimated Cost: ${dur*ratePerMinute} Ksh` : 'Estimated Cost: 0 Ksh';
-});
+    try {
+      await addDoc(collection(db, "reservations"), {
+        bike: selectedBike,
+        customerName: name,
+        phone: phone,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        picked: false,
+        returned: false,
+        cancelled: false,
+        estimatedCost: estimatedCost,
+        finalCost: null
+      });
+      closePopup();
+    } catch (e) {
+      console.error("Error adding reservation:", e);
+    }
+  }
+  window.reserveBike = reserveBike;
+  window.openPopup = openPopup;
+  window.closePopup = closePopup;
 
-onSnapshot(query(collection(db, "reservations")), (snapshot) => {
-  const reservations = [];
-  snapshot.forEach(doc => reservations.push(doc.data()));
-
-  const bikes = ['Hummer','Precision','Nitro','Carsia','Snow','Mustony','Slant','Carrera 1','Carrers 2','Valier'];
-  bikes.forEach(bike=>{
-    const div = document.getElementById('status-'+bike);
-    const res = reservations.filter(r=>r.bike===bike && !r.returned && !r.cancelled)
-                            .sort((a,b)=>new Date(a.start)-new Date(b.start));
-    if(res.length===0){ div.innerHTML=''; return; }
-
-    let statusText='';
-    res.forEach(r=>{
-      const now = new Date();
-      let status='', colorClass='';
-      if(r.picked){ status='Riding'; colorClass='status-riding'; }
-      else if(now<new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
-
-      const remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
-      statusText+=`<span class="${colorClass}">${status} (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - ${remainingMinutes} min left</span><br>`;
-    });
-    div.innerHTML=statusText;
+  // 🔹 Update cost live with per-bike rates
+  document.getElementById('duration').addEventListener('input', ()=>{
+    const dur = parseInt(document.getElementById('duration').value);
+    if(selectedBike){
+      const rate = bikeRates[selectedBike] || 0;
+      const cost = dur>0 ? dur*rate : 0;
+      document.getElementById('costDisplay').innerText = `Estimated Cost: ${cost} Ksh`;
+    }
   });
-});
+
+  onSnapshot(query(collection(db, "reservations")), (snapshot) => {
+    const reservations = [];
+    snapshot.forEach(doc => reservations.push(doc.data()));
+
+    const bikes = ['Mountain Bike','Road Bike','Electric Bike'];
+    bikes.forEach(bike=>{
+      const div = document.getElementById('status-'+bike);
+      const res = reservations.filter(r=>r.bike===bike && !r.returned && !r.cancelled)
+                              .sort((a,b)=>new Date(a.start)-new Date(b.start));
+      if(res.length===0){ div.innerHTML=''; return; }
+
+      let statusText='';
+      res.forEach(r=>{
+        const now = new Date();
+        let status='', colorClass='';
+        if(r.picked){ status='Riding'; colorClass='status-riding'; }
+        else if(now<new Date(r.start)){ status='Upcoming'; colorClass='status-upcoming'; }
+
+        const remainingMinutes = Math.max(Math.ceil((new Date(r.end)-now)/60000),0);
+        statusText+=`<span class="${colorClass}">${status} (${new Date(r.start).toLocaleString()} - ${new Date(r.end).toLocaleString()}) - ${remainingMinutes} min left</span><br>`;
+      });
+      div.innerHTML=statusText;
+    });
+  });
 </script>
 </body>
 </html>
