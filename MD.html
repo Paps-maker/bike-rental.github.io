@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>MovieDrift Admin</title>
+<link rel="icon" href="img/logo.png" type="image/png">
+<style>
+:root { --bg:#000; --card-bg:#0a0a0a; --accent:#00ff66; --text:#eee; --muted:#777; }
+body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; margin:0; }
+header { background:#111; color:var(--accent); padding:15px 20px; font-size:24px; font-weight:bold; }
+main { padding:20px; display:grid; grid-template-columns:300px 1fr; gap:20px; flex-wrap:wrap; }
+form { background:var(--card-bg); padding:15px; border-radius:8px; display:flex; flex-direction:column; gap:10px; }
+input, textarea, select, button { padding:8px; border:1px solid var(--accent); border-radius:5px; background:#111; color:var(--text); }
+button { background:var(--accent); color:#000; font-weight:bold; cursor:pointer; }
+button:hover { opacity:0.85; }
+table { width:100%; border-collapse:collapse; background:var(--card-bg); border-radius:8px; overflow:hidden; }
+th, td { border-bottom:1px solid #222; padding:8px; text-align:left; vertical-align:middle; }
+th { color:var(--accent); background:#111; }
+tr:hover { background:#181818; }
+.actions button { margin-right:6px; padding:4px 8px; border:none; border-radius:4px; cursor:pointer; font-size:0.8rem; }
+.actions .edit { background:#00cc88; color:#000; }
+.actions .delete { background:#e63946; color:#fff; }
+.actions .episodes { background:#007bff; color:#fff; }
+.search-bar { margin-bottom:10px; width:100%; }
+.modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:2000; }
+.modal .modal-content { width:95%; max-width:1000px; max-height:90vh; overflow:auto; background:var(--card-bg); padding:16px; border-radius:8px; }
+.modal .close { float:right; cursor:pointer; color:var(--accent); font-size:20px; }
+.small-btn { padding:6px 8px; border-radius:6px; cursor:pointer; border:none; }
+.episode-row { display:flex; gap:8px; align-items:center; }
+.episode-row img { width:80px; height:45px; object-fit:cover; border-radius:4px; }
+.field-row { display:flex; gap:8px; }
+.note { font-size:0.85rem; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+<header>🎬 MovieDrift Admin Dashboard</header>
+
+<main>
+  <!-- ADD / EDIT MOVIE FORM -->
+  <form id="movieForm">
+    <h3>Add / Edit Movie / Series</h3>
+    <input type="hidden" id="movieId">
+    <input id="title" placeholder="Title" required>
+    <input id="year" placeholder="Year">
+    <input id="type" placeholder="Type (Movie, Series, Animation)" required>
+    <input id="genres" placeholder="Genres (comma separated)">
+    <input id="poster" placeholder="Poster URL">
+    <input id="trailer" placeholder="Trailer URL">
+    <input id="fileUrl" placeholder="Movie / Stream URL">
+    <textarea id="description" placeholder="Description"></textarea>
+    <input id="rating" type="number" placeholder="Rating (0-10)" min="0" max="10" step="0.1">
+    <div style="display:flex; gap:8px;">
+      <button type="submit">Save Movie</button>
+      <button type="button" id="clearForm">Clear</button>
+    </div>
+    <p class="note">Note: use Type = <strong>Series</strong> to enable episodes management.</p>
+  </form>
+
+  <!-- MOVIES TABLE -->
+  <div>
+    <h3>🎞 All Movies / Series</h3>
+    <input id="searchInput" class="search-bar" placeholder="🔍 Search movies by title...">
+    <div style="margin-bottom:10px;">
+      <button id="deleteSelectedBtn" onclick="deleteSelectedMovies()" disabled>🗑 Delete Selected</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+          <th>Title</th>
+          <th>Year</th>
+          <th>Type</th>
+          <th>Genres</th>
+          <th>Rating</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="movieTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Episodes Modal -->
+<div id="episodesModal" class="modal" aria-hidden="true">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal('episodesModal')">&times;</span>
+    <h2 id="episodesModalTitle">Episodes</h2>
+
+    <!-- Episode Add/Edit Form -->
+    <form id="episodeForm" style="margin-bottom:12px;">
+      <input type="hidden" id="episodeId">
+      <input type="hidden" id="episodeSeriesId">
+      <div class="field-row">
+        <input id="epNumber" placeholder="Episode Number" style="width:120px;">
+        <input id="epTitle" placeholder="Episode Title" style="flex:1;">
+      </div>
+      <input id="epFileUrl" placeholder="Episode File URL (mp4,mkv,webm...)">
+      <div class="field-row" style="margin-top:8px;">
+        <input id="epPoster" placeholder="Episode Poster URL">
+        <input id="epRuntime" placeholder="Runtime (e.g. 24m)" style="width:140px;">
+      </div>
+      <textarea id="epDescription" placeholder="Episode Description" style="margin-top:8px;"></textarea>
+      <div style="margin-top:8px;">
+        <button type="submit">Save Episode</button>
+        <button type="button" id="clearEpisodeForm">Clear</button>
+      </div>
+    </form>
+
+    <h3>Episode List</h3>
+    <div id="episodesListContainer">
+      <!-- episodes inserted here -->
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* Admin with Episodes support (Firestore v11 modular) */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc,
+  onSnapshot, query, where, orderBy
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+// -------------------- Firebase Config --------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
+  authDomain: "gamers-65b44.firebaseapp.com",
+  projectId: "gamers-65b44",
+  storageBucket: "gamers-65b44.firebasestorage.app",
+  messagingSenderId: "97331968745",
+  appId: "1:97331968745:web:a93ff0bd2c383800dcce78",
+  measurementId: "G-JPPCZ3M4G2"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const moviesRef = collection(db, "movies");
+
+// DOM refs
+const movieForm = document.getElementById("movieForm");
+const movieTable = document.getElementById("movieTable");
+const searchInput = document.getElementById("searchInput");
+const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
+const selectAllCheckbox = document.getElementById("selectAll");
+
+const episodesModal = document.getElementById("episodesModal");
+const episodesModalTitle = document.getElementById("episodesModalTitle");
+const episodesListContainer = document.getElementById("episodesListContainer");
+const episodeForm = document.getElementById("episodeForm");
+const clearEpisodeFormBtn = document.getElementById("clearEpisodeForm");
+
+let allMovies = [];
+let selectedMovies = new Set();
+let currentSeriesId = null;
+let episodesUnsubscribe = null; // for real-time episodes listener
+
+// -------------------- RENDER MOVIES --------------------
+function renderMovies(list) {
+  movieTable.innerHTML = "";
+  list.forEach(m => {
+    const checked = selectedMovies.has(m.id) ? "checked" : "";
+    const ratingDisplay = m.rating ? `${m.rating} (${(m.rating*10).toFixed(0)}%)` : "-";
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><input type="checkbox" ${checked} onchange="toggleMovieSelection('${m.id}')"></td>
+      <td>${escapeHtml(m.title)}</td>
+      <td>${m.year || ""}</td>
+      <td>${m.type || ""}</td>
+      <td>${m.genres ? escapeHtml(m.genres.join(", ")) : ""}</td>
+      <td>${ratingDisplay}</td>
+      <td class="actions">
+        <button class="edit" onclick='editMovie("${m.id}")'>Edit</button>
+        <button class="episodes" onclick='openEpisodes("${m.id}", "${escapeJs(m.title)}")' ${m.type !== "Series" ? "title='Not a series'": ""}>Manage Episodes</button>
+        <button class="delete" onclick='deleteMovie("${m.id}")'>Delete</button>
+      </td>`;
+    movieTable.appendChild(row);
+  });
+  updateDeleteButtonState();
+}
+
+// -------------------- UTIL --------------------
+function escapeHtml(str){ if(!str) return ""; return str.replace(/[&<>"']/g, s=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[s]); }
+function escapeJs(str){ if(!str) return ""; return str.replace(/'/g, "\\'").replace(/"/g,'\\"'); }
+
+// -------------------- TOGGLE SELECTION --------------------
+window.toggleMovieSelection = id => {
+  if (selectedMovies.has(id)) selectedMovies.delete(id);
+  else selectedMovies.add(id);
+  updateDeleteButtonState();
+};
+
+window.toggleSelectAll = checkbox => {
+  if (checkbox.checked) allMovies.forEach(m => selectedMovies.add(m.id));
+  else selectedMovies.clear();
+  renderMovies(allMovies);
+};
+
+function updateDeleteButtonState() {
+  deleteSelectedBtn.disabled = selectedMovies.size === 0;
+  deleteSelectedBtn.textContent = selectedMovies.size
+    ? `🗑 Delete Selected (${selectedMovies.size})`
+    : "🗑 Delete Selected";
+}
+
+// -------------------- DELETE SELECTED --------------------
+window.deleteSelectedMovies = async () => {
+  if (selectedMovies.size === 0) return alert("No movies selected.");
+  if (!confirm(`Delete ${selectedMovies.size} selected movie(s)?`)) return;
+  for (const id of selectedMovies) {
+    // delete episodes subcollection too? (optional) — Firestore does not cascade; you'd need Cloud Function or manual delete.
+    await deleteDoc(doc(db, "movies", id));
+  }
+  selectedMovies.clear();
+  updateDeleteButtonState();
+  alert("✅ Selected movies deleted successfully!");
+};
+
+// -------------------- SINGLE DELETE --------------------
+window.deleteMovie = async id => {
+  if (!confirm("Delete this movie?")) return;
+  await deleteDoc(doc(db, "movies", id));
+  alert("🗑 Movie deleted");
+};
+
+// -------------------- LOAD MOVIES REALTIME --------------------
+onSnapshot(query(moviesRef, orderBy("createdAt", "desc")), snapshot => {
+  allMovies = [];
+  snapshot.forEach(docSnap => allMovies.push({ id: docSnap.id, ...docSnap.data() }));
+  renderMovies(allMovies);
+});
+
+// -------------------- SEARCH FILTER --------------------
+searchInput.addEventListener("input", e => {
+  const term = e.target.value.toLowerCase();
+  const filtered = allMovies.filter(m => (m.title || "").toLowerCase().includes(term));
+  renderMovies(filtered);
+});
+
+// -------------------- ADD / UPDATE MOVIE --------------------
+movieForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const movieData = {
+    title: title.value.trim(),
+    year: year.value.trim(),
+    type: type.value.trim(),
+    genres: genres.value ? genres.value.split(",").map(g=>g.trim()).filter(Boolean) : [],
+    poster: poster.value.trim(),
+    trailer: trailer.value.trim(),
+    fileUrl: fileUrl.value.trim(),
+    description: description.value.trim(),
+    rating: parseFloat(rating.value) || null
+  };
+  const id = movieId.value;
+  if (id) {
+    await updateDoc(doc(db, "movies", id), movieData);
+    alert("✅ Movie updated!");
+  } else {
+    const q = query(moviesRef, where("title", "==", movieData.title));
+    const existing = await getDocs(q);
+    if (!existing.empty) return alert("⚠️ Movie already exists. Edit it instead of adding.");
+    movieData.createdAt = Date.now();
+    await addDoc(moviesRef, movieData);
+    alert("✅ Movie added!");
+  }
+  movieForm.reset();
+  movieId.value = "";
+});
+
+document.getElementById("clearForm").addEventListener("click", () => {
+  movieForm.reset();
+  movieId.value = "";
+});
+
+// -------------------- EDIT MOVIE --------------------
+window.editMovie = async id => {
+  const docs = await getDocs(moviesRef);
+  const movieDoc = docs.docs.find(d => d.id === id);
+  if (!movieDoc) return alert("Movie not found!");
+  const m = movieDoc.data();
+  movieId.value = id;
+  title.value = m.title || "";
+  year.value = m.year || "";
+  type.value = m.type || "";
+  genres.value = m.genres ? m.genres.join(", ") : "";
+  poster.value = m.poster || "";
+  trailer.value = m.trailer || "";
+  fileUrl.value = m.fileUrl || "";
+  description.value = m.description || "";
+  rating.value = m.rating || "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+// -------------------- EPISODES: OPEN / LISTENER --------------------
+window.openEpisodes = (seriesId, title) => {
+  if (!seriesId) return alert("Missing series id");
+  currentSeriesId = seriesId;
+  episodesModalTitle.innerText = `Episodes — ${title}`;
+  document.getElementById("episodeSeriesId").value = seriesId;
+  // clear any existing list
+  episodesListContainer.innerHTML = "<p>Loading episodes...</p>";
+  // unsubscribe previous
+  if (typeof episodesUnsubscribe === "function") episodesUnsubscribe();
+
+  // real-time listener on subcollection: movies/{seriesId}/episodes ordered by epNumber
+  const episodesColl = collection(db, "movies", seriesId, "episodes");
+  const q = query(episodesColl, orderBy("epNumber", "asc"));
+  episodesUnsubscribe = onSnapshot(q, snapshot => {
+    const episodes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderEpisodes(episodes);
+  }, err => {
+    console.error("Episodes listener error", err);
+    episodesListContainer.innerHTML = "<p>Error loading episodes.</p>";
+  });
+
+  // show modal
+  episodesModal.style.display = "flex";
+};
+
+// render episodes list
+function renderEpisodes(episodes) {
+  if (!episodes || episodes.length === 0) {
+    episodesListContainer.innerHTML = "<p>No episodes yet. Use the form above to add one.</p>";
+    return;
+  }
+  episodesListContainer.innerHTML = "";
+  episodes.forEach(ep => {
+    const div = document.createElement("div");
+    div.className = "episode-row";
+    div.style.marginBottom = "10px";
+    div.innerHTML = `
+      <div style="width:90%; display:flex; gap:10px; align-items:center;">
+        <img src="${ep.poster || (ep.fileUrl && ep.fileUrl.includes('image') ? ep.fileUrl : (ep.poster || ''))}" onerror="this.style.display='none'">
+        <div style="flex:1;">
+          <strong>EP ${ep.epNumber || ''} — ${escapeHtml(ep.title || '')}</strong>
+          <div style="font-size:0.9rem;color:var(--muted)">${escapeHtml(ep.runtime || '')} • ${escapeHtml(ep.description || '')}</div>
+          <div style="margin-top:6px;">
+            <a href="${ep.fileUrl || '#'}" target="_blank" style="color:var(--accent); text-decoration:underline;">Open file</a>
+          </div>
+        </div>
+      </div>
+      <div style="width:10%;display:flex;flex-direction:column;gap:6px;">
+        <button class="small-btn" onclick='editEpisode("${currentSeriesId}","${ep.id}")'>Edit</button>
+        <button class="small-btn" style="background:#e63946;color:white;" onclick='deleteEpisode("${currentSeriesId}","${ep.id}")'>Delete</button>
+      </div>
+    `;
+    episodesListContainer.appendChild(div);
+  });
+}
+
+// -------------------- EPISODE FORM: ADD / UPDATE --------------------
+episodeForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const seriesId = document.getElementById("episodeSeriesId").value;
+  if (!seriesId) return alert("Missing series id");
+
+  const epId = document.getElementById("episodeId").value;
+  const epData = {
+    epNumber: parseInt(document.getElementById("epNumber").value) || null,
+    title: document.getElementById("epTitle").value.trim(),
+    fileUrl: document.getElementById("epFileUrl").value.trim(),
+    description: document.getElementById("epDescription").value.trim(),
+    poster: document.getElementById("epPoster").value.trim(),
+    runtime: document.getElementById("epRuntime").value.trim(),
+    updatedAt: Date.now()
+  };
+
+  const episodesCollRef = collection(db, "movies", seriesId, "episodes");
+
+  try {
+    if (epId) {
+      await updateDoc(doc(db, "movies", seriesId, "episodes", epId), epData);
+      alert("✅ Episode updated!");
+    } else {
+      epData.createdAt = Date.now();
+      await addDoc(episodesCollRef, epData);
+      alert("✅ Episode added!");
+    }
+    clearEpisodeForm();
+  } catch (err) {
+    console.error("Episode save error", err);
+    alert("Failed to save episode.");
+  }
+});
+
+clearEpisodeFormBtn.addEventListener("click", clearEpisodeForm);
+
+function clearEpisodeForm() {
+  document.getElementById("episodeId").value = "";
+  document.getElementById("epNumber").value = "";
+  document.getElementById("epTitle").value = "";
+  document.getElementById("epFileUrl").value = "";
+  document.getElementById("epDescription").value = "";
+  document.getElementById("epPoster").value = "";
+  document.getElementById("epRuntime").value = "";
+}
+
+// -------------------- EDIT / DELETE EPISODE --------------------
+window.editEpisode = async (seriesId, epId) => {
+  try {
+    const docs = await getDocs(collection(db, "movies", seriesId, "episodes"));
+    const epDoc = docs.docs.find(d => d.id === epId);
+    if (!epDoc) return alert("Episode not found.");
+    const ep = epDoc.data();
+    document.getElementById("episodeId").value = epId;
+    document.getElementById("episodeSeriesId").value = seriesId;
+    document.getElementById("epNumber").value = ep.epNumber || "";
+    document.getElementById("epTitle").value = ep.title || "";
+    document.getElementById("epFileUrl").value = ep.fileUrl || "";
+    document.getElementById("epDescription").value = ep.description || "";
+    document.getElementById("epPoster").value = ep.poster || "";
+    document.getElementById("epRuntime").value = ep.runtime || "";
+    // Scroll to top of modal form
+    episodesModal.querySelector(".modal-content").scrollTop = 0;
+  } catch (err) {
+    console.error(err);
+    alert("Failed to load episode for editing.");
+  }
+};
+
+window.deleteEpisode = async (seriesId, epId) => {
+  if (!confirm("Delete this episode?")) return;
+  await deleteDoc(doc(db, "movies", seriesId, "episodes", epId));
+  alert("🗑 Episode deleted");
+};
+
+// -------------------- CLOSE MODAL --------------------
+window.closeModal = id => {
+  if (id === "episodesModal") {
+    if (typeof episodesUnsubscribe === "function") { episodesUnsubscribe(); episodesUnsubscribe = null; }
+  }
+  document.getElementById(id).style.display = "none";
+};
+
+// -------------------- Wootly auto-renew (kept from your existing script) --------------------
+const WOOTLY_FILE_ID = "91381f9d967238d3ee78e520cedb532ad6f51ed1";
+const WOOTLY_REFRESH_BUFFER = 60;
+let wootlyCurrentLink = "";
+let wootlyExpireTime = 0;
+
+async function fetchWootlyLink() {
+  try {
+    const res = await fetch(`https://web.wootly.ch/api/generateLink?id=${WOOTLY_FILE_ID}`);
+    const data = await res.json();
+    wootlyCurrentLink = data.url;
+    wootlyExpireTime = data.expire;
+    console.log("✅ New Wootly link fetched:", wootlyCurrentLink);
+    if (fileUrl) fileUrl.value = wootlyCurrentLink;
+    scheduleWootlyRefresh();
+  } catch (err) {
+    console.error("❌ Failed to fetch Wootly link:", err);
+    setTimeout(fetchWootlyLink, 5000);
+  }
+}
+function scheduleWootlyRefresh() {
+  const now = Math.floor(Date.now() / 1000);
+  const timeUntilRefresh = Math.max(wootlyExpireTime - now - WOOTLY_REFRESH_BUFFER, 5);
+  setTimeout(fetchWootlyLink, timeUntilRefresh * 1000);
+}
+fetchWootlyLink();
+
+// -------------------- TMDb fetch and weekly auto-run kept from your script --------------------
+const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
+async function fetchAllTMDbContent() {
+  const PAGES = 7;
+  const endpoints = [
+    { type: "Movie", label: "Now Playing", baseUrl: "https://api.themoviedb.org/3/movie/now_playing" },
+    { type: "Movie", label: "Popular", baseUrl: "https://api.themoviedb.org/3/movie/popular" },
+    { type: "Series", label: "Popular", baseUrl: "https://api.themoviedb.org/3/tv/popular" },
+    { type: "Anime", label: "Popular", baseUrl: "https://api.themoviedb.org/3/discover/tv?with_original_language=ja&sort_by=popularity.desc" },
+    { type: "Animation", label: "Popular", baseUrl: "https://api.themoviedb.org/3/discover/movie?with_genres=16&sort_by=popularity.desc" }
+  ];
+
+  try {
+    const now = new Date();
+    const [movieGenresRes, tvGenresRes] = await Promise.all([
+      fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${TMDB_API_KEY}&language=en-US`),
+      fetch(`https://api.themoviedb.org/3/genre/tv/list?api_key=${TMDB_API_KEY}&language=en-US`)
+    ]);
+    const movieGenres = (await movieGenresRes.json()).genres || [];
+    const tvGenres = (await tvGenresRes.json()).genres || [];
+    const genreMap = {};
+    [...movieGenres, ...tvGenres].forEach(g => (genreMap[g.id] = g.name));
+
+    for (const endpoint of endpoints) {
+      console.log(`🔄 Fetching ${endpoint.label} ${endpoint.type}s...`);
+      for (let page = 1; page <= PAGES; page++) {
+        const url = endpoint.baseUrl.includes("?")
+          ? `${endpoint.baseUrl}&api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
+          : `${endpoint.baseUrl}?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const results = Array.isArray(data.results) ? data.results : [data];
+
+        for (const item of results) {
+          if (!item || (!item.title && !item.name)) continue;
+          const title = item.title || item.name;
+          const releaseDateStr = item.release_date || item.first_air_date;
+          if (!releaseDateStr) continue;
+          const releaseDate = new Date(releaseDateStr);
+          if (isNaN(releaseDate)) continue;
+          if (releaseDate > now) continue;
+          const year = releaseDate.getFullYear();
+          const month = releaseDate.getMonth() + 1;
+          const day = releaseDate.getDate();
+          if (!item.poster_path) continue;
+          const poster = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
+          const rating = item.vote_average || null;
+          const description = item.overview || "";
+          const genreNames = (item.genre_ids || []).map(id => genreMap[id]).filter(Boolean);
+
+          const q = query(moviesRef, where("title", "==", title));
+          const existingSnap = await getDocs(q);
+
+          if (!existingSnap.empty) {
+            for (const docSnap of existingSnap.docs) {
+              await updateDoc(doc(db, "movies", docSnap.id), {
+                year, releaseDate: releaseDateStr, month, day,
+                type: endpoint.type, description, rating, poster,
+                genres: genreNames, category: endpoint.label, updatedAt: Date.now()
+              });
+            }
+          } else {
+            await addDoc(moviesRef, {
+              title, year, month, day, releaseDate: releaseDateStr,
+              type: endpoint.type, genres: genreNames, poster, trailer: "", fileUrl: "",
+              description, rating, source: "tmdb", category: endpoint.label, createdAt: Date.now()
+            });
+          }
+        }
+      }
+      console.log(`✅ Completed ${endpoint.label} ${endpoint.type}s!`);
+    }
+    console.log("🎉 TMDB fetch completed.");
+  } catch (e) {
+    console.error("TMDb fetch error:", e);
+  }
+}
+
+async function autoRunWeeklyTMDbFetch() {
+  const lastRun = localStorage.getItem("tmdb_last_run");
+  const now = Date.now();
+  const oneWeek = 7 * 24 * 60 * 60 * 1000;
+  if (!lastRun || now - lastRun > oneWeek) {
+    await fetchAllTMDbContent();
+    localStorage.setItem("tmdb_last_run", now);
+  } else {
+    const daysLeft = Math.ceil((oneWeek - (now - lastRun)) / (24 * 60 * 60 * 1000));
+    console.log(`TMDb auto-fetch next run in ~${daysLeft} days`);
+  }
+}
+autoRunWeeklyTMDbFetch();
+setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000);
+
+// -------------------- Helper: getMovieLink --------------------
+function getMovieLink(movie) {
+  return movie.fileUrl || wootlyCurrentLink || "";
+}
+
+// -------------------- expose some functions globally used in markup --------------------
+window.openEpisodes = window.openEpisodes;
+window.toggleMovieSelection = window.toggleMovieSelection;
+window.toggleSelectAll = window.toggleSelectAll;
+window.deleteSelectedMovies = window.deleteSelectedMovies;
+window.deleteMovie = window.deleteMovie;
+window.editMovie = window.editMovie;
+window.editEpisode = window.editEpisode;
+window.deleteEpisode = window.deleteEpisode;
+</script>
+
+</body>
+</html>
