@@ -141,11 +141,17 @@ tr:hover { background:#181818; }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { 
+  getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, 
+  onSnapshot, query, where, orderBy 
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-// -------------------- Firebase Config --------------------
+
+// =======================================================
+// 🔥 FIREBASE CONFIG
+// =======================================================
 const firebaseConfig = {
- apiKey: "AIzaSyCEmj-LpFSWb9Y4uVSmA7fejHomXgaoY-w",
+  apiKey: "AIzaSyCEmj-LpFSWb9Y4uVSmA7fejHomXgaoY-w",
   authDomain: "gamer-cba09.firebaseapp.com",
   projectId: "gamer-cba09",
   storageBucket: "gamer-cba09.firebasestorage.app",
@@ -153,44 +159,69 @@ const firebaseConfig = {
   appId: "1:1068487836276:web:e92922a8ecb297b58cc721",
   measurementId: "G-JGR62E27JR"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// -------------------- MOVIE MANAGEMENT --------------------
+
+
+// =======================================================
+// 🔥 COLLECTION REFERENCES
+// =======================================================
 const moviesRef = collection(db, "movies");
-const movieForm = document.getElementById("movieForm");
-const movieTable = document.getElementById("movieTable");
-const searchInput = document.getElementById("searchInput");
+const usersRef  = collection(db, "users");
+
+
+// =======================================================
+// 🔧 ELEMENTS
+// =======================================================
+const movieForm        = document.getElementById("movieForm");
+const movieTable       = document.getElementById("movieTable");
+const searchInput      = document.getElementById("searchInput");
 const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
 const selectAllCheckbox = document.getElementById("selectAll");
-const episodesModal = document.getElementById("episodesModal");
+const episodesModal     = document.getElementById("episodesModal");
 const episodesModalTitle = document.getElementById("episodesModalTitle");
 const episodesListContainer = document.getElementById("episodesListContainer");
-const episodeForm = document.getElementById("episodeForm");
+const episodeForm       = document.getElementById("episodeForm");
 const clearEpisodeFormBtn = document.getElementById("clearEpisodeForm");
+const usersTable          = document.getElementById("usersTable");
+const registerForm        = document.getElementById("registerForm");
 
+
+// =======================================================
+// 🔧 GLOBAL STATES
+// =======================================================
 let allMovies = [];
 let selectedMovies = new Set();
 let currentSeriesId = null;
 let episodesUnsubscribe = null;
-
-// -------------------- USERS MANAGEMENT --------------------
-const usersRef = collection(db, "users");
-const usersTable = document.getElementById("usersTable");
-const registerForm = document.getElementById("registerForm");
 let allUsers = [];
 
-// -------------------- UTIL --------------------
-function escapeHtml(str){ if(!str) return ""; return str.replace(/[&<>"']/g, s=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[s]); }
-function escapeJs(str){ if(!str) return ""; return str.replace(/'/g, "\\'").replace(/"/g,'\\"'); }
 
-// -------------------- MOVIES --------------------
+
+// =======================================================
+// 🛡 UTILS
+// =======================================================
+function escapeHtml(str){
+  if(!str) return "";
+  return str.replace(/[&<>"']/g, s=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[s]);
+}
+function escapeJs(str){ 
+  if(!str) return ""; 
+  return str.replace(/'/g, "\\'").replace(/"/g,'\\"'); 
+}
+
+
+
+// =======================================================
+// 🎬 MOVIE TABLE RENDERING
+// =======================================================
 function renderMovies(list) {
   movieTable.innerHTML = "";
   list.forEach(m => {
     const checked = selectedMovies.has(m.id) ? "checked" : "";
     const ratingDisplay = m.rating ? `${m.rating} (${(m.rating*10).toFixed(0)}%)` : "-";
+
     const row = document.createElement("tr");
     row.innerHTML = `
       <td><input type="checkbox" ${checked} onchange="toggleMovieSelection('${m.id}')"></td>
@@ -206,6 +237,7 @@ function renderMovies(list) {
       </td>`;
     movieTable.appendChild(row);
   });
+
   updateDeleteButtonState();
 }
 
@@ -223,13 +255,17 @@ window.toggleSelectAll = checkbox => {
 
 function updateDeleteButtonState() {
   deleteSelectedBtn.disabled = selectedMovies.size === 0;
-  deleteSelectedBtn.textContent = selectedMovies.size ? `🗑 Delete Selected (${selectedMovies.size})` : "🗑 Delete Selected";
+  deleteSelectedBtn.textContent = selectedMovies.size 
+    ? `🗑 Delete Selected (${selectedMovies.size})` 
+    : "🗑 Delete Selected";
 }
 
 window.deleteSelectedMovies = async () => {
   if (selectedMovies.size === 0) return alert("No movies selected.");
   if (!confirm(`Delete ${selectedMovies.size} selected movie(s)?`)) return;
+
   for (const id of selectedMovies) await deleteDoc(doc(db, "movies", id));
+
   selectedMovies.clear();
   updateDeleteButtonState();
   alert("✅ Selected movies deleted successfully!");
@@ -252,9 +288,14 @@ searchInput.addEventListener("input", e => {
   renderMovies(filtered);
 });
 
-// -------------------- MOVIE FORM --------------------
+
+
+// =======================================================
+// ✏ MOVIE FORM
+// =======================================================
 movieForm.addEventListener("submit", async e => {
   e.preventDefault();
+
   const movieData = {
     title: title.value.trim(),
     year: year.value.trim(),
@@ -267,7 +308,9 @@ movieForm.addEventListener("submit", async e => {
     rating: parseFloat(rating.value) || null,
     createdAt: Date.now()
   };
+
   const id = movieId.value;
+
   if (id) {
     await updateDoc(doc(db, "movies", id), movieData);
     alert("✅ Movie updated!");
@@ -275,6 +318,7 @@ movieForm.addEventListener("submit", async e => {
     await addDoc(moviesRef, movieData);
     alert("✅ Movie added!");
   }
+
   movieForm.reset();
   movieId.value = "";
 });
@@ -284,11 +328,13 @@ document.getElementById("clearForm").addEventListener("click", () => {
   movieId.value = "";
 });
 
+// Load movie into form
 window.editMovie = async id => {
   const docs = await getDocs(moviesRef);
   const movieDoc = docs.docs.find(d => d.id === id);
   if (!movieDoc) return alert("Movie not found!");
   const m = movieDoc.data();
+
   movieId.value = id;
   title.value = m.title || "";
   year.value = m.year || "";
@@ -299,57 +345,81 @@ window.editMovie = async id => {
   fileUrl.value = m.fileUrl || "";
   description.value = m.description || "";
   rating.value = m.rating || "";
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
-// -------------------- EPISODES --------------------
+
+
+// =======================================================
+// 📺 EPISODES (SERIES)
+// =======================================================
 window.openEpisodes = (seriesId, title) => {
   if (!seriesId) return alert("Missing series id");
+
   currentSeriesId = seriesId;
   episodesModalTitle.innerText = `Episodes — ${title}`;
   document.getElementById("episodeSeriesId").value = seriesId;
+
   episodesListContainer.innerHTML = "<p>Loading episodes...</p>";
+
   if (typeof episodesUnsubscribe === "function") episodesUnsubscribe();
+
   const episodesColl = collection(db, "movies", seriesId, "episodes");
   const q = query(episodesColl, orderBy("epNumber", "asc"));
+
   episodesUnsubscribe = onSnapshot(q, snapshot => {
     const episodes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     renderEpisodes(episodes);
   });
+
   episodesModal.style.display = "flex";
 };
 
 function renderEpisodes(episodes) {
   episodesListContainer.innerHTML = "";
-  if (!episodes.length) return episodesListContainer.innerHTML = "<p>No episodes yet.</p>";
+  if (!episodes.length) {
+    episodesListContainer.innerHTML = "<p>No episodes yet.</p>";
+    return;
+  }
+
   episodes.forEach(ep => {
     const div = document.createElement("div");
     div.className = "episode-row";
     div.style.marginBottom = "10px";
+
     div.innerHTML = `
       <div style="width:90%; display:flex; gap:10px; align-items:center;">
         <img src="${ep.poster || ''}" onerror="this.style.display='none'">
         <div style="flex:1;">
           <strong>EP ${ep.epNumber || ''} — ${escapeHtml(ep.title || '')}</strong>
-          <div style="font-size:0.9rem;color:var(--muted)">${escapeHtml(ep.runtime || '')} • ${escapeHtml(ep.description || '')}</div>
+          <div style="font-size:0.9rem;color:var(--muted)">
+            ${escapeHtml(ep.runtime || '')} • ${escapeHtml(ep.description || '')}
+          </div>
           <div style="margin-top:6px;">
-            <a href="${ep.fileUrl || '#'}" target="_blank" style="color:var(--accent); text-decoration:underline;">Open file</a>
+            <a href="${ep.fileUrl || '#'}" target="_blank" style="color:var(--accent); text-decoration:underline;">
+              Open file
+            </a>
           </div>
         </div>
       </div>
+
       <div style="width:10%;display:flex;flex-direction:column;gap:6px;">
         <button class="small-btn" onclick='editEpisode("${currentSeriesId}","${ep.id}")'>Edit</button>
         <button class="small-btn" style="background:#e63946;color:white;" onclick='deleteEpisode("${currentSeriesId}","${ep.id}")'>Delete</button>
       </div>
     `;
+
     episodesListContainer.appendChild(div);
   });
 }
 
 episodeForm.addEventListener("submit", async e => {
   e.preventDefault();
+
   const seriesId = document.getElementById("episodeSeriesId").value;
-  const epId = document.getElementById("episodeId").value;
+  const epId     = document.getElementById("episodeId").value;
+
   const epData = {
     epNumber: parseInt(document.getElementById("epNumber").value) || null,
     title: document.getElementById("epTitle").value.trim(),
@@ -359,9 +429,12 @@ episodeForm.addEventListener("submit", async e => {
     runtime: document.getElementById("epRuntime").value.trim(),
     updatedAt: Date.now()
   };
+
   const episodesCollRef = collection(db, "movies", seriesId, "episodes");
+
   if (epId) await updateDoc(doc(episodesCollRef, epId), epData);
   else await addDoc(episodesCollRef, epData);
+
   episodeForm.reset();
   document.getElementById("episodeId").value = "";
 });
@@ -375,6 +448,7 @@ window.editEpisode = async (seriesId, epId) => {
   const epDoc = await getDocs(collection(db, "movies", seriesId, "episodes"));
   const epData = epDoc.docs.find(d=>d.id===epId)?.data();
   if (!epData) return alert("Episode not found!");
+
   document.getElementById("episodeId").value = epId;
   document.getElementById("episodeSeriesId").value = seriesId;
   document.getElementById("epNumber").value = epData.epNumber || "";
@@ -395,27 +469,44 @@ window.closeModal = modalId => {
   if (typeof episodesUnsubscribe === "function") episodesUnsubscribe();
 };
 
-// -------------------- USERS --------------------
+
+
+// =======================================================
+// 👤 USERS
+// =======================================================
 registerForm.addEventListener("submit", async e => {
   e.preventDefault();
+
   const email = regEmail.value.trim();
   const username = regUsername.value.trim();
   const password = regPassword.value.trim();
-  if (!email || !username || password.length < 6) return alert('Fill valid info and password min 6 chars');
+
+  if (!email || !username || password.length < 6)
+    return alert('Fill valid info and password min 6 chars');
+
   try {
-    await addDoc(usersRef, { email, username, password, createdAt: Date.now(), status: "Paid" });
+    await addDoc(usersRef, { 
+      email, username, password, createdAt: Date.now(), status: "Paid" 
+    });
     alert("✅ User registered!");
     registerForm.reset();
-  } catch(err) { console.error(err); alert("Failed to register user."); }
+  } catch(err) { 
+    console.error(err); 
+    alert("Failed to register user."); 
+  }
 });
 
 function renderUsers(list) {
   usersTable.innerHTML = "";
+
   list.forEach(u => {
     const regDate = new Date(u.createdAt).toLocaleDateString();
     const oneMonth = 30*24*60*60*1000;
     let status = u.status || "Paid";
-    if (Date.now()-u.createdAt>oneMonth && status!=="Paid") status="Unpaid";
+
+    if (Date.now() - u.createdAt > oneMonth && status !== "Paid") 
+      status = "Unpaid";
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${u.email}</td>
@@ -440,6 +531,7 @@ onSnapshot(query(usersRef, orderBy("createdAt","desc")), snapshot => {
 window.resetPassword = async id => {
   const newPw = prompt("Enter new password (min 6 chars):");
   if (!newPw || newPw.length<6) return alert("Password too short");
+
   await updateDoc(doc(db,"users",id), { password:newPw });
   alert("✅ Password reset");
 };
@@ -455,10 +547,19 @@ window.toggleStatus = async (id,currentStatus) => {
   await updateDoc(doc(db,"users",id), { status:newStatus });
   alert(`✅ Status changed to ${newStatus}`);
 };
-// -------------------- TMDb fetch and weekly auto-run kept from your script --------------------
+
+
+
+
+// =======================================================================
+// ⭐⭐ TMDb FETCH SYSTEM (FULLY INTEGRATED) ⭐⭐
+// =======================================================================
+
 const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
+
 async function fetchAllTMDbContent() {
   const PAGES = 7;
+
   const endpoints = [
     { type: "Movie", label: "Now Playing", baseUrl: "https://api.themoviedb.org/3/movie/now_playing" },
     { type: "Movie", label: "Popular", baseUrl: "https://api.themoviedb.org/3/movie/popular" },
@@ -469,42 +570,57 @@ async function fetchAllTMDbContent() {
 
   try {
     const now = new Date();
+
+    // Get Genre Lists
     const [movieGenresRes, tvGenresRes] = await Promise.all([
       fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${TMDB_API_KEY}&language=en-US`),
       fetch(`https://api.themoviedb.org/3/genre/tv/list?api_key=${TMDB_API_KEY}&language=en-US`)
     ]);
+
     const movieGenres = (await movieGenresRes.json()).genres || [];
-    const tvGenres = (await tvGenresRes.json()).genres || [];
+    const tvGenres    = (await tvGenresRes.json()).genres || [];
+
     const genreMap = {};
     [...movieGenres, ...tvGenres].forEach(g => (genreMap[g.id] = g.name));
 
+    // LOOP ENDPOINTS
     for (const endpoint of endpoints) {
       console.log(`🔄 Fetching ${endpoint.label} ${endpoint.type}s...`);
+
       for (let page = 1; page <= PAGES; page++) {
         const url = endpoint.baseUrl.includes("?")
           ? `${endpoint.baseUrl}&api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
           : `${endpoint.baseUrl}?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`;
+
         const res = await fetch(url);
         const data = await res.json();
+
         const results = Array.isArray(data.results) ? data.results : [data];
 
         for (const item of results) {
           if (!item || (!item.title && !item.name)) continue;
+
           const title = item.title || item.name;
+
           const releaseDateStr = item.release_date || item.first_air_date;
           if (!releaseDateStr) continue;
+
           const releaseDate = new Date(releaseDateStr);
           if (isNaN(releaseDate)) continue;
           if (releaseDate > now) continue;
+
           const year = releaseDate.getFullYear();
           const month = releaseDate.getMonth() + 1;
           const day = releaseDate.getDate();
+
           if (!item.poster_path) continue;
           const poster = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
+
           const rating = item.vote_average || null;
           const description = item.overview || "";
           const genreNames = (item.genre_ids || []).map(id => genreMap[id]).filter(Boolean);
 
+          // Check if movie exists
           const q = query(moviesRef, where("title", "==", title));
           const existingSnap = await getDocs(q);
 
@@ -513,54 +629,55 @@ async function fetchAllTMDbContent() {
               await updateDoc(doc(db, "movies", docSnap.id), {
                 year, releaseDate: releaseDateStr, month, day,
                 type: endpoint.type, description, rating, poster,
-                genres: genreNames, category: endpoint.label, updatedAt: Date.now()
+                genres: genreNames, category: endpoint.label,
+                updatedAt: Date.now()
               });
             }
           } else {
             await addDoc(moviesRef, {
               title, year, month, day, releaseDate: releaseDateStr,
-              type: endpoint.type, genres: genreNames, poster, trailer: "", fileUrl: "",
-              description, rating, source: "tmdb", category: endpoint.label, createdAt: Date.now()
+              type: endpoint.type, genres: genreNames, poster,
+              trailer: "", fileUrl: "",
+              description, rating, source: "tmdb",
+              category: endpoint.label,
+              createdAt: Date.now()
             });
           }
         }
       }
+
       console.log(`✅ Completed ${endpoint.label} ${endpoint.type}s!`);
     }
+
     console.log("🎉 TMDB fetch completed.");
+
   } catch (e) {
     console.error("TMDb fetch error:", e);
   }
 }
 
+
 async function autoRunWeeklyTMDbFetch() {
   const lastRun = localStorage.getItem("tmdb_last_run");
-  const now = Date.now();
+  const now     = Date.now();
   const oneWeek = 7 * 24 * 60 * 60 * 1000;
+
   if (!lastRun || now - lastRun > oneWeek) {
     await fetchAllTMDbContent();
     localStorage.setItem("tmdb_last_run", now);
   } else {
-    const daysLeft = Math.ceil((oneWeek - (now - lastRun)) / (24 * 60 * 60 * 1000));
+    const daysLeft = Math.ceil((oneWeek - (now - lastRun)) / (24*60*60*1000));
     console.log(`TMDb auto-fetch next run in ~${daysLeft} days`);
   }
 }
-autoRunWeeklyTMDbFetch();
-setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000);
-// -------------------- Helper: getMovieLink --------------------
-function getMovieLink(movie) {
-  return movie.fileUrl || wootlyCurrentLink || "";
-}
 
-// -------------------- expose some functions globally used in markup --------------------
-window.openEpisodes = window.openEpisodes;
-window.toggleMovieSelection = window.toggleMovieSelection;
-window.toggleSelectAll = window.toggleSelectAll;
-window.deleteSelectedMovies = window.deleteSelectedMovies;
-window.deleteMovie = window.deleteMovie;
-window.editMovie = window.editMovie;
-window.editEpisode = window.editEpisode;
-window.deleteEpisode = window.deleteEpisode;
+autoRunWeeklyTMDbFetch();
+setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000); // Every 12 hours
+
+
+
+
 </script>
+
 </body>
 </html>
