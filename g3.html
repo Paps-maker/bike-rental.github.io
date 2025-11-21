@@ -1171,11 +1171,10 @@ document.getElementById('gameForm').onsubmit = async (e)=>{
   bootstrap.Modal.getInstance(document.getElementById('gameModal')).hide();
 };
 
-  // Tournaments
  document.addEventListener('DOMContentLoaded', ()=>{
 
   // Add Tournament button
-  document.getElementById('btnAddTournament').onclick = ()=>{
+  document.getElementById('btnAddTournament').onclick = ()=> {
     $('#tournamentModalTitle').textContent = "Add Tournament";
     $('#tournamentId').value = "";
     $('#tournamentName').value = "";
@@ -1186,6 +1185,21 @@ document.getElementById('gameForm').onsubmit = async (e)=>{
   };
 
   renderTournamentsAdmin();
+
+  // Check URL for external registration
+  const urlParams = new URLSearchParams(window.location.search);
+  const tidFromLink = urlParams.get('tid');
+  if(tidFromLink){
+    // Pre-fill tournament ID in registration modal
+    $('#regTournamentId').value = tidFromLink;
+    $('#regPlayerName').value = '';
+    $('#regPlayerContact').value = '';
+    $('#regPlayerPaid').checked = false;
+    $('#registerPlayerModal .modal-title').textContent = 'Register Player / Team';
+    $('#registerPlayerForm button[type="submit"]').textContent = 'Register';
+    new bootstrap.Modal(document.getElementById('registerPlayerModal')).show();
+  }
+
 });
 
 // Render tournaments list
@@ -1200,11 +1214,12 @@ function renderTournamentsAdmin(){
         <div class="small-muted">${t.game || '-'} • ${t.date || '-'}</div>
         <div class="small-muted">Fee: KSh ${t.fee || 0}</div>
       </div>
-      <div>
+      <div class="d-flex flex-column gap-1">
         <button class="btn btn-sm btn-success register-player-btn" data-id="${t.id}">Register</button>
         <button class="btn btn-sm btn-primary edit-tournament-btn" data-id="${t.id}">Edit</button>
         <button class="btn btn-sm btn-danger delete-tournament-btn" data-id="${t.id}">Delete</button>
         <button class="btn btn-sm btn-info view-players-btn" data-id="${t.id}">View Players</button>
+        <button class="btn btn-sm btn-secondary generate-link-btn" data-id="${t.id}">Copy Registration Link</button>
       </div>`;
     wrap.appendChild(div);
   });
@@ -1213,7 +1228,8 @@ function renderTournamentsAdmin(){
 
 // Attach buttons
 function attachTournamentButtons(){
-  // Register player
+
+  // Register player (admin)
   document.querySelectorAll('.register-player-btn').forEach(btn=>{
     btn.onclick = ()=>{
       $('#regTournamentId').value = btn.dataset.id;
@@ -1247,87 +1263,86 @@ function attachTournamentButtons(){
   });
 
   // View players
-  
-  // View players
-document.querySelectorAll('.view-players-btn').forEach(btn => {
-  btn.onclick = () => {
-    const t = state.tournaments[btn.dataset.id];
-    $('#viewPlayersTitle').textContent = `Players: ${t.name}`;
-    const tbody = $('#playersTable tbody');
-    tbody.innerHTML = '';
+  document.querySelectorAll('.view-players-btn').forEach(btn => {
+    btn.onclick = () => {
+      const t = state.tournaments[btn.dataset.id];
+      $('#viewPlayersTitle').textContent = `Players: ${t.name}`;
+      const tbody = $('#playersTable tbody'); tbody.innerHTML = '';
+      (t.participants||[]).forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${p.contact || '-'}</td>
+          <td>${p.paid ? '✅' : '❌'}</td>
+          <td>
+            <button class="btn btn-sm btn-warning edit-player-btn" data-tid="${t.id}" data-pid="${p.id}">Edit</button>
+            <button class="btn btn-sm btn-danger delete-player-btn" data-tid="${t.id}" data-pid="${p.id}">Delete</button>
+            <button class="btn btn-sm btn-primary print-receipt-btn" data-tid="${t.id}" data-pid="${p.id}">Print Receipt</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
 
-    (t.participants || []).forEach(p => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${p.name}</td>
-        <td>${p.contact || '-'}</td>
-        <td>${p.paid ? '✅' : '❌'}</td>
-        <td>
-          <button class="btn btn-sm btn-warning edit-player-btn" data-tid="${t.id}" data-pid="${p.id}">Edit</button>
-          <button class="btn btn-sm btn-danger delete-player-btn" data-tid="${t.id}" data-pid="${p.id}">Delete</button>
-          <button class="btn btn-sm btn-primary print-receipt-btn" data-tid="${t.id}" data-pid="${p.id}">Print Receipt</button>
-        </td>`;
-      tbody.appendChild(tr);
-    });
+      tbody.onclick = async (e)=>{
+        const btn = e.target.closest('button'); if(!btn) return;
+        const tid = btn.dataset.tid;
+        const pid = btn.dataset.pid;
+        const tournament = state.tournaments[tid]; if(!tournament) return;
 
-    new bootstrap.Modal(document.getElementById('viewPlayersModal')).show();
+        if(btn.classList.contains('edit-player-btn')){
+          const player = tournament.participants.find(p=>p.id===pid);
+          if(!player) return alert('Player not found');
 
-    // Event delegation for edit, delete, and print
-    tbody.onclick = async (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
+          $('#regTournamentId').value = tid;
+          $('#regPlayerName').value = player.name;
+          $('#regPlayerContact').value = player.contact || '';
+          $('#regPlayerPaid').checked = !!player.paid;
+          $('#registerPlayerModal .modal-title').textContent = 'Edit Player';
+          $('#registerPlayerForm button[type="submit"]').textContent = 'Save';
+          new bootstrap.Modal($('#registerPlayerModal')).show();
 
-      const tid = btn.dataset.tid;
-      const pid = btn.dataset.pid;
-      const tournament = state.tournaments[tid];
-      if (!tournament) return;
+          const modalEl = document.getElementById('registerPlayerModal');
+          const form = $('#registerPlayerForm');
+          form.onsubmit = async ev=>{
+            ev.preventDefault();
+            player.name = $('#regPlayerName').value.trim();
+            player.contact = $('#regPlayerContact').value.trim();
+            player.paid = $('#regPlayerPaid').checked;
+            await db.collection('tournaments').doc(tid).update({ participants: tournament.participants });
 
-      if (btn.classList.contains('edit-player-btn')) {
-        const player = tournament.participants.find(p => p.id === pid);
-        if (!player) return alert('Player not found');
+            const tr = btn.closest('tr');
+            tr.querySelector('td:nth-child(1)').textContent = player.name;
+            tr.querySelector('td:nth-child(2)').textContent = player.contact || '-';
+            tr.querySelector('td:nth-child(3)').textContent = player.paid ? '✅' : '❌';
+            bootstrap.Modal.getInstance(modalEl).hide();
+          };
+        }
 
-        // Open modal for editing
-        $('#regTournamentId').value = tid;
-        $('#regPlayerName').value = player.name;
-        $('#regPlayerContact').value = player.contact || '';
-        $('#regPlayerPaid').checked = !!player.paid;
-        $('#registerPlayerModal .modal-title').textContent = 'Edit Player';
-        $('#registerPlayerForm button[type="submit"]').textContent = 'Save';
-        new bootstrap.Modal($('#registerPlayerModal')).show();
-
-        const modalEl = document.getElementById('registerPlayerModal');
-        const form = $('#registerPlayerForm');
-        form.onsubmit = async (ev) => {
-          ev.preventDefault();
-          player.name = $('#regPlayerName').value.trim();
-          player.contact = $('#regPlayerContact').value.trim();
-          player.paid = $('#regPlayerPaid').checked;
+        if(btn.classList.contains('delete-player-btn')){
+          if(!confirm('Are you sure you want to delete this player?')) return;
+          tournament.participants = tournament.participants.filter(p=>p.id!==pid);
           await db.collection('tournaments').doc(tid).update({ participants: tournament.participants });
+          btn.closest('tr').remove();
+        }
 
-          // Update table row
-          const tr = btn.closest('tr');
-          tr.querySelector('td:nth-child(1)').textContent = player.name;
-          tr.querySelector('td:nth-child(2)').textContent = player.contact || '-';
-          tr.querySelector('td:nth-child(3)').textContent = player.paid ? '✅' : '❌';
-
-          // Close modal
-          bootstrap.Modal.getInstance(modalEl).hide();
-        };
-      }
-
-      if (btn.classList.contains('delete-player-btn')) {
-        if (!confirm('Are you sure you want to delete this player?')) return;
-        tournament.participants = tournament.participants.filter(p => p.id !== pid);
-        await db.collection('tournaments').doc(tid).update({ participants: tournament.participants });
-        btn.closest('tr').remove();
-      }
-
-      if (btn.classList.contains('print-receipt-btn')) {
-        printReceipt(tid, pid); // your existing print function
-      }
+        if(btn.classList.contains('print-receipt-btn')){
+          printReceipt(tid, pid);
+        }
+      };
     };
-  };
-});
+  });
+
+  // Generate shareable registration link
+  document.querySelectorAll('.generate-link-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const tid = btn.dataset.id;
+      const link = `${window.location.origin}?tid=${tid}`;
+      // Add a message so apps auto-link it
+      const message = `Click to register for the tournament: ${link}`;
+      navigator.clipboard.writeText(message);
+      alert('Registration link copied to clipboard:\n' + message);
+    };
+  });
 
 }
 
@@ -1341,8 +1356,20 @@ document.getElementById('tournamentForm').onsubmit = async e=>{
     date: $('#tournamentDate').value,
     fee: Number($('#tournamentFee').value)
   };
-  if(id) await db.collection('tournaments').doc(id).update(data);
-  else await db.collection('tournaments').add(data);
+
+  let docRef;
+  if(id){
+    docRef = db.collection('tournaments').doc(id);
+    await docRef.update(data);
+  } else {
+    docRef = await db.collection('tournaments').add(data);
+  }
+
+  // Show registration link
+  const link = `${window.location.origin}?tid=${docRef.id}`;
+  const message = `Click to register for the tournament: ${link}`;
+  alert(`Tournament saved!\nShareable registration link:\n${message}`);
+
   bootstrap.Modal.getInstance(document.getElementById('tournamentModal')).hide();
   renderTournamentsAdmin();
 };
@@ -1358,34 +1385,19 @@ document.getElementById('registerPlayerForm').onsubmit = async e => {
   
   const tournamentRef = db.collection('tournaments').doc(tid);
   const tournamentSnap = await tournamentRef.get();
-  
-  if (!tournamentSnap.exists) {
-    alert('Tournament not found!');
-    return;
-  }
+  if(!tournamentSnap.exists){ alert('Tournament not found!'); return; }
 
   const tournament = tournamentSnap.data();
   const participants = tournament.participants || [];
 
-  // Check if phone number already exists
-  if (participants.some(p => p.contact === contact)) {
+  if(participants.some(p=>p.contact===contact)){
     alert('A player with this phone number is already registered!');
     return;
   }
 
-  // Create new participant
-  const participant = {
-    id: uid(),
-    name,
-    contact,
-    paid,
-    timestamp: Date.now()
-  };
+  const participant = { id: uid(), name, contact, paid, timestamp: Date.now() };
 
-  // Add participant
-  await tournamentRef.update({
-    participants: firebase.firestore.FieldValue.arrayUnion(participant)
-  });
+  await tournamentRef.update({ participants: firebase.firestore.FieldValue.arrayUnion(participant) });
 
   bootstrap.Modal.getInstance(document.getElementById('registerPlayerModal')).hide();
   alert('Player / Team registered successfully!');
@@ -1419,7 +1431,7 @@ document.addEventListener('click', e=>{
 });
 
 // Download all players PDF
-document.getElementById('exportPlayersPdf').onclick = () => {
+document.getElementById('exportPlayersPdf').onclick = ()=>{
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
@@ -1429,17 +1441,12 @@ document.getElementById('exportPlayersPdf').onclick = () => {
 
   const rows = [];
   const tbody = document.querySelectorAll('#playersTable tbody tr');
-  tbody.forEach(tr => {
-    const cols = Array.from(tr.querySelectorAll('td')).slice(0,3).map(td => td.textContent);
+  tbody.forEach(tr=>{
+    const cols = Array.from(tr.querySelectorAll('td')).slice(0,3).map(td=>td.textContent);
     rows.push(cols);
   });
 
-  doc.autoTable({
-    head: [['Name', 'Contact', 'Paid']],
-    body: rows,
-    startY: 30,
-  });
-
+  doc.autoTable({ head: [['Name', 'Contact', 'Paid']], body: rows, startY: 30 });
   doc.save(`${title.replace(/\s+/g,'_')}_players.pdf`);
 };
 
