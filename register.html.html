@@ -54,75 +54,152 @@
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+<script>
+// Helper for selecting elements
+const $ = el => document.querySelector(el);
 
-    // ---------- Firebase Config ----------
-    const firebaseConfig = {
-      apiKey: "<YOUR_API_KEY>",
-      authDomain: "<YOUR_AUTH_DOMAIN>",
-      projectId: "<YOUR_PROJECT_ID>",
-      storageBucket: "<YOUR_STORAGE_BUCKET>",
-      messagingSenderId: "<YOUR_MESSAGING_SENDER_ID>",
-      appId: "<YOUR_APP_ID>"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+// Initialize Bootstrap modal
+const registerModal = new bootstrap.Modal($('#registerPlayerModal'));
 
-    function uid() {
-      return '_' + Math.random().toString(36).substr(2, 9);
-    }
+// Auto-open registration modal if 'tid' is in URL
+document.addEventListener('DOMContentLoaded', async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const tidFromLink = urlParams.get('tid');
 
-    const registerModal = new bootstrap.Modal(document.getElementById('registerPlayerModal'));
-    const urlParams = new URLSearchParams(window.location.search);
-    const tidFromLink = urlParams.get('tid');
+  if (tidFromLink) {
+    openRegisterModal(tidFromLink);
+  }
 
-    // Auto-open modal if link has tid
-    if (tidFromLink) {
-      $('#regTournamentId').value = tidFromLink;
-      $('#regPlayerName').value = '';
-      $('#regPlayerContact').value = '';
-      $('#regPlayerPaid').checked = false;
-      registerModal.show();
-    }
+  // Optionally render tournaments list if you want users to pick one
+  renderTournamentsList();
+});
 
-    // Open modal manually if button clicked
-    document.getElementById('openRegisterBtn').onclick = () => {
-      $('#regTournamentId').value = tidFromLink || '';
-      registerModal.show();
-    };
+// Function to open the register modal for a given tournament
+function openRegisterModal(tid) {
+  $('#regTournamentId').value = tid;
+  $('#regPlayerName').value = '';
+  $('#regPlayerContact').value = '';
+  $('#regPlayerPaid').checked = false;
 
-    // Register player form submission
-    document.getElementById('registerPlayerForm').onsubmit = async e => {
-      e.preventDefault();
-      const tid = $('#regTournamentId').value;
-      const name = $('#regPlayerName').value.trim();
-      const contact = $('#regPlayerContact').value.trim();
-      const paid = $('#regPlayerPaid').checked;
+  // Ensure inputs are editable
+  $('#regPlayerName').removeAttribute('disabled');
+  $('#regPlayerContact').removeAttribute('disabled');
 
-      if(!tid) return alert('Tournament ID missing!');
+  // Update modal title and button text
+  $('#registerPlayerModal .modal-title').textContent = 'Register Player / Team';
+  $('#registerPlayerForm button[type="submit"]').textContent = 'Register';
 
-      const tournamentRef = doc(db, 'tournaments', tid);
-      const tournamentSnap = await getDoc(tournamentRef);
-      if (!tournamentSnap.exists()) return alert('Tournament not found!');
+  // Show modal and focus first input
+  registerModal.show();
+  $('#regPlayerName').focus();
+}
 
-      const tournament = tournamentSnap.data();
-      const participants = tournament.participants || [];
+// Render tournaments list for users to choose from
+async function renderTournamentsList() {
+  const wrap = $('#tournamentsList'); // div where tournaments are shown
+  if(!wrap) return;
+  wrap.innerHTML = '';
 
-      if (participants.some(p => p.contact === contact)) {
-        return alert('A player with this contact is already registered!');
-      }
+  const tournamentsSnap = await db.collection('tournaments').orderBy('date').get();
+  tournamentsSnap.forEach(doc => {
+    const t = { id: doc.id, ...doc.data() };
+    const div = document.createElement('div');
+    div.className = 'station-card d-flex justify-content-between align-items-center mb-2 p-2';
+    div.innerHTML = `
+      <div>
+        <strong>${t.name}</strong>
+        <div class="small-muted">${t.game || '-'} • ${t.date || '-'}</div>
+        <div class="small-muted">Fee: KSh ${t.fee || 0}</div>
+      </div>
+      <div class="d-flex flex-column gap-1">
+        <button class="btn btn-sm btn-success register-player-btn" data-id="${t.id}">Register</button>
+      </div>`;
+    wrap.appendChild(div);
+  });
 
-      const participant = { id: uid(), name, contact, paid, timestamp: Date.now() };
-      await updateDoc(tournamentRef, { participants: arrayUnion(participant) });
+  // Attach click for register buttons
+  document.querySelectorAll('.register-player-btn').forEach(btn => {
+    btn.onclick = () => openRegisterModal(btn.dataset.id);
+  });
+}
 
-      alert('Player / Team registered successfully!');
-      registerModal.hide();
-    };
+// Register player form submit
+document.getElementById('registerPlayerForm').onsubmit = async e => {
+  e.preventDefault();
 
-    // Simple jQuery-like selector
-    function $(id) { return document.getElementById(id); }
-  </script>
+  const tid = $('#regTournamentId').value;
+  const name = $('#regPlayerName').value.trim();
+  const contact = $('#regPlayerContact').value.trim();
+  const paid = $('#regPlayerPaid').checked;
+
+  if (!name) return alert('Please enter your name!');
+  if (!contact) return alert('Please enter your email or phone!');
+
+  const tournamentRef = db.collection('tournaments').doc(tid);
+  const tournamentSnap = await tournamentRef.get();
+  if (!tournamentSnap.exists) return alert('Tournament not found!');
+
+  const tournament = tournamentSnap.data();
+  const participants = tournament.participants || [];
+
+  if (participants.some(p => p.contact === contact)) {
+    return alert('You are already registered!');
+  }
+
+  const participant = { id: uid(), name, contact, paid, timestamp: Date.now() };
+  await tournamentRef.update({ participants: firebase.firestore.FieldValue.arrayUnion(participant) });
+
+  registerModal.hide();
+  alert('Player / Team registered successfully!');
+  renderTournamentsList(); // optional: refresh list
+};
+
+// Print receipt (unchanged)
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('print-receipt-btn')) {
+    const tid = e.target.dataset.tid;
+    const pid = e.target.dataset.pid;
+    const t = state.tournaments[tid];
+    const p = (t.participants || []).find(x => x.id === pid);
+    if (!p) return alert('Player not found');
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Tournament Receipt', 14, 20);
+    doc.setFontSize(12);
+    doc.text(`Tournament: ${t.name}`, 14, 40);
+    doc.text(`Player/Team: ${p.name}`, 14, 50);
+    doc.text(`Contact: ${p.contact || '-'}`, 14, 60);
+    doc.text(`Entry Fee: KSh ${t.fee || 0}`, 14, 70);
+    const startTime = new Date(p.timestamp).toLocaleString();
+    const stopTime = new Date().toLocaleString();
+    doc.text(`Start Time: ${startTime}`, 14, 80);
+    doc.text(`Receipt Time: ${stopTime}`, 14, 90);
+    doc.save(`${p.name}_${t.name}_receipt.pdf`);
+  }
+});
+
+// Export all players PDF (unchanged)
+document.getElementById('exportPlayersPdf')?.onclick = () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const title = document.getElementById('viewPlayersTitle')?.textContent || 'Players';
+  doc.setFontSize(16);
+  doc.text(title, 14, 20);
+
+  const rows = [];
+  const tbody = document.querySelectorAll('#playersTable tbody tr');
+  tbody.forEach(tr => {
+    const cols = Array.from(tr.querySelectorAll('td')).slice(0, 3).map(td => td.textContent);
+    rows.push(cols);
+  });
+
+  doc.autoTable({ head: [['Name', 'Contact', 'Paid']], body: rows, startY: 30 });
+  doc.save(`${title.replace(/\s+/g,'_')}_players.pdf`);
+};
+</script>
+
 </body>
 </html>
