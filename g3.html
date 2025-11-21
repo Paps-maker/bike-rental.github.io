@@ -1244,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   }
 
   function attachTournamentButtons(){
-    // ---------------- REGISTER PLAYER (ADMIN) ----------------
+    // ---------------- REGISTER PLAYER ----------------
     document.querySelectorAll('.register-player-btn').forEach(btn=>{
       btn.onclick = ()=> openRegisterModal(btn.dataset.id);
     });
@@ -1267,7 +1267,14 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     document.querySelectorAll('.delete-tournament-btn').forEach(btn=>{
       btn.onclick = async ()=>{
         if(!confirm('Delete this tournament?')) return;
-        await db.collection('tournaments').doc(btn.dataset.id).delete();
+        try {
+          await db.collection('tournaments').doc(btn.dataset.id).delete();
+          alert('Tournament deleted successfully!');
+          renderTournamentsAdmin();
+        } catch(err){
+          console.error(err);
+          alert('Failed to delete tournament!');
+        }
       };
     });
 
@@ -1349,7 +1356,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         const link = `${window.location.origin}${window.location.pathname}?tid=${tid}`;
         navigator.clipboard.writeText(link);
 
-        // Show modal with clickable link
         let modalEl = document.getElementById('registrationLinkModal');
         if(!modalEl){
           modalEl = document.createElement('div');
@@ -1380,7 +1386,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     });
   }
 
-  // ===================== ADD / EDIT TOURNAMENT FORM =====================
+  // ===================== TOURNAMENT FORM SUBMISSION =====================
   document.getElementById('tournamentForm').onsubmit = async e=>{
     e.preventDefault();
     const id = $('#tournamentId').value;
@@ -1400,7 +1406,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       docRef = { id: docRef.id };
     }
 
-    // Show shareable registration link
     const link = `${window.location.origin}${window.location.pathname}?tid=${docRef.id}`;
     let modalEl = document.getElementById('registrationLinkModal');
     if(!modalEl){
@@ -1434,7 +1439,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // ===================== REGISTER PLAYER FORM =====================
   document.getElementById('registerPlayerForm').onsubmit = async e=>{
     e.preventDefault();
-    
     const tid = $('#regTournamentId').value;
     const name = $('#regPlayerName').value.trim();
     const contact = $('#regPlayerContact').value.trim();
@@ -1487,28 +1491,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       doc.save(`${p.name}_${t.name}_receipt.pdf`);
     }
   });
-
-  // ===================== EXPORT ALL PLAYERS PDF =====================
-  const exportBtn = document.getElementById('exportPlayersPdf');
-  if(exportBtn){
-    exportBtn.onclick = ()=>{
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const title = document.getElementById('viewPlayersTitle').textContent || 'Players';
-      doc.setFontSize(16);
-      doc.text(title, 14, 20);
-
-      const rows = [];
-      const tbody = document.querySelectorAll('#playersTable tbody tr');
-      tbody.forEach(tr=>{
-        const cols = Array.from(tr.querySelectorAll('td')).slice(0,3).map(td=>td.textContent);
-        rows.push(cols);
-      });
-
-      doc.autoTable({ head: [['Name', 'Contact', 'Paid']], body: rows, startY: 30 });
-      doc.save(`${title.replace(/\s+/g,'_')}_players.pdf`);
-    };
-  }
 
 });
   // Offers & birthdays & memberships rendering
