@@ -1171,7 +1171,7 @@ document.getElementById('gameForm').onsubmit = async (e)=>{
   bootstrap.Modal.getInstance(document.getElementById('gameModal')).hide();
 };
 
- document.addEventListener('DOMContentLoaded', ()=>{
+document.addEventListener('DOMContentLoaded', ()=>{
 
   // Add Tournament button
   document.getElementById('btnAddTournament').onclick = ()=> {
@@ -1186,11 +1186,10 @@ document.getElementById('gameForm').onsubmit = async (e)=>{
 
   renderTournamentsAdmin();
 
-  // Check URL for external registration
+  // Auto-open registration modal if 'tid' is in URL
   const urlParams = new URLSearchParams(window.location.search);
   const tidFromLink = urlParams.get('tid');
   if(tidFromLink){
-    // Pre-fill tournament ID in registration modal
     $('#regTournamentId').value = tidFromLink;
     $('#regPlayerName').value = '';
     $('#regPlayerContact').value = '';
@@ -1199,7 +1198,6 @@ document.getElementById('gameForm').onsubmit = async (e)=>{
     $('#registerPlayerForm button[type="submit"]').textContent = 'Register';
     new bootstrap.Modal(document.getElementById('registerPlayerModal')).show();
   }
-
 });
 
 // Render tournaments list
@@ -1332,18 +1330,42 @@ function attachTournamentButtons(){
     };
   });
 
-  // Generate shareable registration link
+  // Generate shareable registration link (clickable)
   document.querySelectorAll('.generate-link-btn').forEach(btn=>{
     btn.onclick = ()=>{
       const tid = btn.dataset.id;
-      const link = `${window.location.origin}?tid=${tid}`;
-      // Add a message so apps auto-link it
-      const message = `Click to register for the tournament: ${link}`;
-      navigator.clipboard.writeText(message);
-      alert('Registration link copied to clipboard:\n' + message);
+      const link = `${window.location.origin}${window.location.pathname}?tid=${tid}`;
+      navigator.clipboard.writeText(link);
+
+      // Show modal with clickable link
+      let modalEl = document.getElementById('registrationLinkModal');
+      if(!modalEl){
+        modalEl = document.createElement('div');
+        modalEl.id = 'registrationLinkModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        modalEl.innerHTML = `
+          <div class="modal-dialog">
+            <div class="modal-content p-3">
+              <h5 class="modal-title mb-3">Shareable Registration Link</h5>
+              <p>Click the link below or copy it:</p>
+              <a href="${link}" target="_blank" id="clickableRegLink">${link}</a>
+              <div class="mt-3 text-end">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>`;
+        document.body.appendChild(modalEl);
+      } else {
+        const linkAnchor = modalEl.querySelector('#clickableRegLink');
+        linkAnchor.href = link;
+        linkAnchor.textContent = link;
+      }
+
+      new bootstrap.Modal(modalEl).show();
+      alert('Registration link copied to clipboard!');
     };
   });
-
 }
 
 // Add/Edit Tournament form
@@ -1363,12 +1385,38 @@ document.getElementById('tournamentForm').onsubmit = async e=>{
     await docRef.update(data);
   } else {
     docRef = await db.collection('tournaments').add(data);
+    docRef = { id: docRef.id }; // for link generation
   }
 
-  // Show registration link
-  const link = `${window.location.origin}?tid=${docRef.id}`;
-  const message = `Click to register for the tournament: ${link}`;
-  alert(`Tournament saved!\nShareable registration link:\n${message}`);
+  // Generate clickable link immediately after saving
+  const link = `${window.location.origin}${window.location.pathname}?tid=${docRef.id}`;
+  
+  // Show modal with clickable link
+  let modalEl = document.getElementById('registrationLinkModal');
+  if(!modalEl){
+    modalEl = document.createElement('div');
+    modalEl.id = 'registrationLinkModal';
+    modalEl.className = 'modal fade';
+    modalEl.tabIndex = -1;
+    modalEl.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-content p-3">
+          <h5 class="modal-title mb-3">Shareable Registration Link</h5>
+          <p>Click the link below or copy it:</p>
+          <a href="${link}" target="_blank" id="clickableRegLink">${link}</a>
+          <div class="mt-3 text-end">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modalEl);
+  } else {
+    const linkAnchor = modalEl.querySelector('#clickableRegLink');
+    linkAnchor.href = link;
+    linkAnchor.textContent = link;
+  }
+
+  new bootstrap.Modal(modalEl).show();
 
   bootstrap.Modal.getInstance(document.getElementById('tournamentModal')).hide();
   renderTournamentsAdmin();
@@ -1449,8 +1497,7 @@ document.getElementById('exportPlayersPdf').onclick = ()=>{
   doc.autoTable({ head: [['Name', 'Contact', 'Paid']], body: rows, startY: 30 });
   doc.save(`${title.replace(/\s+/g,'_')}_players.pdf`);
 };
-
-
+ 
   // Offers & birthdays & memberships rendering
   document.addEventListener('DOMContentLoaded', () => {
 
