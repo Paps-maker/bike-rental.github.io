@@ -56,7 +56,9 @@ th { background:#27ae60; color:white; }
   <h1>🚲 Bicycle Rental - Admin Dashboard</h1>
   <button class="logout-btn" onclick="logout()">Logout</button>
   <p>Welcome, <span id="adminEmail"></span> 🎉</p>
-
+<button onclick="downloadExcel()" style="margin:10px; padding:6px 12px; background:#2b7cff; color:white; border:none; border-radius:5px; cursor:pointer;">
+  Download All Data (Excel)
+</button>
   <!-- Walk-in Customer -->
   <div id="addWalkinForm">
     <input type="text" id="walkinName" placeholder="Customer Name">
@@ -125,7 +127,7 @@ th { background:#27ae60; color:white; }
     <ul id="logList"></ul>
   </div>
 </div>
-
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <!-- Firebase Setup & Dashboard Logic -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
@@ -341,6 +343,42 @@ function renderCharts(){
     options:{ responsive:true, plugins:{legend:{display:true}} }
   });
 }
+  // ----- Download Excel -----
+window.downloadExcel = function () {
+  if (!reservations || reservations.length === 0) {
+    alert("No reservation data available!");
+    return;
+  }
+
+  // Convert to clean Excel-friendly format
+  const exportData = reservations.map(r => ({
+    Bike: r.bike,
+    Customer: r.customerName || "-",
+    Phone: r.phone || "-",
+    Start: new Date(r.start).toLocaleString(),
+    End: new Date(r.end).toLocaleString(),
+    Picked: r.picked ? "Yes" : "No",
+    Returned: r.returned ? "Yes" : "No",
+    Cancelled: r.cancelled ? "Yes" : "No",
+    Deposited_Items: (r.depositedItems || []).join(", "),
+    Estimated_Cost: r.estimatedCost || "-",
+    Final_Cost: r.finalCost || "-",
+    Ride_Duration_Minutes: r.returnedTime
+      ? Math.floor((new Date(r.returnedTime) - new Date(r.start)) / 60000)
+      : ""
+  }));
+
+  // Create worksheet
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Reservations");
+
+  // Export file
+  XLSX.writeFile(workbook, "Bike_Reservations.xlsx");
+};
+
 </script>
 </body>
 </html>
