@@ -463,7 +463,7 @@ fetchWootlyLink();
 // -------------------- TMDb fetch and weekly auto-run kept from your script --------------------
 const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
 async function fetchAllTMDbContent() {
-  const PAGES = 7;
+  const PAGES = 2;
   const endpoints = [
     { type: "Movie", label: "Now Playing", baseUrl: "https://api.themoviedb.org/3/movie/now_playing" },
     { type: "Movie", label: "Popular", baseUrl: "https://api.themoviedb.org/3/movie/popular" },
@@ -570,4 +570,5 @@ window.deleteEpisode = window.deleteEpisode;
 </script>
 
 </body>
+
 </html>
