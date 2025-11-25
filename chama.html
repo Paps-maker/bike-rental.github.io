@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChamaHub Admin</title>
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+/* ---------- Theme A: Modern glass dashboard (dark + neon accents) ---------- */
+:root{
+  --bg:#031021;
+  --panel:#071826;
+  --muted:#8da8b8;
+  --accent:#00ffd5;
+  --glass: rgba(255,255,255,0.03);
+  --card-shadow: 0 12px 40px rgba(2,10,25,0.6);
+  --radius:14px;
+}
+
+html, body { height:100%; }
+
+body{
+  margin:0;
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg,#000814 0%, #02182b 60%);
+  color: #e6f2fb;
+  display:flex;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  width:260px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  padding:22px;
+  box-shadow: var(--card-shadow);
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  border-radius: 0 20px 20px 0;
+  transition: left 0.3s ease;
+}
+
+.brand{ font-weight:700; color:#fff; font-size:1.25rem; letter-spacing:0.2px; }
+.nav-item{
+  color:var(--muted);
+  padding:10px 12px;
+  border-radius:10px;
+  display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:600;
+}
+.nav-item:hover{ background:var(--glass); color:#fff; }
+.nav-item.active{
+  background:linear-gradient(90deg, rgba(0,255,213,0.06), rgba(0,170,200,0.03));
+  color:var(--accent);
+}
+
+/* ---------- Hamburger toggle ---------- */
+#menuToggle{
+  display:none;
+  position:fixed;
+  top:16px;
+  left:16px;
+  z-index:1500;
+  font-size:1.8rem;
+  color:var(--accent);
+  cursor:pointer;
+}
+
+/* ---------- Main content ---------- */
+main{
+  flex:1;
+  padding:26px;
+  overflow:auto;
+  transition: margin-left 0.3s ease;
+}
+
+.card-panel{
+  background: rgba(10,25,40,0.95); /* more opaque for better readability */
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow: 0 12px 50px rgba(0,255,213,0.3); /* subtle neon glow */
+  margin-bottom:18px;
+  color: #e6f2fb;
+}
+
+.kpi{ font-weight:700; font-size:1.45rem; color:#fff; }
+.muted{ color:var(--muted); }
+.btn-ghost{
+  background:transparent;
+  border:1px solid rgba(255,255,255,0.05);
+  color:var(--muted);
+}
+
+/* ---------- Table ---------- */
+table thead th{
+  color:var(--muted);
+  font-weight:700;
+  font-size:0.9rem;
+}
+table tbody tr:hover{
+  background: rgba(0,255,213,0.08);
+  color:#fff;
+}
+.small-muted{ font-size:0.85rem; color:var(--muted); }
+
+/* ---------- Inputs ---------- */
+.input-ghost{
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(0,255,213,0.5);
+  color: #e6f2fb;
+}
+.input-ghost::placeholder{
+  color: var(--muted);
+}
+
+/* ---------- Modal adjustments ---------- */
+.modal-content.card-panel{
+  background: rgba(10,25,40,0.95);
+  color: #e6f2fb;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 12px 50px rgba(0,255,213,0.3);
+}
+.modal-content.card-panel .form-control,
+.modal-content.card-panel .form-select{
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(0,255,213,0.5);
+  color: #e6f2fb;
+}
+.modal-content.card-panel .form-control::placeholder,
+.modal-content.card-panel .form-select option{
+  color: var(--muted);
+}
+.modal-content.card-panel .btn-primary{
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #00121a;
+}
+.modal-content.card-panel .btn-secondary{
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e6f2fb;
+}
+.modal-content.card-panel .text-success{ color: #00ffae; }
+.modal-content.card-panel .text-danger{ color: #ff4d4d; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px){
+  #menuToggle{ display:block; }
+  .sidebar{
+    position:fixed;
+    left:-280px; /* hide offscreen */
+    top:0;
+    height:100%;
+    z-index:1400;
+  }
+  .sidebar.show{ left:0; }
+  main.shift{ margin-left:260px; }
+  main{ padding:12px; }
+}
+</style>
+
+<!-- Hamburger -->
+<div id="menuToggle">&#9776;</div>
+
+<script>
+// Mobile sidebar toggle
+document.addEventListener('DOMContentLoaded', () => {
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('main');
+
+  menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('show');
+    mainContent.classList.toggle('shift');
+  });
+
+  // Close sidebar when clicking outside
+  mainContent.addEventListener('click', () => {
+    if(sidebar.classList.contains('show')){
+      sidebar.classList.remove('show');
+      mainContent.classList.remove('shift');
+    }
+  });
+});
+</script>
+
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">ChamaHub • Admin</div>
+
+    <div id="navOverview" class="nav-item active" onclick="showSection('overview')"><i class="bi bi-speedometer2"></i>Overview</div>
+    <div id="navMembers" class="nav-item" onclick="showSection('members')"><i class="bi bi-people"></i>Members</div>
+    <div id="navContrib" class="nav-item" onclick="showSection('contributions')"><i class="bi bi-wallet2"></i>Contributions</div>
+    <div id="navRotation" class="nav-item" onclick="showSection('rotation')"><i class="bi bi-arrow-repeat"></i>Rotation</div>
+    <div id="navLoans" class="nav-item" onclick="showSection('loans')"><i class="bi bi-file-earmark-text"></i>Loans</div>
+    <div id="navPayouts" class="nav-item" onclick="showSection('payouts')"><i class="bi bi-cash"></i>Payouts</div>
+
+    <div style="flex:1"></div>
+
+    <div id="navSettings" class="nav-item" onclick="showSection('settings')"><i class="bi bi-gear"></i>Settings</div>
+    <div style="height:6px"></div>
+    <div class="nav-item" onclick="signOut()"><i class="bi-box-arrow-right bi"></i>Sign out</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- ADMIN AUTH MODAL -->
+    <div class="modal fade" id="adminAuthModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="bg-transparent border-0 modal-content">
+          <div class="text-light card-panel" style="max-width:480px;margin:auto">
+            <h5>Admin Sign in</h5>
+            <div class="mt-3">
+              <input id="adminEmail" class="mb-2 form-control input-ghost" placeholder="Admin email">
+              <input id="adminPassword" type="password" class="mb-2 form-control input-ghost" placeholder="Password">
+              <div id="adminAuthMsg" class="mt-1 text-danger small"></div>
+              <button id="adminSignInBtn" class="mt-2 w-100 btn btn-primary">Sign in</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section id="overview" class="card-panel">
+      <div class="d-flex align-items-start justify-content-between mb-3">
+        <div>
+          <h4 class="mb-1">Overview</h4>
+          <div class="small-muted">Admin dashboard • everything in sync with members</div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <input id="globalSearch" class="form-control form-control-sm input-ghost" placeholder="Search members or contributions" style="width:340px">
+          <button id="btnRunRotation" class="btn btn-success"><i class="bi-arrow-right-circle me-1 bi"></i>Run rotation</button>
+          <button id="btnProcessPayouts" class="btn btn-ghost"><i class="me-1 bi bi-check2-circle"></i>Process due payouts</button>
+        </div>
+      </div>
+
+      <div class="d-flex gap-3 mb-3">
+        <div style="flex:1" class="p-3 card-panel">
+          <div class="muted">Total members</div>
+          <div id="totalMembers" class="kpi">0</div>
+        </div>
+        <div style="flex:1" class="p-3 card-panel">
+          <div class="muted">Total confirmed contributions</div>
+          <div id="totalConfirmed" class="kpi">KSh 0</div>
+        </div>
+        <div style="flex:1" class="p-3 card-panel">
+          <div class="muted">Next scheduled payout</div>
+          <div id="nextPayout" class="kpi muted">None</div>
+        </div>
+      </div>
+
+      <div class="card-panel">
+        <h6 class="mb-2">Recent transactions</h6>
+        <div class="table-responsive">
+          <table class="table table-borderless text-light">
+            <thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+            <tbody id="recentTx"><tr><td colspan="5" class="text-center muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEMBERS -->
+    <section id="members" class="card-panel" style="display:none">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h4 class="mb-0">Members</h4>
+          <div class="small-muted">Add, edit, activate or remove members</div>
+        </div>
+        <div class="d-flex gap-2">
+          <input id="membersSearch" class="form-control form-control-sm input-ghost" placeholder="Search name or email" style="width:300px">
+          <button id="openAddMember" class="btn btn-primary"><i class="me-1 bi bi-plus-lg"></i>Add member</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover table-striped text-light align-middle">
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Share</th><th>Rotation Pos</th><th>Active</th><th>Actions</th></tr></thead>
+          <tbody id="membersTable"><tr><td colspan="7" class="text-center muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CONTRIBUTIONS -->
+    <section id="contributions" class="card-panel" style="display:none">
+      <div class="d-flex justify-content-between mb-3">
+        <div>
+          <h4 class="mb-0">Contributions</h4>
+          <div class="small-muted">Confirm or reject pending contributions</div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover text-light">
+          <thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Method</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="contribTable"><tr><td colspan="6" class="text-center muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ROTATION -->
+    <section id="rotation" class="card-panel" style="display:none">
+      <h4>Rotation manager</h4>
+      <div class="mb-2 small-muted">Sequential rotation (Option A). Members rotate by <code>rotationPosition</code>.</div>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-striped text-light">
+          <thead><tr><th>Position</th><th>Name</th><th>Next payout</th></tr></thead>
+          <tbody id="rotationTable"><tr><td colspan="3" class="text-center muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- LOANS -->
+    <section id="loans" class="card-panel" style="display:none">
+      <h4>Loan requests</h4>
+      <div class="table-responsive mt-3">
+        <table class="table table-hover text-light">
+          <thead><tr><th>Date</th><th>Member</th><th>Amount</th><th>Months</th><th>Interest</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="loansTable"><tr><td colspan="7" class="text-center muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAYOUTS -->
+    <section id="payouts" class="card-panel" style="display:none">
+      <h4>Scheduled payouts</h4>
+      <div class="table-responsive mt-3">
+        <table class="table table-hover text-light">
+          <thead><tr><th>Scheduled</th><th>Member</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="payoutsTable"><tr><td colspan="5" class="text-center muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settings" class="card-panel" style="display:none">
+      <h4>Settings</h4>
+      <div class="mt-2 row g-3">
+        <div class="col-auto">
+          <label class="small-muted">Rotation frequency</label>
+          <select id="rotationFrequency" class="form-select-sm form-select" style="width:160px">
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        <div class="align-self-end col-auto">
+          <button id="saveSettingsBtn" class="btn btn-primary">Save settings</button>
+          <span id="saveSettingsMsg" class="ms-2 small-muted"></span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ADD / EDIT MEMBER MODAL -->
+  <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background:linear-gradient(180deg,#041826,#00121a);color:#e6f2fb;border-radius:12px">
+        <div class="border-0 modal-header">
+          <h5 id="memberModalTitle">Add Member</h5>
+        </div>
+        <div class="modal-body">
+          <input id="m_name" class="mb-2 form-control input-ghost" placeholder="Full name">
+          <input id="m_email" class="mb-2 form-control input-ghost" placeholder="Email">
+          <input id="m_phone" class="mb-2 form-control input-ghost" placeholder="Phone (used as member password)">
+          <input id="m_password" class="mb-2 form-control input-ghost" placeholder="Password (optional; if blank uses phone)">
+          <input id="m_share" type="number" class="mb-2 form-control input-ghost" placeholder="Share">
+          <input id="m_rotation" type="number" class="mb-2 form-control input-ghost" placeholder="Rotation position (leave blank to append)">
+          <div id="memberModalMsg" class="mb-2 text-danger small"></div>
+          <div class="d-flex gap-2">
+            <button id="saveMemberBtn" class="w-100 btn btn-success">Save</button>
+            <button class="w-100 btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM MODAL -->
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background:linear-gradient(180deg,#041826,#00121a);color:#e6f2fb;border-radius:12px">
+        <div class="border-0 modal-header">
+          <h5 id="confirmTitle">Confirm</h5>
+        </div>
+        <div class="modal-body">
+          <p id="confirmText" class="small-muted"></p>
+          <div class="d-flex gap-2">
+            <button id="confirmYes" class="w-100 btn btn-success">Yes</button>
+            <button class="w-100 btn btn-secondary" data-bs-dismiss="modal">No</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  // ---------- CONFIG ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0avd1EPsYGw9paeuECB8dd781ZPQBAMI",
+    authDomain: "transc-eec4c.firebaseapp.com",
+    projectId: "transc-eec4c",
+    storageBucket: "transc-eec4c.firebasestorage.app",
+    messagingSenderId: "3676403115",
+    appId: "1:3676403115:web:07a7d387e40282aa614eee"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // ---------- UI elements ----------
+  const adminAuthModal = new bootstrap.Modal(document.getElementById('adminAuthModal'), {backdrop:'static'});
+  const memberModal = new bootstrap.Modal(document.getElementById('memberModal'));
+  const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+  const $ = s => document.querySelector(s);
+
+  // state
+  let editingMemberId = null;
+  let confirmCallback = null;
+  let settingsCache = {};
+
+  // helper: show a section
+  function showSection(id){
+    document.querySelectorAll('main section').forEach(s => s.style.display = 'none');
+    document.getElementById(id).style.display = 'block';
+    document.querySelectorAll('.sidebar .nav-item').forEach(n=>n.classList.remove('active'));
+    const navId = 'nav' + id.charAt(0).toUpperCase() + id.slice(1);
+    const el = document.getElementById(navId);
+    if(el) el.classList.add('active');
+  }
+
+  function showConfirm(title, text, cb){
+    $('#confirmTitle').textContent = title;
+    $('#confirmText').textContent = text;
+    confirmCallback = cb;
+    confirmModal.show();
+  }
+  $('#confirmYes').addEventListener('click', ()=>{ if(confirmCallback) confirmCallback(); confirmModal.hide(); });
+
+  // ---------- Admin auth ----------
+  $('#adminSignInBtn').addEventListener('click', async ()=>{
+    const email = $('#adminEmail').value.trim();
+    const pw = $('#adminPassword').value;
+    try{
+      await auth.signInWithEmailAndPassword(email, pw);
+      $('#adminAuthMsg').textContent = '';
+    }catch(e){
+      $('#adminAuthMsg').textContent = e.message;
+    }
+  });
+
+  auth.onAuthStateChanged(user=>{
+    if(user){
+      adminAuthModal.hide();
+      showSection('overview');
+      startRealtimeListeners();
+    } else {
+      adminAuthModal.show();
+      // hide all sections while not signed in
+      document.querySelectorAll('main section').forEach(s=>s.style.display='none');
+    }
+  });
+
+  function signOut(){ auth.signOut(); }
+
+  // ---------- Realtime listeners / load ----------
+  function startRealtimeListeners(){
+    // members (ordered by rotationPosition ascending)
+    db.collection('members').orderBy('rotationPosition','asc').onSnapshot(snapshot=>{
+      const tbody = $('#membersTable'); tbody.innerHTML = '';
+      snapshot.forEach(doc=>{
+        const d = doc.data();
+        const rotation = d.rotationPosition || '-';
+        tbody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td>${d.name||''}</td>
+            <td>${d.email||''}</td>
+            <td>${d.phone||''}</td>
+            <td>${d.share||0}</td>
+            <td>${rotation}</td>
+            <td>${d.active?'<span class="bg-success badge">Yes</span>':'<span class="bg-secondary badge">No</span>'}</td>
+            <td>
+              <button class="me-1 btn-outline-light btn btn-sm" onclick="openEditMember('${doc.id}')"><i class="bi bi-pencil"></i></button>
+              <button class="btn-outline-danger btn btn-sm" onclick="confirmDeleteMember('${doc.id}')"><i class="bi bi-trash"></i></button>
+            </td>
+          </tr>
+        `);
+      });
+      $('#totalMembers').textContent = snapshot.size;
+    });
+
+   // contributions
+db.collection('contributions').orderBy('date','desc').onSnapshot(snapshot=>{
+  const tbody = $('#contribTable'); 
+  tbody.innerHTML = '';
+  let totalConfirmed = 0;
+  let recentHtml = '';
+  let i = 0;
+
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+    if(d.status === 'confirmed') totalConfirmed += Number(d.amount||0);
+    if(i < 20){
+      recentHtml += `<tr>
+        <td>${d.date ? new Date(d.date.seconds*1000).toLocaleString() : ''}</td>
+        <td>${d.memberName || ''}</td>
+        <td>${d.amount || 0}</td>
+        <td>${d.method || ''}</td>
+        <td>${d.status || ''}</td>
+      </tr>`;
+    }
+
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr data-id="${doc.id}">
+        <td>${d.date ? new Date(d.date.seconds*1000).toLocaleDateString() : ''}</td>
+        <td>${d.memberName || ''}</td>
+        <td>${d.amount || 0}</td>
+        <td>${d.method || ''}</td>
+        <td>${d.status || ''}</td>
+        <td>
+          ${d.status === 'pending' ? `<button class="btn btn-sm btn-success confirm-btn">Confirm</button>` : ''}
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      </tr>
+    `);
+    i++;
+  });
+
+  $('#totalConfirmed').textContent = `KSh ${totalConfirmed}`;
+  $('#recentTx').innerHTML = recentHtml || '<tr><td colspan="5" class="text-center muted">No transactions</td></tr>';
+});
+
+// Event delegation for dynamically added buttons
+document.addEventListener('click', function(e){
+  const target = e.target;
+
+  if(target.classList.contains('delete-btn')){
+    const id = target.closest('tr').dataset.id;
+    if(confirm('Are you sure you want to delete this contribution?')){
+      db.collection('contributions').doc(id).delete()
+        .then(() => showToast('Deleted', 'Contribution deleted successfully'))
+        .catch(err => showToast('Error', 'Failed to delete contribution: '+err.message));
+    }
+  }
+
+  if(target.classList.contains('confirm-btn')){
+    const id = target.closest('tr').dataset.id;
+    confirmContribution(id); // call your existing confirm function
+  }
+});
+
+   // loans
+db.collection('loans').orderBy('date','desc').onSnapshot(snapshot=>{
+  const tbody = $('#loansTable'); 
+  tbody.innerHTML = '';
+  
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr data-id="${doc.id}">
+        <td>${d.date ? new Date(d.date.seconds*1000).toLocaleDateString() : ''}</td>
+        <td>${d.memberName || ''}</td>
+        <td>${d.amount || 0}</td>
+        <td>${d.months || 0}</td>
+        <td>${d.interest || 0}%</td>
+        <td>${d.status || 'pending'}</td>
+        <td>
+          ${d.status==='pending' ? `<button class="btn btn-sm btn-success" onclick="approveLoan('${doc.id}')">Approve</button>` : ''}
+          <button class="btn btn-sm btn-danger delete-loan-btn">Delete</button>
+        </td>
+      </tr>
+    `);
+  });
+});
+
+// Event delegation for delete buttons in loans table
+document.addEventListener('click', function(e){
+  if(e.target.classList.contains('delete-loan-btn')){
+    const id = e.target.closest('tr').dataset.id;
+    if(confirm('Are you sure you want to delete this loan?')){
+      db.collection('loans').doc(id).delete()
+        .then(() => showToast('Deleted', 'Loan removed successfully'))
+        .catch(err => showToast('Error', 'Failed to delete loan: ' + err.message));
+    }
+  }
+});
+
+    // payouts
+db.collection('payouts').orderBy('scheduledAt','desc').onSnapshot(snapshot=>{
+  const tbody = $('#payoutsTable'); 
+  tbody.innerHTML = '';
+  
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr data-id="${doc.id}">
+        <td>${d.scheduledAt ? new Date(d.scheduledAt.seconds*1000).toLocaleDateString() : ''}</td>
+        <td>${d.memberName || ''}</td>
+        <td>${d.amount || 0}</td>
+        <td>${d.status || ''}</td>
+        <td>
+          ${d.status==='scheduled' ? `<button class="btn btn-sm btn-success" onclick="markPayoutPaid('${doc.id}')">Mark paid</button>` : ''}
+          <button class="btn btn-sm btn-danger delete-payout-btn">Delete</button>
+        </td>
+      </tr>
+    `);
+  });
+
+  // next payout display
+  db.collection('payouts').where('status','==','scheduled').orderBy('scheduledAt','asc').limit(1).get()
+    .then(q=>{
+      $('#nextPayout').textContent = q.empty ? 'None' : new Date(q.docs[0].data().scheduledAt.seconds*1000).toLocaleDateString();
+    });
+});
+
+// Event delegation for delete buttons in payouts table
+document.addEventListener('click', function(e){
+  if(e.target.classList.contains('delete-payout-btn')){
+    const id = e.target.closest('tr').dataset.id;
+    if(confirm('Are you sure you want to delete this payout?')){
+      db.collection('payouts').doc(id).delete()
+        .then(() => showToast('Deleted', 'Payout removed successfully'))
+        .catch(err => showToast('Error', 'Failed to delete payout: ' + err.message));
+    }
+  }
+});
+
+
+    // settings (one doc)
+    db.collection('settings').doc('meta').onSnapshot(doc=>{
+      settingsCache = doc.exists ? doc.data() : {};
+      $('#rotationFrequency').value = settingsCache.rotationFrequency || 'monthly';
+    });
+
+    // rotation table rendering
+    renderRotationTable();
+  }
+
+  async function renderRotationTable(){
+    const snap = await db.collection('members').orderBy('rotationPosition','asc').get();
+    const tbody = $('#rotationTable'); tbody.innerHTML = '';
+    snap.forEach(doc=>{
+      const d = doc.data();
+      tbody.insertAdjacentHTML('beforeend', `<tr><td>${d.rotationPosition||'-'}</td><td>${d.name||''}</td><td>${d.nextPayout?new Date(d.nextPayout.seconds*1000).toLocaleDateString():'-'}</td></tr>`);
+    });
+  }
+
+  // ---------- Members CRUD ----------
+  $('#openAddMember').addEventListener('click', ()=>{
+    editingMemberId = null;
+    $('#memberModalTitle').textContent = 'Add member';
+    $('#m_name').value = ''; $('#m_email').value = ''; $('#m_phone').value = ''; $('#m_password').value = ''; $('#m_share').value = ''; $('#m_rotation').value = '';
+    $('#memberModalMsg').textContent = '';
+    memberModal.show();
+  });
+
+  window.openEditMember = async function(id){
+    editingMemberId = id;
+    const doc = await db.collection('members').doc(id).get();
+    const d = doc.data();
+    $('#memberModalTitle').textContent = 'Edit member';
+    $('#m_name').value = d.name||''; $('#m_email').value = d.email||''; $('#m_phone').value = d.phone||''; $('#m_password').value = d.password||''; $('#m_share').value = d.share||0; $('#m_rotation').value = d.rotationPosition || '';
+    $('#memberModalMsg').textContent = '';
+    memberModal.show();
+  };
+
+  $('#saveMemberBtn').addEventListener('click', async ()=>{
+    const name = $('#m_name').value.trim();
+    const email = $('#m_email').value.trim();
+    const phone = $('#m_phone').value.trim();
+    const password = $('#m_password').value.trim() || phone;
+    const share = Number($('#m_share').value || 0);
+    let rotationPos = $('#m_rotation').value ? Number($('#m_rotation').value) : null;
+
+    if(!name || !email || !phone){ $('#memberModalMsg').textContent = 'Fill name, email and phone'; return; }
+
+    try{
+      if(editingMemberId){
+        await db.collection('members').doc(editingMemberId).update({
+          name, email, phone, password, share,
+          rotationPosition: rotationPos !== null ? rotationPos : firebase.firestore.FieldValue.delete()
+        });
+      } else {
+        // determine append position if not provided
+        if(rotationPos === null){
+          const q = await db.collection('members').orderBy('rotationPosition','desc').limit(1).get();
+          rotationPos = q.empty ? 1 : (q.docs[0].data().rotationPosition || 0) + 1;
+        }
+        await db.collection('members').add({
+          name, email, phone, password, share,
+          rotationPosition: rotationPos,
+          active: true,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      memberModal.hide();
+    }catch(e){
+      $('#memberModalMsg').textContent = e.message;
+    }
+  });
+
+  window.confirmDeleteMember = function(id){
+    showConfirm('Delete member','Delete this member permanently? This cannot be undone.', async ()=>{
+      await db.collection('members').doc(id).delete();
+    });
+  };
+
+  // ---------- Contributions ----------
+  window.confirmContribution = function(id){
+    showConfirm('Confirm contribution','Mark this contribution as confirmed?', async ()=>{
+      await db.collection('contributions').doc(id).update({ status: 'confirmed', confirmedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+  };
+
+  // ---------- Loans ----------
+  window.approveLoan = function(id){
+    showConfirm('Approve loan','Approve this loan request?', async ()=>{
+      await db.collection('loans').doc(id).update({ status: 'approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+  };
+
+  // ---------- Payouts ----------
+  window.markPayoutPaid = function(id){
+    showConfirm('Mark paid','Mark this payout as paid?', async ()=>{
+      await db.collection('payouts').doc(id).update({ status: 'paid', paidAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+  };
+
+  // ---------- Rotation (Option A: sequential) ----------
+  async function runRotation(){
+    // Load settings doc
+    const settingsRef = db.collection('settings').doc('meta');
+    const settingsSnap = await settingsRef.get();
+    const settings = settingsSnap.exists ? settingsSnap.data() : { currentRotationIndex: 0, rotationFrequency: 'monthly' };
+
+    // Load members ordered by rotationPosition
+    const membersSnap = await db.collection('members').orderBy('rotationPosition','asc').get();
+    if(membersSnap.empty){ alert('No members to rotate'); return; }
+    const members = membersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    let idx = settings.currentRotationIndex || 0;
+    if(idx >= members.length) idx = 0;
+    const recipient = members[idx];
+
+    // Compute payout amount (sum of confirmed contributions since last rotation marker).
+    // For simplicity, we sum all confirmed contributions.
+    const contribSnap = await db.collection('contributions').where('status','==','confirmed').get();
+    let totalConfirmed = 0;
+    contribSnap.forEach(c => totalConfirmed += Number(c.data().amount || 0));
+    const amount = totalConfirmed;
+
+    // Create payout scheduled now
+    const scheduledAt = firebase.firestore.Timestamp.now();
+    const payoutDoc = {
+      memberId: recipient.id,
+      memberName: recipient.name,
+      amount: amount,
+      status: 'scheduled',
+      scheduledAt: scheduledAt,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('payouts').add(payoutDoc);
+    // update member nextPayout
+    await db.collection('members').doc(recipient.id).update({ nextPayout: scheduledAt });
+
+    // advance pointer
+    const nextIndex = (idx + 1) % members.length;
+    await settingsRef.set({ currentRotationIndex: nextIndex, rotationFrequency: settings.rotationFrequency || 'monthly' }, { merge: true });
+
+    alert(`Rotation scheduled for ${recipient.name} — KSh ${amount}. Next index: ${nextIndex}`);
+  }
+
+  async function processDuePayouts(){
+    const now = firebase.firestore.Timestamp.now();
+    const q = await db.collection('payouts').where('status','==','scheduled').where('scheduledAt','<=', now).get();
+    if(q.empty){ alert('No due payouts'); return; }
+    const batch = db.batch();
+    q.forEach(doc => {
+      batch.update(db.collection('payouts').doc(doc.id), { status: 'paid', paidAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    await batch.commit();
+    alert(`Processed ${q.size} payout(s).`);
+  }
+
+  // bind rotation buttons
+  $('#btnRunRotation').addEventListener('click', ()=> showConfirm('Run rotation', 'Run rotation now?', runRotation));
+  $('#btnProcessPayouts').addEventListener('click', ()=> showConfirm('Process payouts', 'Process due payouts now?', processDuePayouts));
+
+  // ---------- Settings save ----------
+  $('#saveSettingsBtn').addEventListener('click', async ()=>{
+    const freq = $('#rotationFrequency').value;
+    await db.collection('settings').doc('meta').set({ rotationFrequency: freq }, { merge: true });
+    $('#saveSettingsMsg').textContent = 'Saved';
+    setTimeout(()=> $('#saveSettingsMsg').textContent = '', 2200);
+  });
+
+  // ---------- Search helpers ----------
+  $('#membersSearch').addEventListener('input', e=>{
+    const term = e.target.value.toLowerCase();
+    document.querySelectorAll('#membersTable tr').forEach(tr=>{
+      tr.style.display = tr.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+  });
+  $('#globalSearch').addEventListener('input', e=>{
+    const term = e.target.value.toLowerCase();
+    document.querySelectorAll('#recentTx tr, #membersTable tr').forEach(tr=>{
+      tr.style.display = tr.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+  });
+
+  // Render rotation table periodically when data changes
+  setInterval(()=>{ renderRotationTable(); }, 60000); // refresh every minute
+
+  // show auth modal at load; auth.onAuthStateChanged will hide it if signed in
+  adminAuthModal.show();
+  </script>
+</body>
+</html>
