@@ -157,7 +157,7 @@ const firebaseConfig = {
   storageBucket: "gamers-65b44.firebasestorage.app",
   messagingSenderId: "97331968745",
   appId: "1:97331968745:web:a93ff0bd2c383800dcce78",
-  measurementId: "G-JPPCZ3M4G2
+  measurementId: "G-JPPCZ3M4G2"
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -293,28 +293,32 @@ searchInput.addEventListener("input", e => {
 // =======================================================
 // ✏ MOVIE FORM
 // =======================================================
+/* ---------------- MOVIES ---------------- */
 movieForm.addEventListener("submit", async e => {
   e.preventDefault();
 
+  const id = movieId.value;
+
+  // Prepare movie data
   const movieData = {
     title: title.value.trim(),
     year: year.value.trim(),
     type: type.value.trim(),
-    genres: genres.value ? genres.value.split(",").map(g=>g.trim()).filter(Boolean) : [],
+    genres: genres.value ? genres.value.split(",").map(g => g.trim()).filter(Boolean) : [],
     poster: poster.value.trim(),
     trailer: trailer.value.trim(),
     fileUrl: fileUrl.value.trim(),
     description: description.value.trim(),
     rating: parseFloat(rating.value) || null,
-    createdAt: Date.now()
   };
 
-  const id = movieId.value;
-
   if (id) {
+    // Update movie WITHOUT changing createdAt
     await updateDoc(doc(db, "movies", id), movieData);
     alert("✅ Movie updated!");
   } else {
+    // Add new movie WITH createdAt
+    movieData.createdAt = Date.now();
     await addDoc(moviesRef, movieData);
     alert("✅ Movie added!");
   }
@@ -350,10 +354,7 @@ window.editMovie = async id => {
 };
 
 
-
-// =======================================================
-// 📺 EPISODES (SERIES)
-// =======================================================
+/* ---------------- EPISODES (SERIES) ---------------- */
 window.openEpisodes = (seriesId, title) => {
   if (!seriesId) return alert("Missing series id");
 
@@ -427,7 +428,7 @@ episodeForm.addEventListener("submit", async e => {
     description: document.getElementById("epDescription").value.trim(),
     poster: document.getElementById("epPoster").value.trim(),
     runtime: document.getElementById("epRuntime").value.trim(),
-    updatedAt: Date.now()
+    updatedAt: Date.now() // Only tracks edits, doesn't affect order of new episodes
   };
 
   const episodesCollRef = collection(db, "movies", seriesId, "episodes");
@@ -446,7 +447,7 @@ clearEpisodeFormBtn.addEventListener("click", () => {
 
 window.editEpisode = async (seriesId, epId) => {
   const epDoc = await getDocs(collection(db, "movies", seriesId, "episodes"));
-  const epData = epDoc.docs.find(d=>d.id===epId)?.data();
+  const epData = epDoc.docs.find(d => d.id === epId)?.data();
   if (!epData) return alert("Episode not found!");
 
   document.getElementById("episodeId").value = epId;
@@ -681,5 +682,3 @@ setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000); // Every 12 hours
 
 </body>
 </html>
-
-
