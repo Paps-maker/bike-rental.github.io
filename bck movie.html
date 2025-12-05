@@ -1,24 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="icon" href="img/logo.png" type="image/png">
-
-
 <title>MovieDrift</title>
 
-
-<style> 
+<style>
 :root { --bg:#000; --card-bg:#0a0a0a; --accent:#00ff66; --text:#ddd; --muted:#888; }
 body { margin:0; font-family:Arial,sans-serif; background:var(--bg); color: var(--text);}
 header { display:flex; justify-content:space-between; align-items:center; background:#111; padding:10px 20px; flex-wrap:wrap;}
 .logo { font-size:24px; font-weight:bold; color: var(--accent);}
 .controls { display:flex; gap:10px; flex-wrap:wrap;}
 input, select, button, textarea { padding:6px 10px; border:1px solid var(--accent); border-radius:4px; background: var(--card-bg); color: var(--text);}
-button { cursor:pointer; font-weight:bold;} 
+button { cursor:pointer; font-weight:bold;}
 button:hover { background:#003300;}
-
 main { padding:20px;}
 .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:20px;}
 .card { background: var(--card-bg); border:1px solid rgba(0,255,102,0.15); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; transition: transform 0.2s;}
@@ -31,58 +27,41 @@ main { padding:20px;}
 .card-actions { display:flex; gap:5px; flex-wrap:wrap;}
 .btn { flex:1; text-align:center;}
 
-/* ---------------- FIXED MODAL (TV + BIG SCREENS SAFE) ---------------- */
-.modal { 
-  display:none; 
-  position:fixed; 
-  inset:0; 
-  background:rgba(0,0,0,0.92); 
-  justify-content:center; 
-  align-items:center;              /* center on all screens */
-  z-index:1000; 
-  overflow-y:auto;                 /* allow full scroll on TVs */
-  padding:40px 20px;               /* space for top & bottom */
+/* ---------------- FIXED MODAL ---------------- */
+.modal {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.85);
+  justify-content:center;
+  align-items:flex-start;
+  z-index:1000;
+  overflow-y:auto;
+  padding:20px 0;
 }
-
-/* SAFE modal container for TVs */
-.modal-content { 
-  background:var(--card-bg); 
-  width:90%;
-  max-width:1000px;
-
-  /* Prevent TV clipping */
-  max-height:90vh;                 /* always fits inside ANY TV */
-  overflow-y:auto;                 /* internal scroll for long content */
-
-  border-radius:10px; 
-  padding:20px; 
-  position:relative;
-}
-
-/* Responsive Player */
-.modal-content iframe,
-.modal-content video { 
-  width:100%; 
+.modal-content {
+  background:var(--card-bg);
+  max-width:980px;
+  width:95%;
   height:auto;
-  
-  /* keep player fully visible on TVs */
-  max-height:45vh;                 /* prevents overflow even on 720p TVs */
-
-  border-radius:6px; 
-  margin-bottom:15px;
+  max-height:none;
+  overflow-y:visible;
+  border-radius:8px;
+  padding:20px;
+  position:relative;
+  margin:40px auto;
 }
+.close { position:absolute; top:10px; right:15px; cursor:pointer; color:var(--accent); font-size:22px;}
+.modal-content iframe,
+.modal-content video { width:100%; height:auto; max-height:60vh; border-radius:6px; margin-bottom:10px;}
 
-/* Close button */
-.close { 
-  position:absolute; 
-  top:10px; 
-  right:15px; 
-  cursor:pointer; 
-  color:var(--accent); 
-  font-size:26px;
-}
+/* Guest CTA */
+.guest-cta { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+.call-btn, .wa-btn { padding:10px 12px; border-radius:8px; border:none; font-weight:700; cursor:pointer; }
+.call-btn { background:#00a676; color:#fff; }
+.wa-btn { background:#25D366; color:#fff; }
 
-/* ---------------- WATCHLIST ---------------- */
+/* WATCHLIST */
 #watchlistModal h2 { color:var(--accent); margin-bottom:15px;}
 #watchlistModal .movie-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:15px;}
 .watchlist-card { background:#111; border-radius:8px; padding:10px; text-align:center; transition:transform 0.2s;}
@@ -90,11 +69,10 @@ main { padding:20px;}
 .watchlist-card img { width:100%; aspect-ratio: 2/3; object-fit:cover; margin-bottom:6px;}
 .remove-btn { margin-top:6px; padding:4px 8px; border:none; border-radius:4px; background:#e63946; color:white; cursor:pointer; font-size:0.8rem;}
 .remove-btn:hover { background:#c82333;}
-
 .episode-list { margin-top:10px;}
 .episode-list button { margin:2px; font-size:0.8rem;}
 
-/* ----- THEMES ----- */
+/* THEMES */
 .theme-dark { --bg:#000; --card-bg:#0a0a0a; --accent:#00ff66; --text:#ddd; --muted:#888; }
 .theme-white { --bg:#ffffff; --card-bg:#f2f2f2; --accent:#0066ff; --text:#000; --muted:#666; }
 .theme-pink { --bg:#ffebf0; --card-bg:#ffd6e3; --accent:#ff2f8a; --text:#5a0032; --muted:#a64a6b; }
@@ -102,159 +80,175 @@ main { padding:20px;}
 .theme-gold { --bg:#0d0c07; --card-bg:#1a1a10; --accent:#ffd700; --text:#fff4c2; --muted:#aa9955; }
 .theme-purple { --bg:#120018; --card-bg:#25002f; --accent:#d800ff; --text:#f9d9ff; --muted:#b76cd8; }
 
-/* --- Phone layout: 2 cards per row --- */
-@media (max-width: 600px) {
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-}
-
-.wa-small-btn {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  background:#25D366;
-  color:#000;
-  padding:6px 10px;
-  border-radius:20px;
-  font-size:13px;
-  font-weight:600;
-  text-decoration:none;
-  border:1px solid #128C7E;
-  transition:0.2s ease-in-out;
-}
-.wa-small-btn:hover {
-  background:#1ebe5d;
-  transform:scale(1.05);
-}
-.wa-small-btn svg { display:block; }
-
-/* ============================================================
-   NETFLIX TV REMOTE FOCUS STYLE (NEW)
-   ============================================================ */
-.tv-focus {
-  outline:4px solid var(--accent);
-  outline-offset:4px;
-  transform:scale(1.08) !important;
-  z-index:5 !important;
-  transition:0.15s ease-in-out;
-}
-/* ---------------- EPISODES - PROFESSIONAL / NETFLIX VERTICAL STYLE ---------------- */
-.episode-section h4 {
-  font-size: 1.2rem;
-  color: var(--accent);
-  margin: 0 0 10px 0;
-  font-weight: 600;
-}
-
-/* Change to vertical layout */
-.episode-list {
-  display: flex;
-  flex-direction: column;   /* vertical now */
-  gap: 12px;
-  max-height: 450px;        /* scroll vertically */
+@media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+/* ---------------- MODAL BASE ---------------- */
+#movieModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
   overflow-y: auto;
-  padding-right: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: #00ff66 transparent;
+  z-index: 1000;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  animation: fadeIn 0.3s ease-in-out;
 }
 
-.episode-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.episode-list::-webkit-scrollbar-thumb {
-  background: #00ff66;
-  border-radius: 3px;
-}
-
-.episode-btn {
-  background: #111;
+#movieModal .modal-content {
+  max-width: 900px;
+  margin: 0 auto;
+  background: #1a1a1a;
+  padding: 20px 30px;
+  border-radius: 10px;
   color: #fff;
+  box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+}
+
+#movieModal h4 {
+  margin-top: 20px;
+  font-size: 20px;
+  color: #00ff66;
+  border-bottom: 1px solid #333;
+  padding-bottom: 5px;
+}
+
+/* ---------------- VIDEO WRAPPER ---------------- */
+.video-wrapper, .episode-video-wrapper {
+  position: relative;
+  width: 100%;
+  max-height: 500px;
+  background: #000;
   border-radius: 8px;
-  padding: 12px 14px;
-  border: 1px solid #333;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: transform 0.15s, outline 0.15s;
-  display: flex;
-  flex-direction: column;  /* vertical stack inside each episode */
-  align-items: flex-start;
+  overflow: hidden;
 }
 
-.episode-btn strong {
-  font-size: 1rem;
-  color: var(--accent);
-  margin-bottom: 4px;
+.video-wrapper iframe, 
+.episode-video-wrapper iframe,
+.video-wrapper video,
+.episode-video-wrapper video {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
 }
 
-.episode-btn small {
-  color: #aaa;
-  font-size: 0.8rem;
-}
-
-.episode-btn:hover,
-.episode-btn:focus,
-.episode-btn.tv-focus {
-  outline: 3px solid var(--accent);
-  transform: scale(1.03);
-  z-index: 5;
-}
+/* ---------------- PLAY BUTTON ---------------- */
 .play-btn {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  
-  background: #00c853; /* professional green */
-  color: #fff;
-  padding: 18px 40px;
-  border: none;
-  border-radius: 40px;
-
-  font-size: 22px;
-  font-weight: bold;
-  cursor: pointer;
-
-  z-index: 9999;        /* ensures it's on top */
-  display: inline-block;
-
-  box-shadow: 0 6px 18px rgba(0,0,0,0.3);
-  transition: all 0.25s ease;
-}
-
-/* Hover effect */
-.play-btn:hover {
-  background: #00e676;
-  transform: translate(-50%, -50%) scale(1.07);
-}
-/* Custom overlay play button */
-.custom-play-btn {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 20px 25px;
-  font-size: 24px;
-  border: none;
-  border-radius: 50%;
   background: #00ff66;
-  color: black;
+  color: #000;
   font-weight: bold;
+  border: none;
+  padding: 12px 20px;
+  font-size: 18px;
+  border-radius: 6px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0, 255, 102, 0.5);
-  transition: transform 0.2s, box-shadow 0.2s;
-  z-index: 10;
+  transition: 0.3s all;
 }
 
-.custom-play-btn:hover {
-  transform: translate(-50%, -50%) scale(1.2);
-  box-shadow: 0 8px 25px rgba(0, 255, 102, 0.7);
-}
-.poster-wrapper {
-  position: relative;
+.play-btn:hover {
+  background: #00cc52;
 }
 
+/* ---------------- DOWNLOAD LINK ---------------- */
+a.download-link, 
+.episode-video-wrapper a {
+  display: inline-block;
+  margin-top: 10px;
+  background: #00ff66;
+  color: #000;
+  font-weight: bold;
+  padding: 8px 15px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: 0.3s all;
+}
+
+a.download-link:hover,
+.episode-video-wrapper a:hover {
+  background: #00cc52;
+}
+
+/* ---------------- EPISODE LIST ---------------- */
+.episode-list {
+  margin-top: 10px;
+}
+
+.episode-list div {
+  cursor: pointer;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #222;
+  border-radius: 6px;
+  transition: 0.2s all;
+}
+
+.episode-list div:hover {
+  background: #333;
+}
+
+.episode-list strong {
+  color: #00ff66;
+}
+
+.episode-list small {
+  color: #ccc;
+  display: block;
+  margin-top: 3px;
+}
+
+/* ---------------- MODAL DETAILS ---------------- */
+#modalTitle {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+#modalYear, #modalGenres, #modalRating, #modalDesc {
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
+/* ---------------- ANIMATION ---------------- */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---------------- RESPONSIVE ---------------- */
+@media (max-width: 768px) {
+  #movieModal .modal-content {
+    padding: 15px 20px;
+  }
+
+  .play-btn {
+    font-size: 16px;
+    padding: 10px 16px;
+  }
+
+  a.download-link,
+  .episode-video-wrapper a {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+}
+.btn-icon {
+  background: none;
+  border: none;
+  outline: none;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.btn-icon svg {
+  pointer-events: none;
+}
 .new-badge {
   position: absolute;
   top: 6px;
@@ -353,96 +347,374 @@ main { padding:20px;}
   transform: translateY(-1px);
 }
 
-/* Movie Drift button (keeps your theme) */
-.guest-cta .btn {
-  background: var(--accent);
-  color: #000;
-}
-.guest-cta .btn:hover {
-  opacity: 0.85;
-  transform: translateY(-1px);
+/* ===========================
+   MOVIEDRIFT PREMIUM UI CSS
+   =========================== */
+
+/* COLORS */
+:root {
+  --bg:#000;
+  --card-bg:#0d0d0d;
+  --accent:#00ff66;
+  --accent-dark:#00cc55;
+  --text:#ddd;
+  --muted:#888;
 }
 
+/* ===========================
+      HEADER AREA
+   =========================== */
+.md-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px 20px;
+  background:var(--bg);
+  border-bottom:1px solid #0f0f0f;
+  position:sticky;
+  top:0;
+  z-index:999;
+}
+
+/* Left Area */
+.left-area {
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+/* Logo */
+.logo {
+  font-size:1.6rem;
+  font-weight:800;
+  letter-spacing:-0.5px;
+  color:var(--accent);
+  text-transform:uppercase;
+}
+
+/* ===========================
+      MENU (DESKTOP)
+   =========================== */
+.md-menu {
+  display:flex;
+  align-items:center;
+  gap:20px;
+}
+
+.md-menu a {
+  color:var(--text);
+  text-decoration:none;
+  font-size:1rem;
+  font-weight:500;
+  padding:6px 10px;
+  transition:0.3s;
+}
+
+.md-menu a:hover {
+  color:var(--accent);
+  transform:translateY(-2px);
+}
+
+/* ===========================
+      MOBILE MENU TOGGLE
+   =========================== */
+.menu-toggle {
+  display:none;
+  flex-direction:column;
+  justify-content:space-between;
+  width:30px;
+  height:22px;
+  cursor:pointer;
+}
+
+.menu-toggle span {
+  height:3px;
+  background:var(--accent);
+  border-radius:5px;
+  transition:0.4s ease;
+}
+
+/* Toggle Animation */
+.menu-toggle.active span:nth-child(1) {
+  transform:translateY(9px) rotate(45deg);
+}
+
+.menu-toggle.active span:nth-child(2) {
+  opacity:0;
+}
+
+.menu-toggle.active span:nth-child(3) {
+  transform:translateY(-9px) rotate(-45deg);
+}
+
+/* ===========================
+      MOBILE MENU
+   =========================== */
+@media (max-width: 850px) {
+  .menu-toggle { display:flex; }
+
+  .md-menu {
+    position:absolute;
+    top:68px;
+    left:0;
+    width:100%;
+    flex-direction:column;
+    align-items:flex-start;
+    padding:20px 25px;
+    background:#000000f7;
+    display:none;
+    gap:18px;
+    border-bottom:1px solid #111;
+    animation:menuFade 0.3s ease-out;
+  }
+
+  .md-menu.active { display:flex; }
+
+  .md-menu a {
+    font-size:1.1rem;
+    padding:10px 0;
+    width:100%;
+    border-bottom:1px solid #111;
+  }
+
+  @keyframes menuFade {
+    from { opacity:0; transform:translateY(-10px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+}
+
+/* ===========================
+      MOVIE CARD ACTION ROW
+   =========================== */
+.action-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  background:#000000aa;
+  border-radius:8px;
+  margin-top:8px;
+}
+
+.action-btn {
+  flex:1;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  padding:8px 10px;
+  font-size:0.88rem;
+  border-radius:8px;
+  color:#fff;
+  background:#1a1a1a;
+  border:1px solid #222;
+  transition:0.25s ease;
+  cursor:pointer;
+}
+
+.action-btn:hover {
+  background:#222;
+  border:1px solid var(--accent);
+  transform:translateY(-2px);
+}
+
+/* Watch Button Highlight */
+.action-btn.watch {
+  background:var(--accent);
+  color:#000;
+  font-weight:600;
+}
+
+.action-btn.watch:hover {
+  background:var(--accent-dark);
+}
+
+/* BADGES (HD, NEW, 4K, etc.) */
+.badge {
+  position:absolute;
+  top:8px;
+  left:8px;
+  padding:4px 8px;
+  background:var(--accent);
+  color:#000;
+  font-size:0.72rem;
+  font-weight:700;
+  border-radius:5px;
+  text-transform:uppercase;
+}
+
+/* Prevent menu overlay */
+.movie-grid {
+  margin-top:10px;
+  position:relative;
+  z-index:1;
+}
+/* Responsive search input with spacing */
+#search {
+  width: 100%;           /* Full width of its container */
+  max-width: 500px;      /* Limit max width on large screens */
+  padding: 10px 15px;    /* Comfortable padding */
+  font-size: 16px;       /* Readable text */
+  border: 2px solid #00ff66; /* Accent border */
+  border-radius: 25px;   /* Rounded edges */
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  
+  /* Spacing from menu toggle */
+  margin: 0 10px;        /* Horizontal margin (left & right) */
+}
+
+#search:focus {
+  border-color: #00cc55;
+  box-shadow: 0 0 5px rgba(0, 255, 102, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #search {
+    max-width: 300px;    /* Smaller max width on tablets/mobile */
+    margin: 0 5px;       /* Less margin for small screens */
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+}
 
 </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00ff66">
 
-<style>
-/* ---------- CLASSY ICON BUTTONS ---------- */
-.btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  transition: transform 0.2s ease, filter 0.2s ease;
-}
-
-.btn-icon svg {
-  width: 28px;
-  height: 28px;
-  fill: #00ff66; /* Green theme */
-  transition: transform 0.2s ease, filter 0.2s ease;
-}
-
-.btn-icon:hover svg {
-  transform: scale(1.2);
-  filter: drop-shadow(0 0 6px #00ff66);
-}
-</style>
+<!-- iOS support -->
+<link rel="apple-touch-icon" href="img/logo-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 
 </head>
 <body>
-  
-<header>
-  <div class="logo">MovieDrift</div>
-  <select id="themeSelector">
-  <option value="dark">Dark Green (Default)</option>
-  <option value="white">White Mode</option>
-  <option value="pink">Soft Pink</option>
-  <option value="blue">Blue Neon</option>
-  <option value="gold">Gold Premium</option>
-  <option value="purple">Purple Night</option>
-</select>
- <a href="https://chat.whatsapp.com/EzXluKjsqMoCgJPYc03gQx?mode=hqrt1"
-   target="_blank"
-   class="wa-small-btn">
-   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-     <path d="M13.601 2.326A7.86 7.86 0 0 0 8.043 0C3.733 0 .254 3.478.254 7.787c0 1.373.36 2.712 1.04 3.895L0 16l4.486-1.17a7.75 7.75 0 0 0 3.556.903h.004c4.31 0 7.789-3.478 7.789-7.787a7.72 7.72 0 0 0-2.234-5.62zM8.046 14.4h-.003a6.45 6.45 0 0 1-3.283-.896l-.235-.14-2.662.694.71-2.59-.153-.266a6.47 6.47 0 0 1-.98-3.45c0-3.568 2.907-6.474 6.48-6.474a6.43 6.43 0 0 1 4.58 1.897 6.42 6.42 0 0 1 1.894 4.577c-.003 3.57-2.91 6.476-6.468 6.476zm3.76-4.842c-.206-.103-1.226-.602-1.416-.671-.19-.07-.33-.103-.47.103-.14.206-.54.671-.662.81-.123.14-.243.155-.45.052-.206-.103-.87-.32-1.656-1.02-.612-.546-1.024-1.22-1.146-1.426-.123-.206-.013-.317.09-.42.093-.093.206-.24.31-.36.103-.12.137-.206.206-.343.07-.137.035-.258-.017-.36-.052-.103-.47-1.127-.643-1.544-.17-.41-.343-.354-.47-.354a9.48 9.48 0 0 0-.41-.007c-.137 0-.36.052-.55.258-.19.206-.72.703-.72 1.71s.737 1.978.84 2.115c.103.137 1.45 2.213 3.516 3.103.492.212.875.339 1.174.434.492.157.94.135 1.293.082.395-.058 1.226-.5 1.4-.982.172-.482.172-.89.12-.982-.052-.093-.19-.155-.395-.258z"/>
-   </svg>
-   suggestions
-</a>
 
-  <div class="controls">
+<header class="md-header">
+  <div class="left-area">
+    <div class="logo">MovieDrift</div>
+
+    <!-- Menu Toggle -->
+    <div id="menuToggle" class="menu-toggle">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
     <input id="search" type="search" placeholder="Search movies...">
-    <select id="typeFilter"><option value="">All types</option><option value="Movie">Movie</option><option value="Series">Series</option><option value="Animation">Animation</option></select>
+  </div>
+
+  <div class="controls md-menu">
+    <select id="themeSelector" title="Theme">
+      <option value="dark">Dark Green (Default)</option>
+      <option value="white">White Mode</option>
+      <option value="pink">Soft Pink</option>
+      <option value="blue">Blue Neon</option>
+      <option value="gold">Gold Premium</option>
+      <option value="purple">Purple Night</option>
+    </select>
+
+    
+<style>
+#installAppBtn {
+  background:#00ff66;
+  color:#000;
+  padding:7px 12px;
+  border:none;
+  border-radius:40px;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  display:none;
+  align-items:center;
+  gap:6px;
+  box-shadow:0 0 10px rgba(0,255,102,0.35);
+  transition:all .25s ease;
+}
+
+#installAppBtn:hover {
+  transform:translateY(-2px);
+  box-shadow:0 0 14px rgba(0,255,102,0.6);
+}
+
+#installAppBtn:active {
+  transform:scale(0.95);
+}
+
+#installAppBtn svg {
+  width:14px;
+  height:14px;
+}
+</style>
+
+<button id="installAppBtn">
+  <svg viewBox="0 0 24 24" fill="none">
+    <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17h16" 
+          stroke="black" stroke-width="2" 
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Install App
+</button>
+
+<script>
+let deferredPrompt;
+const installBtn = document.getElementById("installAppBtn");
+
+// Show the install button when PWA can be installed
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "inline-flex";
+});
+
+// Handle button click
+installBtn.addEventListener("click", () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt = null;
+  installBtn.style.display = "none";
+});
+</script>
+
+
+    <select id="typeFilter">
+      <option value="">All types</option>
+      <option value="Movie">Movie</option>
+      <option value="Series">Series</option>
+      <option value="Animation">Animation</option>
+    </select>
+
     <select id="genreFilter"><option value="">All genres</option></select>
     <select id="yearFilter"><option value="">All years</option></select>
-    <div id="authArea" style="display:flex;gap:8px;align-items:center">
-      <button id="openAuthBtn" class="btn" style="padding:6px 10px;">Login</button>
-      <button id="logoutBtn" class="btn" style="display:none;padding:6px 10px;">Logout</button>
+
+    <div id="authArea" class="auth-box">
+      <button id="openAuthBtn" class="btn">Login</button>
+      <button id="logoutBtn" class="btn" style="display:none;">Logout</button>
     </div>
-    <button id="watchlistToggle">Watchlist (0)</button>
+
+    <button id="watchlistToggle" class="btn">Watchlist (0)</button>
   </div>
+  
 </header>
 
 <main><div id="grid" class="grid"></div></main>
 
+<!-- Movie Modal -->
 <div class="modal" id="movieModal">
   <div class="modal-content">
     <span class="close" onclick="closeModal('movieModal')">&times;</span>
-
-    <div class="modal-scroll-area">
-      <h2 id="modalTitle"></h2>
-      <p id="modalYear"></p>
-      <p id="modalGenres"></p>
-      <p class="rating" id="modalRating"></p>
-      <div id="modalPlayer"></div>
-      <div class="episode-list" id="episodeList"></div>
-      <p id="modalDesc"></p>
-      <button id="modalAddToList" class="btn">➕ Add to Watchlist</button>
-    </div>
-
+    <h2 id="modalTitle"></h2>
+    <p id="modalYear"></p>
+    <p id="modalGenres"></p>
+    <p class="rating" id="modalRating"></p>
+    <div id="modalPlayer"></div>
+    <div class="episode-list" id="episodeList"></div>
+    <p id="modalDesc"></p>
+    <button id="modalAddToList" class="btn">➕ Add to Watchlist</button>
   </div>
 </div>
+
 <!-- Guest Modal -->
 <div class="modal" id="guestModal">
   <div class="modal-content">
@@ -458,7 +730,7 @@ main { padding:20px;}
   </div>
 </div>
 
-
+<!-- Watchlist Modal -->
 <div class="modal" id="watchlistModal">
   <div class="modal-content">
     <span class="close" onclick="closeModal('watchlistModal')">&times;</span>
@@ -466,6 +738,8 @@ main { padding:20px;}
     <div class="movie-list" id="watchlistContainer"></div>
   </div>
 </div>
+
+<!-- Auth Modal -->
 <!-- Auth Modal -->
 <div class="modal" id="authModal">
   <div class="modal-content">
@@ -476,7 +750,7 @@ main { padding:20px;}
       <input id="authPassword" placeholder="Password (6+ chars)" type="password">
       <div style="display:flex;gap:8px;">
         <button id="signInBtn" class="btn">Sign In</button>
-        <button id="registerBtn" class="btn"></button>
+        <button id="registerBtn" class="btn">Register</button>
       </div>
       <div style="color:var(--muted);font-size:13px;margin-top:8px;">
         If you have no account contact our team to be registered.
@@ -484,28 +758,121 @@ main { padding:20px;}
     </div>
   </div>
 </div>
+
+<!-- Loader (add this in your HTML, hidden by default) -->
+<div id="loader" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
+  <div style="padding:20px;background:#000;color:#00ff66;border-radius:8px;font-weight:bold;">Loading...</div>
+</div>
+
+
+<style>
+  
+/* Modal Background */
+.modal {
+  display: none; /* hidden by default */
+  position: fixed;
+  z-index: 999;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.6);
+  backdrop-filter: blur(3px);
+  transition: opacity 0.3s ease;
+}
+
+/* Modal Content Box */
+.modal-content {
+  background-color: #111;
+  margin: 8% auto;
+  padding: 24px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  position: relative;
+  color: #eee;
+  font-family: 'Segoe UI', sans-serif;
+  animation: slideDown 0.3s ease;
+}
+
+/* Close Button */
+.close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 28px;
+  font-weight: bold;
+  color: #ccc;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.close:hover { color: #fff; }
+
+/* Modal Heading */
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: #00ff66;
+  text-align: center;
+}
+
+/* Form Inputs */
+.auth-form input {
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background-color: #222;
+  color: #eee;
+  font-size: 15px;
+  outline: none;
+  transition: border 0.2s, background 0.2s;
+}
+.auth-form input:focus {
+  border-color: #00ff66;
+  background-color: #1a1a1a;
+}
+
+/* Buttons */
+.auth-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.auth-buttons .btn {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  border-radius: 8px;
+  background: #00ff66;
+  color: #111;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.auth-buttons .btn:hover {
+  background: #33ff88;
+}
+
+/* Note */
+.auth-note {
+  color: #aaa;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Animation */
+@keyframes slideDown {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+</style>
+
+
 <script type="module">
-/* MovieDrift Master Script v3
-   - Merges features from Script 1 + Script 2
-   - Option B: Multiple subtitle tracks for movies and episodes
-   - Requirements: keep same HTML element IDs used previously
-*/
-
-/* ---------------- FIREBASE IMPORTS ---------------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  doc,
-  onSnapshot,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  orderBy
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, collection, doc, onSnapshot, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-/* ---------------- FIREBASE CONFIG ---------------- */
 const firebaseConfig = {
   apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
   authDomain: "gamers-65b44.firebaseapp.com",
@@ -518,22 +885,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ---------------- GLOBAL STATE ---------------- */
 let movies = [];
 let watchlist = JSON.parse(localStorage.getItem("watchlist")) || [];
-let watchedEpisodes = JSON.parse(localStorage.getItem("watchedEpisodes") || "{}");
-let currentUser = JSON.parse(localStorage.getItem("currentUser") || "null");
+let currentUser = null;
 
-/* Episode unsubscribe map (per movie) */
-const episodeUnsubs = new Map();
-
-/* ---------------- QUERY UI ELEMENTS ---------------- */
 const genreFilter = document.getElementById("genreFilter");
 const yearFilter = document.getElementById("yearFilter");
-const searchInput = document.getElementById("search");
-const typeFilter = document.getElementById("typeFilter");
 
-/* Auth UI elements (from Script 1) */
+/* UI elements */
 const openAuthBtn = document.getElementById('openAuthBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const authModal = document.getElementById('authModal');
@@ -541,8 +900,6 @@ const signInBtn = document.getElementById('signInBtn');
 const registerBtn = document.getElementById('registerBtn');
 const authIdentifier = document.getElementById('authIdentifier');
 const authPassword = document.getElementById('authPassword');
-
-/* Guest modal elements (Script 1/2) */
 const guestModal = document.getElementById('guestModal');
 const guestLoginBtn = document.getElementById('guestLoginBtn');
 const guestGreeting = document.getElementById('guestGreeting');
@@ -550,332 +907,159 @@ const guestMessage = document.getElementById('guestMessage');
 const callLink = document.getElementById('callLink');
 const waLink = document.getElementById('waLink');
 
-/* Modal player elements */
-const modalPlayer = document.getElementById("modalPlayer");
-const episodeListEl = document.getElementById("episodeList");
-const modalTitle = document.getElementById("modalTitle");
-const modalYear = document.getElementById("modalYear");
-const modalGenres = document.getElementById("modalGenres");
-const modalRating = document.getElementById("modalRating");
-const modalDesc = document.getElementById("modalDesc");
-const modalAddToList = document.getElementById("modalAddToList");
-
-/* Watchlist UI */
-const watchlistToggle = document.getElementById("watchlistToggle");
-const watchlistModal = document.getElementById("watchlistModal");
-const watchlistContainer = document.getElementById("watchlistContainer");
-
-/* Theme selector */
-const themeSelector = document.getElementById("themeSelector");
-
-/* ---------------- UTILITIES ---------------- */
+/* ---------------- Persistent login & status tracking ---------------- */
 function saveCurrentUser() {
-  if (currentUser) localStorage.setItem('currentUser', JSON.stringify(currentUser));
+  if(currentUser) localStorage.setItem('currentUser', JSON.stringify(currentUser));
   else localStorage.removeItem('currentUser');
 }
-function saveWatchlist() { localStorage.setItem("watchlist", JSON.stringify(watchlist)); }
-function saveWatchedEpisodes() { localStorage.setItem("watchedEpisodes", JSON.stringify(watchedEpisodes)); }
 
-function markEpisodeWatched(movieId, epNumber) {
-  if (!watchedEpisodes[movieId]) watchedEpisodes[movieId] = [];
-  if (!watchedEpisodes[movieId].includes(epNumber)) {
-    watchedEpisodes[movieId].push(epNumber);
-    saveWatchedEpisodes();
-  }
-}
-function hasWatched(movieId, epNumber) {
-  return watchedEpisodes[movieId]?.includes(epNumber);
+function loadCurrentUser() {
+  const saved = localStorage.getItem('currentUser');
+  if(saved) currentUser = JSON.parse(saved);
+  if(currentUser) watchUserStatus(); // Track status changes in real-time
 }
 
-/* Convert youtube link to embed */
-function convertYouTubeLink(url) {
-  try {
-    if (!url) return url;
-    if (url.includes("youtube.com/watch?v="))
-      return `https://www.youtube.com/embed/${url.split("v=")[1].split("&")[0]}?rel=0`;
-    if (url.includes("youtu.be/"))
-      return `https://www.youtube.com/embed/${url.split("youtu.be/")[1].split("?")[0]}?rel=0`;
-    return url;
-  } catch { return url; }
-}
-
-function isDownloadable(url) {
-  return /\.(mp4|mkv|mov|wmv|avi|flv|webm)$/i.test(url);
-}
-
-/* ---------------- AUTH (Script1 register/login + guest) ---------------- */
-async function loginUser(identifier, password) {
-  const usersRef = collection(db, "users");
-  let q = query(usersRef, where("email", "==", identifier));
-  let snapshot = await getDocs(q);
-  if (snapshot.empty) {
-    q = query(usersRef, where("username", "==", identifier));
-    snapshot = await getDocs(q);
-    if (snapshot.empty) { alert("User not found"); return; }
-  }
-  const userDoc = snapshot.docs[0];
-  const user = userDoc.data();
-  if (user.password === password) {
-    currentUser = { id: userDoc.id, ...user };
-    saveCurrentUser();
-    watchUserStatus();
-    alert("Logged in successfully");
-    updateAuthUI();
-    closeModal('authModal');
-    // re-render to ensure event listeners and UI reflect user status (optional)
-    renderMovies();
-  } else alert("Incorrect password");
-}
-
-async function registerUser(identifier, password) {
-  if (password.length < 6) { alert("Password must be 6+ chars"); return; }
-  const usersRef = collection(db, "users");
-  let q = query(usersRef, where("email", "==", identifier));
-  let snapshot = await getDocs(q);
-  if (!snapshot.empty) { return alert("User already exists"); }
-  const docRef = await addDoc(usersRef, { email: identifier, password: password, createdAt: Date.now(), status: "Paid" });
-  currentUser = { id: docRef.id, email: identifier, status: "Paid" };
-  saveCurrentUser();
-  watchUserStatus();
-  alert("Account created & logged in");
-  updateAuthUI();
-  closeModal('authModal');
-  renderMovies();
-}
-
-/* Simple user status watcher to update local state if Firestore user doc changes */
 function watchUserStatus() {
   if (!currentUser) return;
   const userDocRef = doc(db, "users", currentUser.id);
-  // subscribe once (keeps reference minimal)
-  const unsub = onSnapshot(userDocRef, docSnap => {
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      currentUser.status = data.status || currentUser.status || "Unpaid";
+  onSnapshot(userDocRef, docSnap => {
+    if(docSnap.exists()){
+      currentUser.status = docSnap.data().status || "Unpaid";
       saveCurrentUser();
     }
   });
-  // no explicit unsubscribe here — will persist for session (could store if desired)
 }
 
-/* Guest login (Script2) */
-function loginGuest() {
-  currentUser = { name: "Guest", guest: true, id: Date.now(), status: "Guest" };
-  saveCurrentUser();
-  updateAuthUI();
-  alert("Logged in as Guest");
-  renderMovies();
-}
-function logout() {
-  currentUser = null;
-  saveCurrentUser();
-  updateAuthUI();
-  renderMovies();
-}
-
-/* UI bindings for auth */
-if (signInBtn) signInBtn.onclick = () => loginUser(authIdentifier.value.trim(), authPassword.value);
-if (registerBtn) registerBtn.onclick = () => registerUser(authIdentifier.value.trim(), authPassword.value);
-if (openAuthBtn) openAuthBtn.onclick = () => openAuthModal();
-if (guestLoginBtn) guestLoginBtn.onclick = () => { closeModal('guestModal'); loginGuest(); };
-if (logoutBtn) logoutBtn.onclick = () => logout();
-
-function updateAuthUI() {
-  if (!openAuthBtn || !logoutBtn) return;
-  if (currentUser) { openAuthBtn.style.display = 'none'; logoutBtn.style.display = 'inline-block'; }
-  else { openAuthBtn.style.display = 'inline-block'; logoutBtn.style.display = 'none'; }
-}
-
-/* ---------------- LOAD MOVIES + EPISODES (Realtime) ---------------- */
+/* ---------------- Load movies ---------------- */
 onSnapshot(collection(db, "movies"), snapshot => {
   movies = snapshot.docs.map(d => {
     const data = d.data();
-    const createdAt = data.createdAt?.seconds ? data.createdAt.seconds * 1000 : data.createdAt || 0;
-    const year = parseInt(data.year) || 0;
-    // ensure subtitles array exists
-    const subs = Array.isArray(data.subtitles) ? data.subtitles : (data.subtitles ? [data.subtitles] : []);
-    return { id: d.id, ...data, createdAt, year, episodes: [], subtitles: subs };
-  }).sort((a, b) => b.year !== a.year ? b.year - a.year : b.createdAt - a.createdAt);
-
-  // Subscribe to episodes subcollection for series
-  movies.forEach(m => {
-    if (m.type === "Series") {
-      // If already subscribed, skip
-      if (episodeUnsubs.has(m.id)) return;
-      const episodesColl = collection(db, "movies", m.id, "episodes");
-      const q = query(episodesColl, orderBy("epNumber", "asc"));
-      const unsub = onSnapshot(q, snap => {
-        m.episodes = snap.docs.map(d => {
-          const ed = d.data();
-          const createdAt = ed.createdAt?.seconds ? ed.createdAt.seconds * 1000 : ed.createdAt || 0;
-          const subs = Array.isArray(ed.subtitles) ? ed.subtitles : (ed.subtitles ? [ed.subtitles] : []);
-          return { id: d.id, ep: ed.epNumber || ed.ep || 0, title: ed.title, description: ed.description, createdAt, fileUrl: ed.fileUrl || ed.url, url: ed.url, subtitles: subs, season: ed.season };
-        }).sort((a, b) => (a.ep || 0) - (b.ep || 0));
-        renderMovies();
-      });
-      episodeUnsubs.set(m.id, unsub);
-    }
-  });
-
+    const createdAt = data.createdAt?.seconds ? data.createdAt.seconds*1000 : data.createdAt||0;
+    const year = parseInt(data.year)||0;
+    return { id:d.id, ...data, createdAt, year };
+  }).sort((a,b)=>b.year!==a.year? b.year-a.year : b.createdAt-a.createdAt);
   populateFilters();
   renderMovies();
 });
 
-/* ---------------- FILTERS ---------------- */
+/* Filters */
 function populateFilters() {
-  if (!genreFilter || !yearFilter) return;
-  const genres = new Set(), years = new Set();
-  movies.forEach(m => { if (m.genres) m.genres.forEach(g => genres.add(g)); years.add(m.year); });
+  const genreSet = new Set(), yearSet = new Set();
+  movies.forEach(m => { if(m.genres) m.genres.forEach(g=>genreSet.add(g)); yearSet.add(m.year); });
   genreFilter.innerHTML = '<option value="">All genres</option>';
   yearFilter.innerHTML = '<option value="">All years</option>';
-  genres.forEach(g => genreFilter.innerHTML += `<option value="${g}">${g}</option>`);
-  Array.from(years).sort((a, b) => b - a).forEach(y => yearFilter.innerHTML += `<option value="${y}">${y}</option>`);
+  genreSet.forEach(g=>genreFilter.innerHTML+=`<option value="${g}">${g}</option>`);
+  Array.from(yearSet).sort((a,b)=>b-a).forEach(y=>yearFilter.innerHTML+=`<option value="${y}">${y}</option>`);
 }
 
-/* ---------------- RENDER MOVIES ---------------- */
+/* Render movies */
 function renderMovies() {
   const grid = document.getElementById("grid");
-  if (!grid) return;
-  const searchText = (searchInput?.value || "").toLowerCase();
-  const selectedGenre = genreFilter?.value || "";
-  const selectedYear = yearFilter?.value || "";
-  const selectedType = typeFilter?.value || "";
-
+  const searchText = document.getElementById("search").value.toLowerCase();
+  const selectedGenre = genreFilter.value;
+  const selectedYear = yearFilter.value;
+  const selectedType = document.getElementById("typeFilter").value;
   grid.innerHTML = "";
 
-  const now = Date.now();
-
   const filtered = movies.filter(m => {
-    const title = (m.title || "").toLowerCase();
-    const matchesSearch = title.includes(searchText);
+    const matchesSearch = (m.title||'').toLowerCase().includes(searchText);
     const matchesGenre = !selectedGenre || (m.genres && m.genres.includes(selectedGenre));
     const matchesYear = !selectedYear || m.year == selectedYear;
     const matchesType = !selectedType || m.type === selectedType || !m.type;
     return matchesSearch && matchesGenre && matchesYear && matchesType;
   });
 
-  filtered.forEach((m, index) => {
-    const ratingText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
+  const now = Date.now(); // needed for badge timing
 
-    // BADGES
+  filtered.forEach((m, index) => {
+
+    // -------------------- BADGES --------------------
     let badgesHTML = "";
-    // NEW MOVIE (uploaded < 24h)
+
+    // NEW MOVIE (< 24h)
     if (m.type !== "Series" && now - (m.createdAt || 0) < 24 * 60 * 60 * 1000) {
-      badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
+      badgesHTML += `
+        <div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>
+      `;
     }
-    // HOT badge
+
+    // HOT (views ≥ 1000)
     if (m.views && m.views >= 1000) {
-      badgesHTML += `<div class="hot-badge">HOT</div>`;
+      badgesHTML += `
+        <div class="hot-badge">HOT</div>
+      `;
     }
-    // NEW EPISODE badge (for series)
+
+    // NEW EPISODE for series
     if (m.type === "Series" && m.episodes && m.episodes.length > 0) {
       const latest = m.episodes[m.episodes.length - 1];
-      const ep = latest.ep || 0;
-      const season = latest.season || 1;
       const addedAt = latest.createdAt || now;
       const isFresh = (now - addedAt) < 24 * 60 * 60 * 1000;
+      const ep = latest.ep || 0;
+      const season = latest.season || 1;
       const notWatched = !hasWatched(m.id, ep);
-      if (isFresh && notWatched) badgesHTML += `<div class="new-badge fade-out-24h">NEW Episode S${season}E${ep}</div>`;
-      // also show "NEW Episode Added" if any ep added last 24h
+
+      if (isFresh && notWatched) {
+        badgesHTML += `
+          <div class="new-badge fade-out-24h">NEW Episode S${season}E${ep}</div>
+        `;
+      }
+
       if (m.episodes.some(epObj => now - (epObj.createdAt || now) < 24 * 60 * 60 * 1000)) {
-        badgesHTML += `<div class="new-episode-added fade-out-24h"></div>`;
+        badgesHTML += `
+          <div class="new-episode-added fade-out-24h"></div>
+        `;
       }
     }
+    // ------------------------------------------------
 
-    // build card DOM (no inline onclick)
+    const ratingText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
     const card = document.createElement("div");
     card.className = "card";
 
-    // poster wrapper (badges + img)
-    const posterWrapper = document.createElement("div");
-    posterWrapper.className = "poster-wrapper";
-    posterWrapper.style.position = "relative";
-    posterWrapper.innerHTML = `${badgesHTML}<img class="poster" src="${m.poster || ''}" alt="${(m.title || '').replace(/"/g,'&quot;')}">`;
+    card.innerHTML = `
+      <div class="poster-wrapper" style="position:relative;">
+        <div class="badges-container">${badgesHTML}</div>
 
-    // card body
-    const cardBody = document.createElement("div");
-    cardBody.className = "card-body";
-    const title = document.createElement("h3");
-    title.className = "movie-title";
-    title.innerHTML = (m.title||'').replace(/</g,'&lt;');
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = `${m.year || ''} · ${(m.genres||[]).join(", ")}`;
-    const rating = document.createElement("div");
-    rating.className = "rating";
-    rating.textContent = ratingText;
+        <img class="poster" src="${m.poster||''}" alt="${(m.title||'').replace(/"/g,'&quot;')}">
+      </div>
 
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
-// ---------------- BUTTONS WITH CLASSY GREEN ICONS ----------------
+      <div class="card-body">
+        <h3 class="movie-title">${(m.title||'').replace(/</g,'&lt;')}</h3>
+        <div class="meta">${m.year || ''} · ${(m.genres||[]).join(", ")}</div>
+        <div class="rating">${ratingText}</div>
 
-// Details button (info icon)
-const btnDetails = document.createElement("button");
-btnDetails.className = "btn-icon";
-btnDetails.innerHTML = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10
-             10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67
-             1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm2 12h-4v-2h1v-4h-1v-2h3v6h1v2z"/>
-  </svg>`;
-btnDetails.title = "View Details";
-btnDetails.style.background = "none";
-btnDetails.style.border = "none";
-btnDetails.style.cursor = "pointer";
-btnDetails.style.padding = "4px";
-btnDetails.addEventListener("click", () => protectedAction('details', index));
+        <div class="card-actions">
 
-// Add to List button (plus icon)
-const btnAdd = document.createElement("button");
-btnAdd.className = "btn-icon";
-btnAdd.innerHTML = `
-  <button class="btn-icon" title="Add to Watchlist" onclick="event.stopPropagation(); addToWatchlistByFiltered(${index})">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-    <path d="M19 3H5c-1.1 0-2 .9-2 2v14l8-3 8 3V5c0-1.1-.9-2-2-2zM12 10v4h-2v-4H8v-2h2V6h2v2h2v2h-2z"/>
-  </svg>`;
-btnAdd.title = "Add to Watchlist";
-btnAdd.style.background = "none";
-btnAdd.style.border = "none";
-btnAdd.style.cursor = "pointer";
-btnAdd.style.padding = "4px";
-btnAdd.addEventListener("click", () => protectedAction('add', index));
+          <button class="btn-icon" title="Details" onclick="protectedAction('details', ${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10
+                       10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67
+                       1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm2 12h-4v-2h1v-4h-1v-2h3v6h1v2z"/>
+            </svg>
+          </button>
 
-// Watch button (play icon)
-const btnWatch = document.createElement("button");
-btnWatch.className = "btn-icon";
-btnWatch.innerHTML = `
- <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#00ff66">
-    <path d="M10 8.64L15.27 12 10 15.36V8.64M12 2C6.5 2 2 6.5
-             2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
-  </svg>`;
-btnWatch.title = "Watch Movie";
-btnWatch.style.background = "none";
-btnWatch.style.border = "none";
-btnWatch.style.cursor = "pointer";
-btnWatch.style.padding = "4px";
-btnWatch.addEventListener("click", () => protectedAction('watch', index));
+          <button class="btn-icon" title="Add to Watchlist" onclick="event.stopPropagation(); protectedAction('add', ${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14l8-3 8 3V5
+                       c0-1.1-.9-2-2-2zM12 10v4h-2v-4H8v-2h2V6h2v2h2v2h-2z"/>
+            </svg>
+          </button>
 
-// Append buttons to actions container
-actions.appendChild(btnDetails);
-actions.appendChild(btnAdd);
-actions.appendChild(btnWatch);
+          <button class="btn-icon" title="Watch Movie" onclick="protectedAction('watch', ${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M10 8.64L15.27 12 10 15.36V8.64M12 2C6.5 2 
+                       2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
+            </svg>
+          </button>
 
-// Append card body elements
-cardBody.appendChild(title);
-cardBody.appendChild(meta);
-cardBody.appendChild(rating);
-cardBody.appendChild(actions);
+        </div>
+      </div>`;
 
-// Append card sections
-card.appendChild(posterWrapper);
-card.appendChild(cardBody);
-
-    // Make poster clickable -> triggers same as watch
-    const posterImg = posterWrapper.querySelector(".poster");
-    if (posterImg) {
-      posterImg.style.cursor = "pointer";
-      posterImg.addEventListener("click", () => protectedAction('watch', index));
-    }
+    // ✔ Click poster to watch
+    const poster = card.querySelector(".poster");
+    poster.style.cursor = "pointer";
+    poster.addEventListener("click", () => protectedAction("watch", index));
 
     grid.appendChild(card);
   });
@@ -883,524 +1067,508 @@ card.appendChild(cardBody);
   window.currentFiltered = filtered;
 }
 
-/* ---------------- Protected action (checks subscription) ---------------- */
+/* ---------------- Protected action ---------------- */
 window.protectedAction = function(action, index) {
-  const m = window.currentFiltered && window.currentFiltered[index];
-  if (!m) return;
-  if (currentUser) {
-    if (currentUser.status && currentUser.status !== "Paid" && !currentUser.guest) {
+  if(currentUser){
+    if(currentUser.status !== "Paid"){
       alert("⚠ Your account is unpaid. Please contact support to regain access.");
       return;
     }
-    // allow actions
-    if (action === 'details') return viewDetailsByFiltered(index);
-    if (action === 'watch') return viewAndPlayByFiltered(index);
-    if (action === 'add') return addToWatchlistByFiltered(index);
-  } else {
-    // if not logged in, show guest modal (encourages subscription)
-    showGuestModal(action);
-  }
+    if(action==='details') return viewDetailsByFiltered(index);
+    if(action==='watch') return viewAndPlayByFiltered(index);
+    if(action==='add') return addToWatchlistByFiltered(index);
+  } else showGuestModal(action);
 };
 
 /* ---------------- Guest modal ---------------- */
 function showGuestModal(actionHint='') {
   const h = new Date(); let greet='Hello';
-  if (h.getHours()<12) greet='Good morning'; else if (h.getHours()<18) greet='Good afternoon'; else greet='Good evening';
-  if (guestGreeting) guestGreeting.innerText = `${greet}, Guest!`;
-  if (guestMessage) guestMessage.innerHTML = `You're browsing in <strong>Guest mode</strong>. To use ${actionHint ? `<strong>${actionHint}</strong>` : 'premium features'} subscribe.<br><br>Subscription: <strong>150 KSh / month</strong>. Contact our team.`;
-  const phone = '+254790427109';
-  if (waLink) waLink.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent('Hi, I want a MovieDrift premium account')}`;
-  if (callLink) callLink.href = `tel:${phone}`;
-  if (guestModal) guestModal.style.display = 'flex';
-  if (guestLoginBtn) guestLoginBtn.onclick = () => { closeModal('guestModal'); openAuthModal(); };
+  if(h.getHours()<12) greet='Good morning';
+  else if(h.getHours()<18) greet='Good afternoon';
+  else greet='Good evening';
+  guestGreeting.innerText = `${greet}, Guest!`;
+  guestMessage.innerHTML = `You're browsing in <strong>Guest mode The Black November offer is gone, but Premium Access unlocks full HD movies, streaming, and downloads anytime</strong>. To use ${actionHint ? `<strong>${actionHint}</strong>` : 'premium features'} subscribe.<br><br>Subscription: <strong>150 KSh / month</strong>. Contact our team.`;
+  const phone='+254790427109';
+  waLink.href=`https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent('Hi, I want a MovieDrift premium account')}`;
+  callLink.href=`tel:${phone}`;
+  document.getElementById('guestModal').style.display='flex';
+  guestLoginBtn.onclick = () => { closeModal('guestModal'); openAuthModal(); };
 }
 
-/* ---------------- MODAL HELPERS ---------------- */
-function openAuthModal(){ if(authModal) authModal.style.display='flex'; }
-window.closeModal = function(id){ const el = document.getElementById(id); if(!el) return; // pause videos & reset iframes
-  el.querySelectorAll("video").forEach(v => { v.pause(); v.currentTime = 0; });
-  el.querySelectorAll("iframe").forEach(f => { try{ f.src = f.src; }catch(e){} });
-  el.style.display='none';
-  // If closing movie modal, also remove any dynamic episode video wrappers
-  if(id === 'movieModal' && modalPlayer) modalPlayer.innerHTML = "";
-  // cleanup episode unsub if any? (we keep episode listeners globally for series)
-};
-document.querySelectorAll?.('.modal .close')?.forEach(btn => { btn.onclick = ()=> btn.closest('.modal').style.display='none'; });
+/* ---------------- Auth system ---------------- */
+async function loginUser(identifier, password) {
+  showLoader(); // Show loading indicator
+  try {
+    const usersRef = collection(db, "users");
 
-/* ---------------- WATCHLIST (Merged) ---------------- */
-function updateWatchlistButton(){ if (watchlistToggle) watchlistToggle.innerText = `Watchlist (${watchlist.length})`; }
-window.addToWatchlistByFiltered = function(index) {
-  const m = window.currentFiltered[index];
-  if(!m) return;
-  if (!watchlist.some(x => x.id === m.id)) { watchlist.push(m); saveWatchlist(); updateWatchlistButton(); alert(`${m.title} added to Watchlist`); }
-  else alert("⚠ Already in Watchlist");
-};
-if (watchlistToggle) watchlistToggle.onclick = function() {
-  if (!watchlistContainer) return;
-  watchlistContainer.innerHTML = "";
-  if (watchlist.length) {
-    watchlist.forEach((m, i) => {
-      const card = document.createElement("div");
-      card.className = "watchlist-card";
-      card.innerHTML = `<img src="${m.poster||''}" alt=""><div><h4>${m.title}</h4><p>${m.year||''}</p></div><button class="remove-btn" onclick="removeFromWatchlist(${i})">Remove</button>`;
-      watchlistContainer.appendChild(card);
-    });
-  } else {
-    watchlistContainer.innerHTML = "<p>No movies yet.</p>";
+    // First try email
+    let q = query(usersRef, where("email", "==", identifier), limit(1));
+    let snapshot = await Promise.race([
+      getDocs(q),
+      new Promise((_, reject) => setTimeout(() => reject("timeout"), 7000))
+    ]);
+
+    if (snapshot === "timeout") {
+      hideLoader();
+      return alert("Network too slow. Try again.");
+    }
+
+    // If not found by email, try username
+    if (snapshot.empty) {
+      q = query(usersRef, where("username", "==", identifier), limit(1));
+      snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        hideLoader();
+        return alert("User not found");
+      }
+    }
+
+    const userDoc = snapshot.docs[0];
+    const user = userDoc.data();
+
+    if (user.password === password) {
+      currentUser = { id: userDoc.id, ...user };
+      saveCurrentUser();
+      watchUserStatus();      // Start real-time status tracking
+      updateAuthUI();
+      closeModal('authModal');
+      hideLoader();
+      alert("Logged in successfully");
+    } else {
+      hideLoader();
+      alert("Incorrect password");
+    }
+  } catch (err) {
+    hideLoader();
+    console.error(err);
+    alert("An error occurred. Try again.");
   }
-  if (watchlistModal) watchlistModal.style.display = "flex";
-};
-window.removeFromWatchlist = i => { watchlist.splice(i,1); saveWatchlist(); updateWatchlistButton(); if(watchlistToggle) watchlistToggle.click(); };
+}
 
-/* ---------------- RENDER EPISODES & SUBTITLES (Option B) ---------------- */
-function attachSubtitlesToVideo(videoEl, tracks) {
-  // Remove existing tracks
-  Array.from(videoEl.querySelectorAll('track')).forEach(t => t.remove());
-  // tracks: array of { lang, label, url }
-  if (!Array.isArray(tracks)) return;
-  tracks.forEach(track => {
-    try {
-      const tr = document.createElement('track');
-      tr.kind = 'subtitles';
-      tr.label = track.label || track.lang || 'Subtitle';
-      tr.srclang = track.lang || '';
-      tr.src = track.url;
-      // default attribute if provided
-      if (track.default) tr.default = true;
-      videoEl.appendChild(tr);
-    } catch (e) { /* ignore */ }
+async function registerUser(identifier,password){
+  if(password.length<6){ alert("Password must be 6+ chars"); return; }
+  const usersRef = collection(db,"users");
+  const q=query(usersRef,where("email","==",identifier));
+  const snapshot=await getDocs(q);
+  if(!snapshot.empty){return alert("User already exists");}
+  const docRef = await addDoc(usersRef,{email:identifier,password:password,createdAt:Date.now(), status:"Paid"});
+  currentUser={id:docRef.id,email:identifier, status:"Paid"};
+  saveCurrentUser();
+  watchUserStatus();
+  alert("Account created & logged in");
+  updateAuthUI();
+  closeModal('authModal');
+}
+
+signInBtn.onclick = ()=>loginUser(authIdentifier.value.trim(),authPassword.value);
+registerBtn.onclick = ()=>registerUser(authIdentifier.value.trim(),authPassword.value);
+openAuthBtn.onclick=()=>openAuthModal();
+guestLoginBtn.onclick=()=>openAuthModal();
+logoutBtn.onclick=()=>{ currentUser=null; saveCurrentUser(); updateAuthUI(); };
+
+/* Modals */
+function openAuthModal(){authModal.style.display='flex';}
+function closeModal(id){document.getElementById(id).style.display='none'; if(episodeUnsub) episodeUnsub();}
+document.querySelectorAll('.modal .close').forEach(btn=>{ btn.onclick = ()=>btn.closest('.modal').style.display='none'; });
+
+/* Update UI */
+function updateAuthUI(){
+  if(currentUser){ openAuthBtn.style.display='none'; logoutBtn.style.display='inline-block'; }
+  else{ openAuthBtn.style.display='inline-block'; logoutBtn.style.display='none'; }
+}
+
+/* Watchlist */
+function updateWatchlistCount(){
+  document.getElementById("watchlistToggle").innerText=`Watchlist (${watchlist.length})`;
+}
+function addToWatchlistByFiltered(index){
+  const movie=currentFiltered[index];
+  if(!watchlist.some(m=>m.id===movie.id)) watchlist.push(movie);
+  localStorage.setItem("watchlist",JSON.stringify(watchlist));
+  updateWatchlistCount();
+  alert(`${movie.title} added to Watchlist`);
+}
+document.getElementById("watchlistToggle").onclick=()=>{ renderWatchlist(); document.getElementById("watchlistModal").style.display='flex'; };
+function renderWatchlist(){
+  const container=document.getElementById("watchlistContainer");
+  container.innerHTML="";
+  watchlist.forEach((m,i)=>{
+    const card=document.createElement("div");
+    card.className="watchlist-card";
+    card.innerHTML=`<img src="${m.poster||''}"><div>${m.title}</div><button class="remove-btn" onclick="removeFromWatchlist(${i})">Remove</button>`;
+    container.appendChild(card);
   });
 }
+window.removeFromWatchlist=function(i){watchlist.splice(i,1);localStorage.setItem("watchlist",JSON.stringify(watchlist));updateWatchlistCount();renderWatchlist();}
 
-function renderEpisodes(m, player, episodeList) {
-  if (!m || !m.episodes?.length) {
-    if (episodeList) episodeList.innerHTML = "";
-    return;
+/* Search & filters */
+document.getElementById("search").oninput=renderMovies;
+genreFilter.onchange=renderMovies;
+yearFilter.onchange=renderMovies;
+document.getElementById("typeFilter").onchange=renderMovies;
+
+/* Theme */
+document.getElementById("themeSelector").onchange=function(){document.body.className='theme-'+this.value;}
+
+/* Page init */
+loadCurrentUser();
+updateAuthUI();
+updateWatchlistCount();
+
+/* ---------------- MODAL & YOUTUBE ---------------- */
+function convertYouTubeLink(url) {
+  try {
+    if (url.includes("youtube.com/watch?v="))
+      return `https://www.youtube.com/embed/${url.split("v=")[1].split("&")[0]}?rel=0`;
+    if (url.includes("youtu.be/"))
+      return `https://www.youtube.com/embed/${url.split("youtu.be/")[1].split("?")[0]}?rel=0`;
+    return url;
+  } catch {
+    return url;
   }
-  episodeList.innerHTML = `<h4>Episodes</h4><div class="episode-list"></div>`;
-  const epContainer = episodeList.querySelector(".episode-list");
-  m.episodes.forEach(ep => {
-    const epUrl = ep.fileUrl || ep.url;
-    const playable = isDownloadable(epUrl);
-    const epDiv = document.createElement("div");
-    epDiv.className = "episode-btn";
-    epDiv.innerHTML = `<strong>Ep ${ep.ep}: ${ep.title || ""}</strong>${ep.description ? `<br><small>${ep.description}</small>` : ""}`;
-    epDiv.addEventListener("click", () => {
-      const existing = player.querySelector(".episode-video-wrapper"); if (existing) existing.remove();
-      const wrapper = document.createElement("div"); wrapper.className = "episode-video-wrapper";
-      wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
-      if (playable) {
-        // Play button + download + subtitle selector UI
-        wrapper.innerHTML = `
-          <div style="position:relative;width:100%;max-height:400px;background:#000;">
-            <button class="play-btn" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:10px 15px;font-size:16px;border:none;border-radius:6px;background:#00ff66;cursor:pointer;font-weight:bold;">▶ Play Episode</button>
-          </div>
-          <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
-            <a href="${epUrl}" download style="display:inline-block;padding:8px 12px;border-radius:6px;background:#00ff66;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>
-            <div id="subtitleControls" style="margin-left:10px;"></div>
-          </div>
-        `;
-        const playBtn = wrapper.querySelector(".play-btn");
-        playBtn.addEventListener("click", () => {
-          // Replace wrapper content with actual <video>
-          wrapper.innerHTML = `<video controls autoplay style="width:100%;max-height:400px;"></video>`;
-          const videoEl = wrapper.querySelector("video");
-          videoEl.src = epUrl;
-          // attach subtitles if present on episode or movie
-          const tracks = Array.isArray(ep.subtitles) && ep.subtitles.length ? ep.subtitles : (Array.isArray(m.subtitles) ? m.subtitles : []);
-          attachSubtitlesToVideo(videoEl, tracks);
-          markEpisodeWatched(m.id, ep.ep);
-        });
+}
 
-        // Subtitle controls (list available and downloadable)
-        const subtitleControls = wrapper.querySelector("#subtitleControls");
-        const tracks = Array.isArray(ep.subtitles) && ep.subtitles.length ? ep.subtitles : (Array.isArray(m.subtitles) ? m.subtitles : []);
-        if (subtitleControls) {
-          if (tracks.length) {
-            subtitleControls.innerHTML = `<label style="font-size:13px;">Subtitles:</label> <select id="subSelect"><option value="">(none)</option></select> <a id="subDownload" style="margin-left:6px;font-size:13px;"></a>`;
-            const subSelect = subtitleControls.querySelector("#subSelect");
-            const subDownload = subtitleControls.querySelector("#subDownload");
-            tracks.forEach((t, i) => {
-              const label = t.label || t.lang || `Track ${i+1}`;
-              const url = t.url;
-              subSelect.innerHTML += `<option value="${i}">${label}</option>`;
-            });
-            subSelect.onchange = () => {
-              const idx = parseInt(subSelect.value);
-              if (isNaN(idx)) {
-                subDownload.href = "";
-                subDownload.innerText = "";
-                return;
-              }
-              const t = tracks[idx];
-              subDownload.href = t.url;
-              subDownload.innerText = "⬇ Download subtitle";
-              subDownload.setAttribute("download", `${m.title}_S${ep.season||1}E${ep.ep}_${t.lang||t.label||'sub'}.vtt`);
-            };
-          } else {
-            subtitleControls.innerHTML = `<small>No subtitles available</small>`;
-          }
+function isDownloadable(url) {
+  return /\.(mp4|mkv|mov|wmv|avi|flv|webm)$/i.test(url);
+}
+
+/* ---------------- Episodes fetching ---------------- */
+let episodeUnsub = null;
+
+async function fetchEpisodesForMovie(movieId) {
+  const episodesColl = collection(db, "movies", movieId, "episodes");
+  const snapshot = await getDocs(episodesColl);
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+function watchEpisodes(movieId) {
+  const episodesColl = collection(db, "movies", movieId, "episodes");
+  const q = query(episodesColl);
+  return onSnapshot(q, snapshot => {
+    let episodes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Sort episodes by season then episode number
+    episodes.sort((a, b) => {
+      const seasonA = a.season || 1;
+      const seasonB = b.season || 1;
+      const epA = a.epNumber || a.ep || 1;
+      const epB = b.epNumber || b.ep || 1;
+      if (seasonA !== seasonB) return seasonA - seasonB;
+      return epA - epB;
+    });
+
+    const episodeList = document.getElementById("episodeList");
+    episodeList.innerHTML = `<h4>Episodes</h4><div class="episode-list"></div>`;
+    const epContainer = episodeList.querySelector(".episode-list");
+
+    episodes.forEach(ep => {
+      const epUrl = ep.fileUrl || ep.url;
+      const playable = isDownloadable(epUrl);
+
+      const epDiv = document.createElement("div");
+      epDiv.style = "border:1px solid #333;padding:10px;margin-top:8px;border-radius:6px;";
+      epDiv.innerHTML = `<strong>Episode ${ep.epNumber || ep.ep || ""}: ${ep.title || ""}</strong>
+                         ${ep.description ? `<br><small>${ep.description}</small>` : ""}`;
+
+      epDiv.addEventListener("click", () => {
+        const player = document.getElementById("modalPlayer");
+
+        // Remove previous episode video wrapper
+        const existing = player.querySelector(".episode-video-wrapper");
+        if (existing) existing.remove();
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "episode-video-wrapper";
+        wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
+
+        if (playable) {
+          wrapper.innerHTML = `
+            <button class="play-btn" style="
+              position:absolute;top:50%;left:50%;
+              transform:translate(-50%,-50%);
+              padding:10px 15px;font-size:16px;
+              border:none;border-radius:6px;
+              background:#00ff66;cursor:pointer;font-weight:bold;
+            ">▶ Play Episode</button>
+            <a href="${epUrl}" download style="
+              display:inline-block;margin-top:8px;
+              background:#00ff66;padding:8px 12px;
+              border-radius:6px;color:black;
+              font-weight:bold;text-decoration:none;
+            ">⬇ Download Episode</a>
+          `;
+          wrapper.querySelector(".play-btn").addEventListener("click", (e) => {
+            e.target.parentElement.innerHTML = `<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>`;
+          });
+        } else {
+          wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
         }
 
-      } else {
-        // iframe fallback (can't attach subtitles programmatically)
-        wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-      }
-      player.appendChild(wrapper);
+        player.appendChild(wrapper);
+      });
+
+      epContainer.appendChild(epDiv);
     });
-    epContainer.appendChild(epDiv);
   });
 }
 
-/* ---------------- VIEW DETAILS & WATCH ---------------- */
+/* ---------------- VIEW DETAILS ---------------- */
 window.viewDetailsByFiltered = async function (index) {
   const m = window.currentFiltered[index];
-  if (!m) return;
-  if (currentUser && currentUser.status && currentUser.status !== "Paid" && !currentUser.guest) {
+
+  if(currentUser && currentUser.status !== "Paid"){
     alert("⚠ Your account is unpaid. Upgrade to Paid to watch or download.");
     return;
   }
-  // clear player & episode list
-  if (modalPlayer) modalPlayer.innerHTML = "";
-  if (episodeListEl) episodeListEl.innerHTML = "";
 
-  // TRAILER
+  const player = document.getElementById("modalPlayer");
+  const episodeList = document.getElementById("episodeList");
+  player.innerHTML = "";
+  episodeList.innerHTML = "";
+
+  // Trailer
   if (m.trailer) {
-    const trailerEmbed = convertYouTubeLink(m.trailer);
-    if (modalPlayer) {
-      // show play button for trailer
-      const trailerHtml = `<h4>Trailer</h4>
-        <div class="video-wrapper" style="position:relative;width:100%;max-height:400px;background:#000;">
-          <button class="play-btn" id="trailerPlayBtn" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:12px 20px;font-size:18px;border:none;border-radius:6px;background:#00ff66;cursor:pointer;font-weight:bold;">▶ Play Trailer</button>
-        </div>`;
-      modalPlayer.innerHTML += trailerHtml;
-      const playBtn = modalPlayer.querySelector("#trailerPlayBtn");
-      playBtn && playBtn.addEventListener("click", () => {
-        modalPlayer.querySelector(".video-wrapper").innerHTML = `<iframe src="${trailerEmbed}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-      });
-    }
+    player.innerHTML += `
+      <h4>Trailer</h4>
+      <iframe src="${convertYouTubeLink(m.trailer)}"
+              frameborder="0" allowfullscreen
+              style="width:100%;height:400px;"></iframe>
+    `;
   }
 
-  // MOVIE FILE
+  // Movie Player
   if (m.fileUrl) {
     const direct = isDownloadable(m.fileUrl);
+
     if (direct) {
-      modalPlayer.innerHTML += `<h4>Movie</h4><div class="video-wrapper" style="position:relative;width:100%;max-height:500px;background:#000;"><button class="play-btn" id="moviePlayBtn" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:12px 20px;font-size:18px;border:none;border-radius:6px;background:#00ff66;cursor:pointer;font-weight:bold;">▶ Play Movie</button></div>
-        <a href="${m.fileUrl}" download style="display:inline-block;margin-top:10px;background:#00ff66;padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
-      const moviePlayBtn = document.getElementById("moviePlayBtn");
-      moviePlayBtn && moviePlayBtn.addEventListener("click", () => {
-        const wrapper = modalPlayer.querySelector(".video-wrapper");
-        wrapper.innerHTML = `<video controls autoplay style="width:100%;max-height:500px;"></video>`;
-        const videoEl = wrapper.querySelector("video");
-        videoEl.src = m.fileUrl;
-        // attach movie-level subtitle tracks
-        attachSubtitlesToVideo(videoEl, m.subtitles || []);
-      });
+      player.innerHTML += `
+        <h4>Movie</h4>
+        <video controls src="${m.fileUrl}" style="width:100%;max-height:500px;"></video>
+        <a href="${m.fileUrl}" download
+          style="display:inline-block;margin-top:10px;background:#00ff66;
+                 padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">
+          ⬇ Download
+        </a>
+      `;
     } else {
-      modalPlayer.innerHTML += `<h4>Movie</h4><iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
+      player.innerHTML += `
+        <h4>Movie</h4>
+        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen
+                style="width:100%;height:500px;"></iframe>
+      `;
     }
   }
 
-  // EPISODES (series)
+  // Episodes
+if (m.type === "Series") {
+  if (episodeUnsub) episodeUnsub();
+
+  // Sort episodes by season and episode number
+  if (m.episodes && m.episodes.length > 0) {
+    m.episodes.sort((a, b) => {
+      if ((a.season || 1) !== (b.season || 1)) {
+        return (a.season || 1) - (b.season || 1);
+      }
+      return (a.ep || 1) - (b.ep || 1);
+    });
+  }
+
+  episodeUnsub = watchEpisodes(m.id); // keep same function call
+}
+
+document.getElementById("modalTitle").innerText = m.title;
+document.getElementById("modalYear").innerText = "Year: " + m.year;
+document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
+document.getElementById("modalRating").innerText = m.rating
+  ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
+  : "";
+document.getElementById("modalDesc").innerText = m.description || "";
+document.getElementById("movieModal").style.display = "flex";
+document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
+};
+
+
+/* ---------------- WATCH BUTTON (with real-time episodes) ---------------- */
+window.viewAndPlayByFiltered = function(index){
+  const m = window.currentFiltered[index];
+
+  // CHECK PAYMENT
+  if(currentUser && currentUser.status !== "Paid"){
+    alert("⚠ Your account is unpaid. Upgrade to Paid to watch or download.");
+    return;
+  }
+
+  const player = document.getElementById("modalPlayer");
+  const episodeList = document.getElementById("episodeList");
+
+  player.innerHTML = "";
+  episodeList.innerHTML = "";
+
+  /* ---------------- TRAILER ---------------- */
+  if (m.trailer) {
+    player.innerHTML += `
+      <h4>Trailer</h4>
+      <iframe src="${convertYouTubeLink(m.trailer)}"
+              frameborder="0" allowfullscreen
+              style="width:100%;height:400px;"></iframe>
+    `;
+  }
+
+  /* ---------------- MOVIE / MAIN FILE ---------------- */
+  if (m.fileUrl) {
+    const direct = isDownloadable(m.fileUrl);
+
+    if (direct) {
+      player.innerHTML += `
+        <h4>Movie</h4>
+        <video controls autoplay src="${m.fileUrl}" 
+               style="width:100%;max-height:500px;"></video>
+        <a href="${m.fileUrl}" download
+           style="display:inline-block;margin-top:10px;background:#00ff66;
+                  padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">
+           ⬇ Download
+        </a>
+      `;
+    } else {
+      player.innerHTML += `
+        <h4>Movie</h4>
+        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen
+                style="width:100%;height:500px;"></iframe>
+      `;
+    }
+  }
+
+  /* ---------------- REAL-TIME EPISODES LIKE DETAILS ---------------- */
   if (m.type === "Series") {
-    renderEpisodes(m, modalPlayer, episodeListEl);
-  } else {
-    // also show movie subtitles (list & download) when not a series
-    if (m.subtitles && m.subtitles.length) {
-      const subHtml = `<div style="margin-top:8px;"><label>Subtitles:</label>
-        <select id="movieSubSelect"><option value="">(none)</option></select>
-        <a id="movieSubDownload" style="margin-left:8px;"></a></div>`;
-      modalPlayer.insertAdjacentHTML('beforeend', subHtml);
-      const select = document.getElementById("movieSubSelect");
-      const down = document.getElementById("movieSubDownload");
-      m.subtitles.forEach((t, i) => select.innerHTML += `<option value="${i}">${t.label || t.lang || ('Track ' + (i+1))}</option>`);
-      select.onchange = () => {
-        const idx = parseInt(select.value);
-        if (isNaN(idx)) { down.href = ""; down.innerText = ""; return; }
-        const t = m.subtitles[idx];
-        down.href = t.url; down.innerText = "⬇ Download subtitle"; down.setAttribute("download", `${m.title}_sub_${t.lang||t.label||'vtt'}.vtt`);
-      };
-    }
+    if (episodeUnsub) episodeUnsub();   // stop old listener
+    episodeUnsub = watchEpisodes(m.id); // start new live listener
   }
 
-  // set metadata UI
-  if (modalTitle) modalTitle.innerText = m.title || "";
-  if (modalYear) modalYear.innerText = "Year: " + (m.year || "");
-  if (modalGenres) modalGenres.innerText = "Genres: " + ((m.genres || []).join(", "));
-  if (modalRating) modalRating.innerText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
-  if (modalDesc) modalDesc.innerText = m.description || "";
-  if (modalAddToList) modalAddToList.onclick = () => addToWatchlistByFiltered(index);
+  /* ---------------- POPULATE MODAL DATA ---------------- */
+  document.getElementById("modalTitle").innerText = m.title;
+  document.getElementById("modalYear").innerText = "Year: " + m.year;
+  document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
+  document.getElementById("modalRating").innerText = m.rating
+    ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
+    : "";
+  document.getElementById("modalDesc").innerText = m.description || "";
 
-  if (document.getElementById("movieModal")) document.getElementById("movieModal").style.display = "flex";
+  document.getElementById("movieModal").style.display = "flex";
+  document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
 };
-
-window.viewAndPlayByFiltered = function(index) {
-  // Shortcut to open details and play if possible (same as viewDetails, but focuses on playing)
-  viewDetailsByFiltered(index);
-};
-
-/* ---------------- BACK BUTTON HANDLING (Script2) ---------------- */
-(function () {
-  const modalIds = ["movieModal", "watchlistModal", "authModal", "guestModal"];
+// ---------------- BACK BUTTON HANDLING ----------------
+(function() {
+  const modalIds = ["movieModal", "watchlistModal"];
   let openModal = null;
 
+  // Listen for modal openings
   const observer = new MutationObserver(() => {
     modalIds.forEach(id => {
       const modal = document.getElementById(id);
-      if (modal && modal.style.display === "flex") {
+      if (modal.style.display === "flex") {
         openModal = modal;
+        // Push state only if a modal opens
         history.pushState({ modalOpen: true, modalId: id }, "");
       }
     });
   });
   observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["style"] });
 
+  // Handle back button
   window.addEventListener("popstate", function(event) {
     if (event.state && event.state.modalOpen && event.state.modalId) {
       const modal = document.getElementById(event.state.modalId);
-      if (modal) modal.style.display = "none";
-      openModal = null;
+      if (modal) {
+        modal.style.display = "none";
+        openModal = null;
+      }
     } else if (openModal) {
+      // Close currently open modal
       openModal.style.display = "none";
       openModal = null;
+      // Push a new state so user can go back to previous page if desired
       history.pushState({}, "");
     }
+    // If no modal is open, back button works normally
   });
 })();
+// MENU TOGGLE SCRIPT
+const menuToggle = document.getElementById("menuToggle");
+const menu = document.querySelector(".md-menu");
 
-/* ---------------- SEARCH & FILTER EVENTS ---------------- */
-searchInput?.addEventListener("input", renderMovies);
-genreFilter?.addEventListener("change", renderMovies);
-yearFilter?.addEventListener("change", renderMovies);
-typeFilter?.addEventListener("change", renderMovies);
+menuToggle.onclick = () => {
+  menuToggle.classList.toggle("active");
+  menu.classList.toggle("active");
+  /* AUTO-CLOSE MENU WHEN LINK IS CLICKED */
+document.querySelectorAll('.md-menu a').forEach(link => {
+    link.addEventListener('click', () => {
+        const menu = document.querySelector('.md-menu');
+        const toggle = document.querySelector('.menu-toggle');
 
-/* ---------------- THEME SYSTEM (Script2) ---------------- */
-const savedTheme = localStorage.getItem("theme") || "dark";
-document.body.classList.add("theme-" + savedTheme);
-if (themeSelector) {
-  themeSelector.value = savedTheme;
-  themeSelector.onchange = () => {
-    const theme = themeSelector.value;
-    ["theme-dark","theme-white","theme-pink","theme-blue","theme-gold","theme-purple"].forEach(c => document.body.classList.remove(c));
-    document.body.classList.add("theme-" + theme);
-    localStorage.setItem("theme", theme);
-  };
-}
-
-/* ---------------- INIT / UI STATE ---------------- */
-updateAuthUI();
-updateWatchlistButton();
-
-// Ensure UI reflects logged-in user at init
-if (currentUser) watchUserStatus();
-
-/* ---------------- CLEANUP: Unsubscribe episode listeners when page unloads ---------------- */
-window.addEventListener("beforeunload", () => {
-  episodeUnsubs.forEach(unsub => { try { unsub(); } catch(e){} });
-  episodeUnsubs.clear();
+        menu.classList.remove('active');
+        toggle.classList.remove('active');
+    });
 });
 
-/* ---------------- END OF SCRIPT ---------------- */
-/* ---------------- TRANSLATOR FEATURE ---------------- */
-
-// Create a translation modal
-const translatorModal = document.createElement("div");
-translatorModal.style.position = "fixed";
-translatorModal.style.top = "0";
-translatorModal.style.left = "0";
-translatorModal.style.width = "100%";
-translatorModal.style.height = "100%";
-translatorModal.style.background = "rgba(0,0,0,0.8)";
-translatorModal.style.display = "none";
-translatorModal.style.justifyContent = "center";
-translatorModal.style.alignItems = "center";
-translatorModal.style.zIndex = "9999";
-
-translatorModal.innerHTML = `
-  <div style="background:#111;color:#fff;padding:20px;border-radius:10px;max-width:400px;width:90%;text-align:center;">
-    <h2>Translate Description</h2>
-    <select id="langSelect" style="padding:5px;margin:10px 0;">
-      <option value="en">English</option>
-      <option value="sw">Swahili</option>
-      <option value="fr">French</option>
-      <option value="de">German</option>
-      <option value="es">Spanish</option>
-      <option value="ar">Arabic</option>
-      <option value="zh-CN">Chinese</option>
-    </select>
-    <div style="margin-top:10px;">
-      <button id="translateConfirm" style="padding:5px 10px;background:#00ff66;color:#000;border:none;border-radius:4px;cursor:pointer;">Translate</button>
-      <button id="translateClose" style="padding:5px 10px;background:#ff3333;color:#fff;border:none;border-radius:4px;cursor:pointer;">Close</button>
-    </div>
-  </div>
-`;
-document.body.appendChild(translatorModal);
-
-const langSelect = translatorModal.querySelector("#langSelect");
-const translateConfirm = translatorModal.querySelector("#translateConfirm");
-const translateClose = translatorModal.querySelector("#translateClose");
-
-translateClose.onclick = () => { translatorModal.style.display = "none"; };
-
-// Translation function using Google Translate API
-async function translateText(text, targetLang = "en") {
-  if (!text) return text;
-  try {
-    const encoded = encodeURIComponent(text);
-    const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encoded}`);
-    const data = await res.json();
-    if (data && data[0] && data[0][0] && data[0][0][0]) return data[0][0][0];
-    return text;
-  } catch (e) {
-    console.error("Translation error:", e);
-    return text;
-  }
-}
-
-// Append Translate button inside your movie modal
-const translateBtn = document.createElement("button");
-translateBtn.innerText = "🌐 Translate Description";
-translateBtn.style.margin = "10px 0";
-translateBtn.style.cursor = "pointer";
-translateBtn.style.background = "#00ff66";
-translateBtn.style.color = "#000";
-translateBtn.style.border = "none";
-translateBtn.style.padding = "6px 10px";
-translateBtn.style.borderRadius = "4px";
-
-translateBtn.onclick = () => {
-  translatorModal.style.display = "flex";
-};
-
-// When confirming translation
-translateConfirm.onclick = async () => {
-  if (!modalDesc) return;
-  const originalText = modalDesc.dataset.original || modalDesc.innerText;
-  modalDesc.dataset.original = originalText;
-  const lang = langSelect.value;
-  modalDesc.innerText = "Translating...";
-  const translated = await translateText(originalText, lang);
-  modalDesc.innerText = translated;
-
-  
-
-  translatorModal.style.display = "none";
-};
-
-// Add to movie modal after showing details
-const originalViewDetails = window.viewDetailsByFiltered;
-window.viewDetailsByFiltered = async function(index) {
-  await originalViewDetails(index);
-  if (modalDesc && !modalDesc.parentNode.querySelector('button.translate-btn')) {
-    translateBtn.className = "translate-btn";
-    modalDesc.parentNode.appendChild(translateBtn);
-  }
 };
 
 </script>
 
+<div id="loader" style="
+  display:none;
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.75);
+  backdrop-filter: blur(2px);
+  z-index:999999;
+  color:white;
+  font-size:20px;
+  text-align:center;
+  padding-top:20%;
+  font-family:Arial, sans-serif;
+">
 
+  <!-- Bouncing circles -->
+  <div style="margin:0 auto 12px auto; width:70px; display:flex; justify-content:space-between;">
+    <div class="bounce-circle"></div>
+    <div class="bounce-circle"></div>
+    <div class="bounce-circle"></div>
+  </div>
+
+  Loading, please wait...
+</div>
+
+<style>
+.bounce-circle {
+  width:15px;
+  height:15px;
+  background-color:#00ff66;
+  border-radius:50%;
+  display:inline-block;
+  animation: bounce 0.6s infinite alternate;
+}
+
+.bounce-circle:nth-child(2) { animation-delay: 0.2s; }
+.bounce-circle:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-15px); }
+}
+</style>
 
 <script>
-// =========================
-// NETFLIX-STYLE TV NAVIGATION
-// =========================
-
-// Get all movie cards
-let cards = [];
-let focusedIndex = 0;
-
-// Add focus highlight class
-const focusClass = "tv-focus";
-
-// Add special focus glow style
-const style = document.createElement("style");
-style.innerHTML = `
-.${focusClass} {
-  outline:4px solid var(--accent);
-  outline-offset:4px;
-  transform:scale(1.08) !important;
-  z-index:5 !important;
-}
-`;
-document.head.appendChild(style);
-
-// Run once page loads
-window.addEventListener("load", () => {
-  cards = Array.from(document.querySelectorAll(".card"));
-  if(cards.length > 0) {
-    cards[0].classList.add(focusClass);
-    focusedIndex = 0;
-  }
-});
-
-// ----------------------
-// CHANGE FOCUS HANDLER
-// ----------------------
-function moveFocus(newIndex) {
-  if(!cards.length) return;
-  if(newIndex < 0 || newIndex >= cards.length) return;
-
-  cards[focusedIndex].classList.remove(focusClass);
-  focusedIndex = newIndex;
-  cards[focusedIndex].classList.add(focusClass);
-
-  // scroll card into view on TVs
-  cards[focusedIndex].scrollIntoView({
-    behavior:"smooth",
-    block:"nearest",
-    inline:"center"
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(() => console.log("PWA Ready"))
+      .catch(err => console.log("SW Error:", err));
   });
 }
-
-// ----------------------
-// GRID POSITION CALCULATOR
-// ----------------------
-function getCardsPerRow() {
-  const firstCard = cards[0];
-  if(!firstCard) return 1;
-
-  const cardWidth = firstCard.offsetWidth + 20; // gap included
-  return Math.floor(window.innerWidth / cardWidth);
-}
-
-// ----------------------
-// REMOTE KEY EVENTS
-// ----------------------
-document.addEventListener("keydown", (e) => {
-  const rows = getCardsPerRow();
-
-  if(e.key === "ArrowRight") {
-    moveFocus(focusedIndex + 1);
-  }
-
-  else if(e.key === "ArrowLeft") {
-    moveFocus(focusedIndex - 1);
-  }
-
-  else if(e.key === "ArrowDown") {
-    moveFocus(focusedIndex + rows);
-  }
-
-  else if(e.key === "ArrowUp") {
-    moveFocus(focusedIndex - rows);
-  }
-
-  else if(e.key === "Enter") {
-    // simulate pressing WATCH button
-    const btn = cards[focusedIndex].querySelector("button");
-    if(btn) btn.click();
-  }
-
-  else if(e.key === "Backspace" || e.key === "Escape") {
-    const modal = document.getElementById("playerModal");
-    if(modal && modal.style.display === "flex") {
-      modal.style.display = "none";
-    }
-  }
-});
 </script>
 
 
 </body>
 </html>
+
