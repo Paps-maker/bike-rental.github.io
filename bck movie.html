@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="icon" href="img/logo.png" type="image/png">
 <title>MovieDrift</title>
+<link rel="manifest" href="manifest.json">
+
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js")
+    .then(() => console.log("MovieDrift PWA Active"));
+  }
+</script>
 
 <style>
 :root { --bg:#000; --card-bg:#0a0a0a; --accent:#00ff66; --text:#ddd; --muted:#888; }
@@ -347,6 +355,27 @@ a.download-link:hover,
   transform: translateY(-1px);
 }
 
+/* Movie Drift button (keeps your theme) */
+.guest-cta .btn {
+  background: var(--accent);
+  color: #000;
+}
+.guest-cta .btn:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  outline: none;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.btn-icon svg {
+  pointer-events: none;
+}
 /* ===========================
    MOVIEDRIFT PREMIUM UI CSS
    =========================== */
@@ -550,20 +579,17 @@ a.download-link:hover,
   position:relative;
   z-index:1;
 }
-/* Responsive search input with spacing */
+/* Responsive search input */
 #search {
   width: 100%;           /* Full width of its container */
-  max-width: 500px;      /* Limit max width on large screens */
+  max-width: 500px;      /* Optional: limit max width on large screens */
   padding: 10px 15px;    /* Comfortable padding */
   font-size: 16px;       /* Readable text */
   border: 2px solid #00ff66; /* Accent border */
   border-radius: 25px;   /* Rounded edges */
   outline: none;
-  box-sizing: border-box;
+  box-sizing: border-box; /* Ensure padding doesn't break width */
   transition: all 0.3s ease;
-  
-  /* Spacing from menu toggle */
-  margin: 0 10px;        /* Horizontal margin (left & right) */
 }
 
 #search:focus {
@@ -571,24 +597,370 @@ a.download-link:hover,
   box-shadow: 0 0 5px rgba(0, 255, 102, 0.5);
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
+/* Optional: responsive font size for small screens */
+@media (max-width: 400px) {
   #search {
-    max-width: 300px;    /* Smaller max width on tablets/mobile */
-    margin: 0 5px;       /* Less margin for small screens */
     font-size: 14px;
     padding: 8px 12px;
   }
 }
+/* =========================================
+   FEATURED MODAL (RESPONSIVE PREMIUM)
+   ========================================= */
+.md-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(12px);
+  z-index: 99999;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.md-modal.show {
+  display: flex !important;
+}
+
+.featured-box {
+  width: 95%;
+  max-width: 900px;
+  background: rgba(15, 15, 15, 0.95);
+  border-radius: 18px;
+  padding: 22px;
+  border: 1px solid rgba(0,255,120,0.35);
+  box-shadow: 0 0 40px rgba(0,255,120,0.3);
+  transform: scale(0.92);
+  animation: popIn 0.3s ease forwards;
+  overflow: hidden;
+}
+
+/* Modal Header */
+.featured-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0,255,120,0.35);
+}
+
+.featured-header h2 {
+  color: #00ff80;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(0,255,120,0.25);
+  margin: 0;
+}
+
+.closeFeatured {
+  font-size: 28px;
+  cursor: pointer;
+  color: #fff;
+  transition: 0.25s ease;
+}
+
+.closeFeatured:hover {
+  color: #00ff80;
+  transform: rotate(90deg);
+}
+
+/* Grid */
+.featured-grid {
+  margin-top: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+/* Scrollbar */
+.featured-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.featured-grid::-webkit-scrollbar-thumb {
+  background: #00ff80;
+  border-radius: 50px;
+}
+
+/* Card */
+.featured-grid .card {
+  background: rgba(10,10,10,0.85);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: 0.25s ease;
+  box-shadow: 0 0 15px rgba(0,0,0,0.35);
+}
+
+.featured-grid .card:hover {
+  transform: translateY(-5px) scale(1.04);
+  border-color: #00ff80;
+  box-shadow: 0 0 25px rgba(0,255,120,0.35);
+}
+
+/* Card Image & Title */
+.featured-grid .card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.featured-grid .card .title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ddd;
+  padding: 6px 8px 4px 8px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.featured-grid .card .rating {
+  font-size: 13px;
+  color: #00ff80;
+  text-align: center;
+  padding-bottom: 6px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+@keyframes popIn {
+  0% {transform: scale(0.85); opacity: 0;}
+  100% {transform: scale(1); opacity: 1;}
+}
+
+/* ===============================
+   RESPONSIVE BREAKPOINTS
+================================ */
+@media(max-width:768px){
+  .featured-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  .featured-grid .card img { height: 170px; }
+  .featured-header h2 { font-size: 20px; }
+}
+
+@media(max-width:480px){
+  .featured-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+  }
+  .featured-grid .card img { height: 140px; }
+  .featured-header h2 { font-size: 18px; }
+  .premium-btn { font-size: 12px; padding: 8px 12px; }
+}
+/* ===============================
+   SMALL PREMIUM TRENDING & TOP RATED BUTTONS
+=============================== */
+#trendingBtn, #topRatedBtn {
+  display: inline-block !important;
+  visibility: visible !important;
+  position: relative;
+  z-index: 9999;
+
+  background: linear-gradient(135deg, #00ff80, #00ccff);
+  border: none;
+  color: #000;
+  font-weight: 700;
+  padding: 6px 12px;        /* small size */
+  border-radius: 8px;        /* slightly rounded */
+  cursor: pointer;
+  font-size: 12px;           /* small font */
+  letter-spacing: 0.4px;
+  transition: all 0.25s ease;
+  box-shadow: 0 0 12px rgba(0,255,120,0.25);
+  text-transform: uppercase;
+}
+
+/* Hover effect */
+#trendingBtn:hover, #topRatedBtn:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 0 20px rgba(0,255,150,0.35);
+}
+
+/* Disabled state while movies load */
+#trendingBtn[disabled], #topRatedBtn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media(max-width:768px){
+  #trendingBtn, #topRatedBtn { font-size:11px; padding:5px 10px; }
+}
+@media(max-width:480px){
+  #trendingBtn, #topRatedBtn { font-size:10px; padding:4px 8px; }
+}
+.carousel-wrapper {
+  position: relative;
+}
+
+/* ---------------- Arrows ---------------- */
+.arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background-color: rgba(0,0,0,0.7);
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 5px 10px;
+  transition: background 0.3s ease;
+}
+
+.arrow:hover {
+  background-color: #00ff66;
+  color: #000;
+}
+
+.arrow.left {
+  left: 0;
+}
+
+.arrow.right {
+  right: 0;
+}
+
+/* ---------------- Sections ---------------- */
+.carousel-section {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease, padding 0.5s ease;
+  padding: 0 20px;
+  margin-bottom: 30px;
+}
+
+.carousel-section.show {
+  max-height: 1000px; /* large enough to show carousel */
+  padding: 20px;
+}
+
+.carousel-section h2 {
+  color: var(--accent);
+  font-size: 1.5rem;
+  margin-bottom: 12px;
+}
+
+/* ---------------- Carousel ---------------- */
+.carousel-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 10px 0;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none; /* hide scrollbar */
+}
+
+/* ---------------- Movie Cards ---------------- */
+.carousel .card {
+  flex: 0 0 auto;
+  width: 150px;
+  height: 225px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease;
+}
+
+.carousel .card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* ensures perfect poster fit */
+  display: block;
+}
+
+.carousel .card:hover {
+  transform: scale(1.05);
+}
+
+/* ---------------- Movie Title ---------------- */
+.carousel .card .title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text);
+  text-align: center;
+  padding: 4px 2px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------- Movie Rating ---------------- */
+.carousel .card .rating {
+  font-size: 12px;
+  color: var(--accent);
+  text-align: center;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: rgba(0,0,0,0.5);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* ---------------- Toggle Buttons ---------------- */
+#toggleTrending,
+#toggleTopRated {
+  background-color: #000;          /* black background */
+  color: #00ff66;                  /* accent green text */
+  border: 2px solid #00ff66;       /* green border */
+  padding: 6px 16px;               /* compact size */
+  font-size: 14px;                  /* small, readable */
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 6px;              /* subtle rounding */
+  transition: all 0.3s ease;
+  margin: 0 6px;                    /* spacing between buttons */
+}
+
+#toggleTrending:hover,
+#toggleTopRated:hover {
+  background-color: #00ff66;       /* green on hover */
+  color: #000;                     /* black text on hover */
+  transform: scale(1.05);          /* subtle pop effect */
+}
+
+#toggleTrending:focus,
+#toggleTopRated:focus {
+  outline: none;                   /* remove default focus outline */
+  box-shadow: 0 0 6px #00ff66;    /* glow on focus */
+}
+
 
 </style>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#00ff66">
-
-<!-- iOS support -->
-<link rel="apple-touch-icon" href="img/logo-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-
 </head>
 <body>
 
@@ -616,67 +988,6 @@ a.download-link:hover,
     </select>
 
     
-<style>
-#installAppBtn {
-  background:#00ff66;
-  color:#000;
-  padding:7px 12px;
-  border:none;
-  border-radius:40px;
-  font-size:12px;
-  font-weight:600;
-  cursor:pointer;
-  display:none;
-  align-items:center;
-  gap:6px;
-  box-shadow:0 0 10px rgba(0,255,102,0.35);
-  transition:all .25s ease;
-}
-
-#installAppBtn:hover {
-  transform:translateY(-2px);
-  box-shadow:0 0 14px rgba(0,255,102,0.6);
-}
-
-#installAppBtn:active {
-  transform:scale(0.95);
-}
-
-#installAppBtn svg {
-  width:14px;
-  height:14px;
-}
-</style>
-
-<button id="installAppBtn">
-  <svg viewBox="0 0 24 24" fill="none">
-    <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17h16" 
-          stroke="black" stroke-width="2" 
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  Install App
-</button>
-
-<script>
-let deferredPrompt;
-const installBtn = document.getElementById("installAppBtn");
-
-// Show the install button when PWA can be installed
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.style.display = "inline-flex";
-});
-
-// Handle button click
-installBtn.addEventListener("click", () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  deferredPrompt = null;
-  installBtn.style.display = "none";
-});
-</script>
-
 
     <select id="typeFilter">
       <option value="">All types</option>
@@ -695,10 +1006,66 @@ installBtn.addEventListener("click", () => {
 
     <button id="watchlistToggle" class="btn">Watchlist (0)</button>
   </div>
-  
+   
 </header>
+<button id="toggleTrending">Trending</button>
+  <button id="toggleTopRated">Top Rated</button>
+<div class="toggle-buttons">
+ 
+</div>
+
+<section id="trendingSection" class="carousel-section">
+  <h2>🔥 Trending Movies</h2>
+  <div class="carousel-wrapper">
+    <button class="left arrow" data-target="trendingCarousel">‹</button>
+    <div class="carousel" id="trendingCarousel"></div>
+    <button class="right arrow" data-target="trendingCarousel">›</button>
+  </div>
+</section>
+
+<section id="topRatedSection" class="carousel-section">
+  <h2>⭐ Top Rated Movies</h2>
+  <div class="carousel-wrapper">
+    <button class="left arrow" data-target="topRatedCarousel">‹</button>
+    <div class="carousel" id="topRatedCarousel"></div>
+    <button class="right arrow" data-target="topRatedCarousel">›</button>
+  </div>
+</section>
 
 <main><div id="grid" class="grid"></div></main>
+<button id="installBtn" style="
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  background:#00ff66;
+  color:#000;
+  padding:12px 18px;
+  font-weight:bold;
+  border-radius:6px;
+  border:none;
+  cursor:pointer;
+  display:none;
+">
+  Install MovieDrift
+</button>
+
+<script>
+let deferredPrompt;
+const btn = document.getElementById("installBtn");
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  btn.style.display = "block";
+});
+
+btn.addEventListener("click", () => {
+  btn.style.display = "none";
+  deferredPrompt.prompt();
+  deferredPrompt = null;
+});
+</script>
+
 
 <!-- Movie Modal -->
 <div class="modal" id="movieModal">
@@ -740,33 +1107,25 @@ installBtn.addEventListener("click", () => {
 </div>
 
 <!-- Auth Modal -->
-<!-- Auth Modal -->
 <div class="modal" id="authModal">
   <div class="modal-content">
     <span class="close" onclick="closeModal('authModal')">&times;</span>
-    <h2 id="authTitle">Sign in</h2>
-    <div style="display:flex;gap:8px;flex-direction:column;max-width:420px;">
+    <h2 id="authTitle">Sign In</h2>
+    <div class="auth-form">
       <input id="authIdentifier" placeholder="Email or Username" type="text">
       <input id="authPassword" placeholder="Password (6+ chars)" type="password">
-      <div style="display:flex;gap:8px;">
+      <div class="auth-buttons">
         <button id="signInBtn" class="btn">Sign In</button>
-        <button id="registerBtn" class="btn">Register</button>
+        <button id="registerBtn" class="btn"></button>
       </div>
-      <div style="color:var(--muted);font-size:13px;margin-top:8px;">
-        If you have no account contact our team to be registered.
+      <div class="auth-note">
+        If you have no account, contact our team to be registered.
       </div>
     </div>
   </div>
 </div>
 
-<!-- Loader (add this in your HTML, hidden by default) -->
-<div id="loader" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;justify-content:center;align-items:center;">
-  <div style="padding:20px;background:#000;color:#00ff66;border-radius:8px;font-weight:bold;">Loading...</div>
-</div>
-
-
 <style>
-  
 /* Modal Background */
 .modal {
   display: none; /* hidden by default */
@@ -869,6 +1228,7 @@ installBtn.addEventListener("click", () => {
 </style>
 
 
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
@@ -930,17 +1290,74 @@ function watchUserStatus() {
   });
 }
 
-/* ---------------- Load movies ---------------- */
 onSnapshot(collection(db, "movies"), snapshot => {
   movies = snapshot.docs.map(d => {
     const data = d.data();
     const createdAt = data.createdAt?.seconds ? data.createdAt.seconds*1000 : data.createdAt||0;
     const year = parseInt(data.year)||0;
     return { id:d.id, ...data, createdAt, year };
-  }).sort((a,b)=>b.year!==a.year? b.year-a.year : b.createdAt-a.createdAt);
+  }).sort((a,b)=> b.year!==a.year ? b.year-a.year : b.createdAt-a.createdAt);
+
   populateFilters();
   renderMovies();
+
+  // Populate Trending
+  const trendingCarousel = document.getElementById("trendingCarousel");
+  trendingCarousel.innerHTML = "";
+  const trending = [...movies].sort((a,b)=> (b.createdAt||0) - (a.createdAt||0)).slice(0,20);
+  trending.forEach(m => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${m.poster || ''}" alt="${m.title}">
+      <div class="title">${m.title}</div>
+      <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
+    `;
+    card.onclick = () => protectedAction("watch", movies.findIndex(x=>x.id===m.id));
+    trendingCarousel.appendChild(card);
+  });
+
+  // Populate Top Rated
+  const topRatedCarousel = document.getElementById("topRatedCarousel");
+  topRatedCarousel.innerHTML = "";
+  const topRated = [...movies].sort((a,b)=> (b.rating||0) - (a.rating||0)).slice(0,20);
+  topRated.forEach(m => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${m.poster || ''}" alt="${m.title}">
+      <div class="title">${m.title}</div>
+      <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
+    `;
+    card.onclick = () => protectedAction("watch", movies.findIndex(x=>x.id===m.id));
+    topRatedCarousel.appendChild(card);
+  });
 });
+document.querySelectorAll(".arrow").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const targetId = btn.dataset.target;
+    const carousel = document.getElementById(targetId);
+    const scrollAmount = 300; // adjust to card width
+
+    if (btn.classList.contains("left")) {
+      carousel.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+    } else {
+      carousel.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  });
+});
+
+const trendingSection = document.getElementById("trendingSection");
+const topRatedSection = document.getElementById("topRatedSection");
+
+document.getElementById("toggleTrending").onclick = () => {
+  trendingSection.classList.toggle("show");
+};
+
+document.getElementById("toggleTopRated").onclick = () => {
+  topRatedSection.classList.toggle("show");
+};
+
 
 /* Filters */
 function populateFilters() {
@@ -1096,69 +1513,24 @@ function showGuestModal(actionHint='') {
 }
 
 /* ---------------- Auth system ---------------- */
-async function loginUser(identifier, password) {
-  showLoader(); // Show loading indicator
-  try {
-    const usersRef = collection(db, "users");
-
-    // First try email
-    let q = query(usersRef, where("email", "==", identifier), limit(1));
-    let snapshot = await Promise.race([
-      getDocs(q),
-      new Promise((_, reject) => setTimeout(() => reject("timeout"), 7000))
-    ]);
-
-    if (snapshot === "timeout") {
-      hideLoader();
-      return alert("Network too slow. Try again.");
-    }
-
-    // If not found by email, try username
-    if (snapshot.empty) {
-      q = query(usersRef, where("username", "==", identifier), limit(1));
-      snapshot = await getDocs(q);
-      if (snapshot.empty) {
-        hideLoader();
-        return alert("User not found");
-      }
-    }
-
-    const userDoc = snapshot.docs[0];
-    const user = userDoc.data();
-
-    if (user.password === password) {
-      currentUser = { id: userDoc.id, ...user };
-      saveCurrentUser();
-      watchUserStatus();      // Start real-time status tracking
-      updateAuthUI();
-      closeModal('authModal');
-      hideLoader();
-      alert("Logged in successfully");
-    } else {
-      hideLoader();
-      alert("Incorrect password");
-    }
-  } catch (err) {
-    hideLoader();
-    console.error(err);
-    alert("An error occurred. Try again.");
-  }
-}
-
-async function registerUser(identifier,password){
-  if(password.length<6){ alert("Password must be 6+ chars"); return; }
+async function loginUser(identifier,password){
   const usersRef = collection(db,"users");
-  const q=query(usersRef,where("email","==",identifier));
-  const snapshot=await getDocs(q);
-  if(!snapshot.empty){return alert("User already exists");}
-  const docRef = await addDoc(usersRef,{email:identifier,password:password,createdAt:Date.now(), status:"Paid"});
-  currentUser={id:docRef.id,email:identifier, status:"Paid"};
-  saveCurrentUser();
-  watchUserStatus();
-  alert("Account created & logged in");
-  updateAuthUI();
-  closeModal('authModal');
+  let q=query(usersRef,where("email","==",identifier));
+  let snapshot = await getDocs(q);
+  if(snapshot.empty){ q=query(usersRef,where("username","==",identifier)); snapshot=await getDocs(q); if(snapshot.empty){return alert("User not found");} }
+  const userDoc=snapshot.docs[0];
+  const user=userDoc.data();
+  if(user.password===password){
+    currentUser={id:userDoc.id,...user};
+    saveCurrentUser();
+    watchUserStatus(); // Start real-time status tracking
+    alert("Logged in successfully");
+    updateAuthUI();
+    closeModal('authModal');
+  } else alert("Incorrect password");
 }
+
+
 
 signInBtn.onclick = ()=>loginUser(authIdentifier.value.trim(),authPassword.value);
 registerBtn.onclick = ()=>registerUser(authIdentifier.value.trim(),authPassword.value);
@@ -1312,6 +1684,8 @@ function watchEpisodes(movieId) {
   });
 }
 
+
+
 /* ---------------- VIEW DETAILS ---------------- */
 window.viewDetailsByFiltered = async function (index) {
   const m = window.currentFiltered[index];
@@ -1360,33 +1734,21 @@ window.viewDetailsByFiltered = async function (index) {
   }
 
   // Episodes
-if (m.type === "Series") {
-  if (episodeUnsub) episodeUnsub();
-
-  // Sort episodes by season and episode number
-  if (m.episodes && m.episodes.length > 0) {
-    m.episodes.sort((a, b) => {
-      if ((a.season || 1) !== (b.season || 1)) {
-        return (a.season || 1) - (b.season || 1);
-      }
-      return (a.ep || 1) - (b.ep || 1);
-    });
+  if(m.type === "Series"){
+    if(episodeUnsub) episodeUnsub();
+    episodeUnsub = watchEpisodes(m.id);
   }
 
-  episodeUnsub = watchEpisodes(m.id); // keep same function call
-}
-
-document.getElementById("modalTitle").innerText = m.title;
-document.getElementById("modalYear").innerText = "Year: " + m.year;
-document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
-document.getElementById("modalRating").innerText = m.rating
-  ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
-  : "";
-document.getElementById("modalDesc").innerText = m.description || "";
-document.getElementById("movieModal").style.display = "flex";
-document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
+  document.getElementById("modalTitle").innerText = m.title;
+  document.getElementById("modalYear").innerText = "Year: " + m.year;
+  document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
+  document.getElementById("modalRating").innerText = m.rating
+    ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
+    : "";
+  document.getElementById("modalDesc").innerText = m.description || "";
+  document.getElementById("movieModal").style.display = "flex";
+  document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
 };
-
 
 /* ---------------- WATCH BUTTON (with real-time episodes) ---------------- */
 window.viewAndPlayByFiltered = function(index){
@@ -1499,76 +1861,27 @@ const menu = document.querySelector(".md-menu");
 menuToggle.onclick = () => {
   menuToggle.classList.toggle("active");
   menu.classList.toggle("active");
-  /* AUTO-CLOSE MENU WHEN LINK IS CLICKED */
-document.querySelectorAll('.md-menu a').forEach(link => {
-    link.addEventListener('click', () => {
-        const menu = document.querySelector('.md-menu');
-        const toggle = document.querySelector('.menu-toggle');
-
-        menu.classList.remove('active');
-        toggle.classList.remove('active');
-    });
-});
-
 };
 
+
+
+
 </script>
 
-<div id="loader" style="
-  display:none;
-  position:fixed;
-  top:0; left:0;
-  width:100%; height:100%;
-  background:rgba(0,0,0,0.75);
-  backdrop-filter: blur(2px);
-  z-index:999999;
-  color:white;
-  font-size:20px;
-  text-align:center;
-  padding-top:20%;
-  font-family:Arial, sans-serif;
-">
 
-  <!-- Bouncing circles -->
-  <div style="margin:0 auto 12px auto; width:70px; display:flex; justify-content:space-between;">
-    <div class="bounce-circle"></div>
-    <div class="bounce-circle"></div>
-    <div class="bounce-circle"></div>
-  </div>
-
-  Loading, please wait...
-</div>
-
-<style>
-.bounce-circle {
-  width:15px;
-  height:15px;
-  background-color:#00ff66;
-  border-radius:50%;
-  display:inline-block;
-  animation: bounce 0.6s infinite alternate;
-}
-
-.bounce-circle:nth-child(2) { animation-delay: 0.2s; }
-.bounce-circle:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes bounce {
-  from { transform: translateY(0); }
-  to { transform: translateY(-15px); }
-}
-</style>
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js")
-      .then(() => console.log("PWA Ready"))
-      .catch(err => console.log("SW Error:", err));
-  });
-}
-</script>
 
 
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
 
