@@ -82,32 +82,41 @@ tr:hover { background:#181818; }
   </div>
 
   <!-- -------------------- REGISTERED USERS -------------------- -->
-  <div style="margin-top:20px;">
-    <h3>👥 Registered Users</h3>
-    <form id="registerForm" style="margin-bottom:10px;">
-      <h4>Register New User</h4>
-      <input id="regEmail" placeholder="Email" required>
-      <input id="regUsername" placeholder="Username" required>
-      <input id="regPassword" type="password" placeholder="Password (min 6 chars)" required>
-      <button type="submit">Register User</button>
-    </form>
+<div style="margin-top:20px;">
+  <h3>👥 Registered Users</h3>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Username</th>
-          <th>Password</th>
-          <th>Registered At</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="usersTable"></tbody>
-    </table>
-  </div>
+  <form id="registerForm" style="margin-bottom:10px;">
+    <h4>Register New User</h4>
+
+    <input id="regEmail" placeholder="Email" required>
+    <input id="regUsername" placeholder="Username" required>
+    <input id="regPassword" type="password" placeholder="Password (min 6 chars)" required>
+
+    <!-- NEW: Devices Allowed -->
+    <input id="regDevices" type="number" min="1" value="1"
+           placeholder="Devices Allowed" required>
+
+    <button type="submit">Register User</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Username</th>
+        <th>Password</th>
+        <th>Registered At</th>
+        <th>Subscription Expiry</th>
+        <th>Devices Allowed</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+
+    <tbody id="usersTable"></tbody>
+  </table>
+</div>
 </main>
-
 <!-- Episodes Modal -->
 <div id="episodesModal" class="modal" aria-hidden="true">
   <div class="modal-content">
@@ -472,41 +481,149 @@ window.closeModal = modalId => {
 
 
 
-// =======================================================
-// 👤 USERS
-// =======================================================
+/* =======================================================
+   👤 USERS + DEVICE LIMIT + SUBSCRIPTION + LOGIN + ADMIN
+   ======================================================= */
+
+/* ================= DEVICE ID ================= */
+function getDeviceId() {
+  let id = localStorage.getItem("deviceId");
+  if (!id) {
+    id = "dev_" + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem("deviceId", id);
+  }
+  return id;
+}
+const deviceId = getDeviceId();
+
+/* ================= REGISTER USER ================= */
 registerForm.addEventListener("submit", async e => {
   e.preventDefault();
 
   const email = regEmail.value.trim();
   const username = regUsername.value.trim();
   const password = regPassword.value.trim();
+  const devicesAllowed = parseInt(regDevices.value) || 1;
 
   if (!email || !username || password.length < 6)
-    return alert('Fill valid info and password min 6 chars');
+    return alert("Fill valid info and password min 6 chars");
+
+  const now = Date.now();
+  const subscriptionDays = 30;
+  const expiresAt = now + subscriptionDays * 24 * 60 * 60 * 1000;
 
   try {
-    await addDoc(usersRef, { 
-      email, username, password, createdAt: Date.now(), status: "Paid" 
+    await addDoc(usersRef, {
+      email,
+      username,
+      password,
+      createdAt: now,
+      status: "Paid",
+      devicesAllowed,
+      activeDevices: [],
+      subscriptionExpiresAt: expiresAt
     });
     alert("✅ User registered!");
     registerForm.reset();
-  } catch(err) { 
-    console.error(err); 
-    alert("Failed to register user."); 
+  } catch (err) {
+    console.error(err);
+    alert("Failed to register user.");
   }
 });
 
-function renderUsers(list) {
+/* ================= DEVICE LIMIT ENFORCEMENT ================= */
+async function enforceDeviceLimit(user, allowForceLogout = false) {
+  const allowed = user.devicesAllowed || 1;
+  let active = (user.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
+
+  if (active.includes(deviceId)) return; // current device already active
+
+  if (active.length >= allowed) {
+    if (allowForceLogout) {
+      // Log out oldest device to free slot
+      const updatedDevices = active.slice(1);
+      await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
+      return;
+    } else {
+      throw new Error("🚫 Device limit exceeded. Please upgrade for more devices.");
+    }
+  }
+
+  active.push(deviceId);
+  await updateDoc(doc(db, "users", user.id), { activeDevices: active });
+}
+
+/* ================= LOGIN FUNCTION ================= */
+async function loginUser(identifier, password) {
+  let q = query(usersRef, where("email", "==", identifier));
+  let snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    q = query(usersRef, where("username", "==", identifier));
+    snapshot = await getDocs(q);
+    if (snapshot.empty) return alert("❌ User not found");
+  }
+
+  const userDoc = snapshot.docs[0];
+  const user = { id: userDoc.id, ...userDoc.data() };
+
+  if (user.password !== password) return alert("❌ Incorrect password");
+
+  if (Date.now() >= user.subscriptionExpiresAt) {
+    await updateDoc(doc(db, "users", user.id), { status: "Unpaid", activeDevices: [] });
+    return alert("❌ Your subscription has expired. Please renew.");
+  }
+
+  try {
+    await enforceDeviceLimit(user);
+  } catch (err) {
+    return alert(err.message);
+  }
+
+  currentUser = user;
+  saveCurrentUser();
+  watchUserStatus();
+
+  alert(`✅ Logged in successfully as ${user.username}`);
+  updateAuthUI();
+  closeModal('authModal');
+}
+
+/* ================= AUTO-EXPIRE USER ================= */
+async function autoExpireUser(user) {
+  if (!user.subscriptionExpiresAt) return user.status;
+
+  if (Date.now() >= user.subscriptionExpiresAt && user.status === "Paid") {
+    await updateDoc(doc(db, "users", user.id), {
+      status: "Unpaid",
+      activeDevices: []
+    });
+    return "Unpaid";
+  }
+  return user.status;
+}
+
+/* ================= COUNTDOWN TIMER ================= */
+function getCountdown(expiry) {
+  const diff = expiry - Date.now();
+  if (diff <= 0) return "❌ Expired";
+
+  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const m = Math.floor((diff / (1000 * 60)) % 60);
+  return `⏳ Expires in ${d} days ${h} hrs ${m} mins`;
+}
+
+/* ================= RENDER USERS ================= */
+async function renderUsers(list) {
   usersTable.innerHTML = "";
 
-  list.forEach(u => {
+  for (const u of list) {
     const regDate = new Date(u.createdAt).toLocaleDateString();
-    const oneMonth = 30*24*60*60*1000;
-    let status = u.status || "Paid";
+    const expiryDate = u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).toLocaleString() : "—";
 
-    if (Date.now() - u.createdAt > oneMonth && status !== "Paid") 
-      status = "Unpaid";
+    const status = await autoExpireUser(u);
+    const countdown = u.subscriptionExpiresAt ? getCountdown(u.subscriptionExpiresAt) : "—";
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -514,41 +631,135 @@ function renderUsers(list) {
       <td>${u.username}</td>
       <td>${u.password}</td>
       <td>${regDate}</td>
-      <td>${status}</td>
+      <td>${expiryDate}<br><small>${countdown}</small></td>
+      <td class="devices-cell"><input type="number" min="1" value="${u.devicesAllowed || 1}" style="width:60px" /></td>
+      <td style="color:${status === "Paid" ? "#00ff66" : "#ff4444"}">${status}</td>
       <td class="actions">
-        <button class="small-btn edit" onclick='resetPassword("${u.id}")'>Reset PW</button>
-        <button class="small-btn delete" onclick='deleteUser("${u.id}")'>Delete</button>
-        <button class="small-btn" onclick='toggleStatus("${u.id}","${status}")'>Toggle Status</button>
-      </td>`;
+        <button class="small-btn edit">Edit</button>
+        <button class="small-btn reset">Reset PW</button>
+        <button class="small-btn extend">Extend</button>
+        <button class="small-btn toggle">Toggle</button>
+        <button class="small-btn delete">Delete</button>
+      </td>
+    `;
     usersTable.appendChild(tr);
-  });
+
+    // Inline devices update
+    const devicesInput = tr.querySelector(".devices-cell input");
+    devicesInput.addEventListener("change", async () => {
+      let newDevices = parseInt(devicesInput.value);
+      if (!newDevices || newDevices < 1) {
+        devicesInput.value = u.devicesAllowed || 1;
+        return alert("Invalid device number");
+      }
+      await updateDoc(doc(db, "users", u.id), { devicesAllowed: newDevices });
+      alert(`✅ Devices allowed updated to ${newDevices}`);
+    });
+
+    // Buttons
+    tr.querySelector(".edit").addEventListener("click", () => editUser(u.id));
+    tr.querySelector(".reset").addEventListener("click", () => resetPassword(u.id));
+    tr.querySelector(".extend").addEventListener("click", () => extendSubscription(u.id));
+    tr.querySelector(".toggle").addEventListener("click", () => toggleStatus(u.id, status));
+    tr.querySelector(".delete").addEventListener("click", () => deleteUser(u.id));
+  }
 }
 
-onSnapshot(query(usersRef, orderBy("createdAt","desc")), snapshot => {
-  allUsers = snapshot.docs.map(d => ({ id:d.id,...d.data() }));
+/* ================= REAL-TIME LISTENER ================= */
+onSnapshot(query(usersRef, orderBy("createdAt", "desc")), snapshot => {
+  allUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
   renderUsers(allUsers);
 });
 
+/* ================= ADMIN FUNCTIONS ================= */
 window.resetPassword = async id => {
   const newPw = prompt("Enter new password (min 6 chars):");
-  if (!newPw || newPw.length<6) return alert("Password too short");
-
-  await updateDoc(doc(db,"users",id), { password:newPw });
+  if (!newPw || newPw.length < 6) return alert("Password too short");
+  await updateDoc(doc(db, "users", id), { password: newPw });
   alert("✅ Password reset");
 };
 
 window.deleteUser = async id => {
   if (!confirm("Delete this user?")) return;
-  await deleteDoc(doc(db,"users",id));
+  await deleteDoc(doc(db, "users", id));
   alert("🗑 User deleted");
 };
 
-window.toggleStatus = async (id,currentStatus) => {
-  const newStatus = currentStatus==="Paid"?"Unpaid":"Paid";
-  await updateDoc(doc(db,"users",id), { status:newStatus });
+window.toggleStatus = async (id, currentStatus) => {
+  const newStatus = currentStatus === "Paid" ? "Unpaid" : "Paid";
+  await updateDoc(doc(db, "users", id), { status: newStatus });
   alert(`✅ Status changed to ${newStatus}`);
 };
 
+window.extendSubscription = async id => {
+  let days = prompt("Extend subscription by how many days?", "30");
+  days = parseInt(days);
+  if (!days || days <= 0) return;
+
+  const ref = doc(db, "users", id);
+  const snap = await getDoc(ref);
+  const currentExpiry = snap.data().subscriptionExpiresAt || Date.now();
+
+  await updateDoc(ref, {
+    subscriptionExpiresAt: currentExpiry + days * 24 * 60 * 60 * 1000,
+    status: "Paid"
+  });
+  alert("✅ Subscription extended");
+};
+
+window.editUser = async id => {
+  const ref = doc(db, "users", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return alert("User not found");
+
+  const user = snap.data();
+
+  let extraDays = prompt("Extend subscription by how many days? (0 for none)", "0");
+  extraDays = parseInt(extraDays);
+
+  const updates = {};
+  if (extraDays > 0) {
+    const currentExpiry = user.subscriptionExpiresAt || Date.now();
+    updates.subscriptionExpiresAt = currentExpiry + extraDays * 24 * 60 * 60 * 1000;
+    updates.status = "Paid";
+  }
+
+  await updateDoc(ref, updates);
+  alert("✅ User updated successfully");
+};
+
+/* ================= LOGOUT FUNCTIONS ================= */
+async function logoutUser(userId) {
+  const snap = await getDoc(doc(db, "users", userId));
+  const user = snap.data();
+  const updated = (user.activeDevices || []).filter(d => d !== deviceId);
+  await updateDoc(doc(db, "users", userId), { activeDevices: updated });
+}
+
+async function logoutOtherDevices(userId) {
+  await updateDoc(doc(db, "users", userId), { activeDevices: [deviceId] });
+  alert("✅ Other devices logged out. You can now log in on this device.");
+}
+
+/* ================= CAN PLAY VIDEO ================= */
+async function canPlayVideo(userId) {
+  const snap = await getDoc(doc(db, "users", userId));
+  const user = snap.data();
+  const active = user.activeDevices || [];
+
+  if (!active.includes(deviceId)) {
+    if (active.length >= user.devicesAllowed) {
+      alert("🚫 Device limit reached. Cannot play video. Upgrade subscription or logout from other devices.");
+      return false;
+    }
+    active.push(deviceId);
+    await updateDoc(doc(db, "users", userId), { activeDevices: active });
+  }
+  return true;
+}
+
+/* ================= LIVE COUNTDOWN ================= */
+setInterval(() => renderUsers(allUsers), 60000);
 
 
 
@@ -682,3 +893,4 @@ setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000); // Every 12 hours
 
 </body>
 </html>
+
