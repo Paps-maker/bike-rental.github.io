@@ -124,24 +124,48 @@ tr:hover { background:#181818; }
     <h2 id="episodesModalTitle">Episodes</h2>
 
     <!-- Episode Add/Edit Form -->
-    <form id="episodeForm" style="margin-bottom:12px;">
-      <input type="hidden" id="episodeId">
-      <input type="hidden" id="episodeSeriesId">
-      <div class="field-row">
-        <input id="epNumber" placeholder="Episode Number" style="width:120px;">
-        <input id="epTitle" placeholder="Episode Title" style="flex:1;">
-      </div>
-      <input id="epFileUrl" placeholder="Episode File URL (mp4,mkv,webm...)">
-      <div class="field-row" style="margin-top:8px;">
-        <input id="epPoster" placeholder="Episode Poster URL">
-        <input id="epRuntime" placeholder="Runtime (e.g. 24m)" style="width:140px;">
-      </div>
-      <textarea id="epDescription" placeholder="Episode Description" style="margin-top:8px;"></textarea>
-      <div style="margin-top:8px;">
-        <button type="submit">Save Episode</button>
-        <button type="button" id="clearEpisodeForm">Clear</button>
-      </div>
-    </form>
+  <form id="episodeForm" style="margin-bottom:12px;">
+  
+  <input type="hidden" id="episodeId">
+  <input type="hidden" id="episodeSeriesId">
+
+  <!-- Season Selector -->
+  <div class="field-row">
+    <select id="epSeason" style="width:160px;">
+      <option value="">Select Season</option>
+      <option value="1">Season 1</option>
+      <option value="2">Season 2</option>
+      <option value="3">Season 3</option>
+    </select>
+
+    <input id="newSeasonInput" 
+           placeholder="Add new season (e.g. 4)" 
+           style="flex:1;">
+  </div>
+
+  <div class="field-row">
+    <input id="epNumber" placeholder="Episode Number" style="width:120px;">
+    <input id="epTitle" placeholder="Episode Title" style="flex:1;">
+  </div>
+
+  <input id="epFileUrl" placeholder="Episode File URL (mp4, mkv, webm...)">
+
+  <div class="field-row" style="margin-top:8px;">
+    <input id="epPoster" placeholder="Episode Poster URL">
+    <input id="epRuntime" placeholder="Runtime (e.g. 24m)" style="width:140px;">
+  </div>
+
+  <textarea id="epDescription"
+            placeholder="Episode Description"
+            style="margin-top:8px;"></textarea>
+
+  <div style="margin-top:8px;">
+    <button type="submit">Save Episode</button>
+    <button type="button" id="clearEpisodeForm">Clear</button>
+  </div>
+
+</form>
+
 
     <h3>Episode List</h3>
     <div id="episodesListContainer"></div>
@@ -430,7 +454,16 @@ episodeForm.addEventListener("submit", async e => {
   const seriesId = document.getElementById("episodeSeriesId").value;
   const epId     = document.getElementById("episodeId").value;
 
+  // ✅ SEASON (added only)
+  const seasonSelect = document.getElementById("epSeason");
+  const newSeasonInput = document.getElementById("newSeasonInput");
+  const season =
+    newSeasonInput?.value.trim()
+      ? newSeasonInput.value.trim()
+      : seasonSelect?.value || "";
+
   const epData = {
+    season, // ✅ added
     epNumber: parseInt(document.getElementById("epNumber").value) || null,
     title: document.getElementById("epTitle").value.trim(),
     fileUrl: document.getElementById("epFileUrl").value.trim(),
@@ -442,8 +475,11 @@ episodeForm.addEventListener("submit", async e => {
 
   const episodesCollRef = collection(db, "movies", seriesId, "episodes");
 
-  if (epId) await updateDoc(doc(episodesCollRef, epId), epData);
-  else await addDoc(episodesCollRef, epData);
+  if (epId) {
+    await updateDoc(doc(episodesCollRef, epId), epData);
+  } else {
+    await addDoc(episodesCollRef, epData);
+  }
 
   episodeForm.reset();
   document.getElementById("episodeId").value = "";
@@ -467,6 +503,14 @@ window.editEpisode = async (seriesId, epId) => {
   document.getElementById("epDescription").value = epData.description || "";
   document.getElementById("epPoster").value = epData.poster || "";
   document.getElementById("epRuntime").value = epData.runtime || "";
+
+  // ✅ restore season
+  if (document.getElementById("epSeason")) {
+    document.getElementById("epSeason").value = epData.season || "";
+  }
+  if (document.getElementById("newSeasonInput")) {
+    document.getElementById("newSeasonInput").value = "";
+  }
 };
 
 window.deleteEpisode = async (seriesId, epId) => {
@@ -478,7 +522,6 @@ window.closeModal = modalId => {
   document.getElementById(modalId).style.display = "none";
   if (typeof episodesUnsubscribe === "function") episodesUnsubscribe();
 };
-
 
 
 /* =======================================================
@@ -893,4 +936,5 @@ setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000); // Every 12 hours
 
 </body>
 </html>
+
 
