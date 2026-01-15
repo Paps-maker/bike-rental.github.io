@@ -539,11 +539,51 @@ function getDeviceId() {
 }
 const deviceId = getDeviceId();
 
-/* ================= REGISTER USER ================= */
+/* ================= SELF-REGISTRATION FUNCTION ================= */
+async function registerUser(identifier, password) {
+  identifier = identifier.trim().toLowerCase();
+
+  if (password.length < 6) {
+    alert("Password must be 6+ characters");
+    return;
+  }
+
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("email", "==", identifier));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    alert("User already exists");
+    return;
+  }
+
+  // Create user as Pending
+  await addDoc(usersRef, {
+    email: identifier,
+    password: password,
+    createdAt: Date.now(),
+    status: "Pending", // Cannot login until admin approves
+    devicesAllowed: 1,
+    activeDevices: [],
+    subscriptionExpiresAt: null
+  });
+
+  alert(
+    "✅ Account created successfully!\n\n" +
+    "⚠️ Your account is pending approval.\n" +
+    "Please make payment via M-Pesa 0717436668.\n" +
+    "Admin will activate your account once payment is confirmed.\n" +
+    "You will then be able to log in."
+  );
+
+  closeModal("authModal");
+}
+
+/* ================= REGISTER USER (ADMIN SIDE) ================= */
 registerForm.addEventListener("submit", async e => {
   e.preventDefault();
 
-  const email = regEmail.value.trim();
+  const email = regEmail.value.trim().toLowerCase();
   const username = regUsername.value.trim();
   const password = regPassword.value.trim();
   const devicesAllowed = parseInt(regDevices.value) || 1;
@@ -561,12 +601,16 @@ registerForm.addEventListener("submit", async e => {
       username,
       password,
       createdAt: now,
-      status: "Paid",
+      status: "Pending",
       devicesAllowed,
       activeDevices: [],
       subscriptionExpiresAt: expiresAt
     });
-    alert("✅ User registered!");
+
+    alert(
+      "✅ User registered!\n\n" +
+      "⚠️ Status: Pending. User must pay via M-Pesa 0717436668 and wait for admin approval."
+    );
     registerForm.reset();
   } catch (err) {
     console.error(err);
@@ -579,11 +623,10 @@ async function enforceDeviceLimit(user, allowForceLogout = false) {
   const allowed = user.devicesAllowed || 1;
   let active = (user.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
 
-  if (active.includes(deviceId)) return; // current device already active
+  if (active.includes(deviceId)) return;
 
   if (active.length >= allowed) {
     if (allowForceLogout) {
-      // Log out oldest device to free slot
       const updatedDevices = active.slice(1);
       await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
       return;
@@ -598,6 +641,7 @@ async function enforceDeviceLimit(user, allowForceLogout = false) {
 
 /* ================= LOGIN FUNCTION ================= */
 async function loginUser(identifier, password) {
+  identifier = identifier.trim().toLowerCase();
   let q = query(usersRef, where("email", "==", identifier));
   let snapshot = await getDocs(q);
 
@@ -612,9 +656,30 @@ async function loginUser(identifier, password) {
 
   if (user.password !== password) return alert("❌ Incorrect password");
 
-  if (Date.now() >= user.subscriptionExpiresAt) {
+  // BLOCK Pending users
+  if (user.status === "Pending") {
+    return alert(
+      "⏳ Your account is pending approval.\n\n" +
+      "Please make payment via M-Pesa 0717436668.\n" +
+      "Admin will activate your account once payment is confirmed."
+    );
+  }
+
+  // BLOCK Unpaid users
+  if (user.status === "Unpaid") {
+    return alert(
+      "❌ Your subscription is not active or payment not confirmed.\n" +
+      "Please make payment via M-Pesa 0717436668 or contact admin."
+    );
+  }
+
+  // Check for expired subscription
+  if (user.subscriptionExpiresAt && Date.now() >= user.subscriptionExpiresAt) {
     await updateDoc(doc(db, "users", user.id), { status: "Unpaid", activeDevices: [] });
-    return alert("❌ Your subscription has expired. Please renew.");
+    return alert(
+      "❌ Your subscription has expired.\n" +
+      "Please make payment via M-Pesa 0717436668 or contact admin."
+    );
   }
 
   try {
@@ -623,6 +688,7 @@ async function loginUser(identifier, password) {
     return alert(err.message);
   }
 
+  // ✅ Set current user only if status is Paid
   currentUser = user;
   saveCurrentUser();
   watchUserStatus();
@@ -676,7 +742,11 @@ async function renderUsers(list) {
       <td>${regDate}</td>
       <td>${expiryDate}<br><small>${countdown}</small></td>
       <td class="devices-cell"><input type="number" min="1" value="${u.devicesAllowed || 1}" style="width:60px" /></td>
-      <td style="color:${status === "Paid" ? "#00ff66" : "#ff4444"}">${status}</td>
+      <td style="color:${
+        status === "Paid" ? "#00ff66" :
+        status === "Pending" ? "#ffaa00" :
+        "#ff4444"
+      }">${status}</td>
       <td class="actions">
         <button class="small-btn edit">Edit</button>
         <button class="small-btn reset">Reset PW</button>
@@ -687,7 +757,6 @@ async function renderUsers(list) {
     `;
     usersTable.appendChild(tr);
 
-    // Inline devices update
     const devicesInput = tr.querySelector(".devices-cell input");
     devicesInput.addEventListener("change", async () => {
       let newDevices = parseInt(devicesInput.value);
@@ -699,7 +768,6 @@ async function renderUsers(list) {
       alert(`✅ Devices allowed updated to ${newDevices}`);
     });
 
-    // Buttons
     tr.querySelector(".edit").addEventListener("click", () => editUser(u.id));
     tr.querySelector(".reset").addEventListener("click", () => resetPassword(u.id));
     tr.querySelector(".extend").addEventListener("click", () => extendSubscription(u.id));
@@ -729,9 +797,15 @@ window.deleteUser = async id => {
 };
 
 window.toggleStatus = async (id, currentStatus) => {
-  const newStatus = currentStatus === "Paid" ? "Unpaid" : "Paid";
+  let newStatus;
+
+  if (currentStatus === "Pending") newStatus = "Paid";      
+  else if (currentStatus === "Paid") newStatus = "Unpaid";  
+  else if (currentStatus === "Unpaid") newStatus = "Paid";  
+  else newStatus = "Pending";
+
   await updateDoc(doc(db, "users", id), { status: newStatus });
-  alert(`✅ Status changed to ${newStatus}`);
+  alert(`✅ User status changed to ${newStatus}`);
 };
 
 window.extendSubscription = async id => {
@@ -803,7 +877,6 @@ async function canPlayVideo(userId) {
 
 /* ================= LIVE COUNTDOWN ================= */
 setInterval(() => renderUsers(allUsers), 60000);
-
 
 
 // =======================================================================
@@ -936,5 +1009,6 @@ setInterval(autoRunWeeklyTMDbFetch, 12 * 60 * 60 * 1000); // Every 12 hours
 
 </body>
 </html>
+
 
 
