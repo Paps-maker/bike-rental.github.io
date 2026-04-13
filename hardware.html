@@ -3,23 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hardware Store — SHMS (Firebase)</title>
+  <title>Inventory and pos</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
    <link rel="icon" type="image/png" href="img/hr.jpg">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
  <style>
-  /* ===== BASE ===== */
+  /* ===== BASE & RESET ===== */
+  * {
+    box-sizing: border-box;
+  }
+
   body {
-    padding: 18px;
+    padding: 1.5rem; /* Responsive padding */
     background: #f6f7fb;
     font-family: 'Poppins', sans-serif;
     margin: 0;
+    line-height: 1.5;
+    color: #333;
+  }
+
+  /* Utility for fluid containers (Bootstrap-like) */
+  .container-fluid {
+    width: 100%;
+    margin-right: auto;
+    margin-left: auto;
+    padding-right: 15px;
+    padding-left: 15px;
   }
 
   .low-stock {
-    background: #fff3cd;
+    background: #fff3cd !important;
   }
 
   .badge-low {
@@ -28,6 +43,7 @@
     border-radius: 6px;
     padding: 3px 7px;
     font-size: 0.8rem;
+    white-space: nowrap;
   }
 
   .cursor-pointer {
@@ -36,180 +52,183 @@
 
   .small-muted {
     color: #6c757d;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
 
+  /* ===== CARDS ===== */
   .card-compact {
     background: #fff;
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    padding: 12px;
-    margin-bottom: 12px;
-    transition: all 0.3s ease;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: transform 0.2s ease;
+    border: 1px solid #edf2f7;
   }
 
-  .card-compact:hover {
-    transform: scale(1.01);
+  @media (min-width: 992px) {
+    .card-compact:hover {
+      transform: translateY(-2px);
+    }
   }
 
   /* ===== TABLE STYLING ===== */
+  /* Scroll wrapper for desktop overflow */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .table-fixed {
     width: 100%;
     border-collapse: collapse;
+    background: white;
   }
 
   .table-fixed thead th {
-    background: #f1f3f5;
+    background: #f8f9fa;
     font-weight: 600;
-    padding: 10px;
+    padding: 12px 10px;
     text-align: left;
     border-bottom: 2px solid #dee2e6;
     position: sticky;
     top: 0;
-    z-index: 2;
-  }
-
-  .table-fixed tbody {
-    display: block;
-    max-height: 360px;
-    overflow-y: auto;
-  }
-
-  .table-fixed thead,
-  .table-fixed tbody tr {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
+    z-index: 10;
   }
 
   .table-fixed td {
-    padding: 8px;
-    border-bottom: 1px solid #dee2e6;
+    padding: 12px 10px;
+    border-bottom: 1px solid #edf2f7;
     vertical-align: middle;
     font-size: 0.9rem;
-    word-wrap: break-word;
   }
 
   /* ===== QUANTITY CONTROL ===== */
   .qty-control {
-    display: flex;
-    gap: 6px;
+    display: inline-flex;
+    gap: 4px;
     align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 120px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 2px;
+    background: #fff;
   }
 
   .qty-control button {
-    background: #007bff;
-    border: none;
-    color: white;
-    padding: 4px 8px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #444;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 4px;
-    font-size: 0.85rem;
     cursor: pointer;
-    transition: 0.3s;
+    transition: 0.2s;
   }
 
   .qty-control button:hover {
-    background: #0056b3;
+    background: #e9ecef;
   }
 
   .qty-control input {
-    width: 48px;
+    width: 40px;
     text-align: center;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    padding: 4px;
+    border: none;
+    font-weight: 600;
+    outline: none;
   }
 
-  /* ===== RESPONSIVENESS ===== */
+  /* ===== RESPONSIVE BREAKPOINTS ===== */
 
-  /* Tablets */
+  /* Tablets and small screens (Stacking Table) */
   @media (max-width: 992px) {
     body {
-      padding: 12px;
+      padding: 1rem;
     }
 
-    .card-compact {
-      padding: 10px;
-    }
-
+    /* Hide the actual header but keep it for screen readers */
     .table-fixed thead {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
     }
 
-    .table-fixed,
-    .table-fixed tbody,
-    .table-fixed tr,
+    .table-fixed, 
+    .table-fixed tbody, 
+    .table-fixed tr, 
     .table-fixed td {
       display: block;
       width: 100%;
     }
 
     .table-fixed tr {
-      margin-bottom: 12px;
-      background: #fff;
+      margin-bottom: 1rem;
+      border: 1px solid #dee2e6;
       border-radius: 8px;
-      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
-      padding: 10px;
+      padding: 8px;
+      background: #fff;
     }
 
     .table-fixed td {
-      border: none;
-      padding: 6px 10px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.95rem;
+      text-align: right;
+      padding: 8px 12px;
+      position: relative;
+      border-bottom: 1px solid #f1f3f5;
     }
 
+    .table-fixed td:last-child {
+      border-bottom: none;
+    }
+
+    /* Label generation from data-label attribute */
     .table-fixed td::before {
       content: attr(data-label);
-      font-weight: 600;
-      color: #495057;
-    }
-
-    .qty-control {
-      justify-content: flex-end;
+      float: left;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      color: #6c757d;
+      margin-top: 4px;
     }
   }
 
   /* Mobile Phones */
   @media (max-width: 576px) {
     body {
-      padding: 10px;
+      padding: 0.75rem;
     }
 
-    .small-muted {
-      font-size: 0.8rem;
+    h1, .h1 { font-size: 1.5rem; }
+    
+    .card-compact {
+      padding: 1rem;
+      border-radius: 8px;
     }
 
     .qty-control {
-      max-width: 100px;
-      gap: 4px;
+      scale: 0.9; /* Slightly smaller for small phones */
     }
 
-    .qty-control button {
-      padding: 3px 6px;
-      font-size: 0.8rem;
-    }
-
-    .qty-control input {
-      width: 40px;
-      font-size: 0.85rem;
-    }
-
-    .card-compact {
-      padding: 8px;
+    /* Adjust flex layouts that might be side-by-side */
+    .d-flex-mobile-column {
+      flex-direction: column !important;
+      gap: 10px;
     }
   }
 </style>
-
 </head>
 <body>
   <div class="container">
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h2 class="mb-0">Smart Hardware Management System</h2>
+      <h2 class="mb-0">Inventory and pos</h2>
       <div>
         <span id="userEmail" class="me-2 small-muted"></span>
         <button id="btnSignIn" class="btn-outline-primary btn btn-sm">Sign In</button>
@@ -235,29 +254,37 @@
 
     <div class="row g-3">
 
-      <!-- Inventory list -->
       <div class="col-md-7">
-        <div class="card">
-          <div class="d-flex align-items-center justify-content-between card-header">
-            <div>Inventory <small id="lowStockCount" class="ms-2 text-danger"></small></div>
-            <div class="small-muted">Realtime</div>
-          </div>
-          <div class="col-md-6">
-              <input id="posSearch" class="form-control" placeholder="Search items by name..." />
-              <div id="posSearchResults" class="list-group mt-2" style="max-height:240px; overflow:auto;"></div>
-            </div>
-          <div class="p-0 card-body">
-            
-            <table class="table table-striped mb-0">
-              <thead>
-                <tr><th>Item</th><th>Category</th><th style="width:90px">Stock</th><th style="width:120px">Selling</th><th style="width:220px">Actions</th></tr>
-              </thead>
-              <tbody id="inventoryTbody"></tbody>
-            </table>
-          </div>
-        </div>
+  <div class="card">
+    <div class="d-flex align-items-center justify-content-between card-header">
+      <div>Inventory <small id="lowStockCount" class="ms-2 text-danger"></small></div>
+      <div class="small-muted">Realtime</div>
+    </div>
+    
+    <div class="p-3 border-bottom">
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="text" id="inventorySearch" class="form-control" placeholder="Search items or categories...">
+        <button class="btn-outline-secondary btn" type="button" id="clearInventorySearch">×</button>
       </div>
+    </div>
 
+    <div class="p-0 card-body">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Category</th>
+            <th style="width:90px">Stock</th>
+            <th style="width:120px">Selling</th>
+            <th style="width:220px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
       <!-- Quick POS cart -->
       <div class="col-md-5">
         <div class="card">
@@ -333,41 +360,88 @@
     </div>
   </div>
 
-  <!-- POS Modal -->
-  <div class="modal fade" id="posModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <form id="posForm" class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Point of Sale</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="row g-2">
-            
-            <div class="col-md-6">
-              <h6>Cart</h6>
-              <div id="posCartList" style="max-height:300px; overflow:auto;"></div>
-            </div>
+<!-- POS Modal -->
+<div class="modal fade" id="posModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form id="posForm" class="modal-content">
+      
+      <!-- HEADER -->
+      <div class="modal-header">
+        <h5 class="modal-title">Point of Sale</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- BODY -->
+      <div class="modal-body">
+
+        <!-- 🔍 SEARCH -->
+        <label class="mb-1">Search Product</label>
+        <input id="posSearch" class="form-control" placeholder="Search items by name..." autocomplete="off"/>
+        
+        <div id="posSearchResults" 
+             class="list-group shadow-sm mt-2" 
+             style="max-height:240px; overflow:auto;"></div>
+
+        <div class="mt-2 row g-3">
+
+          <!-- 🛒 CART -->
+          <div class="col-12">
+            <h6 class="pb-1 border-bottom">Cart</h6>
+            <div id="posCartList" 
+                 class="bg-light p-2 rounded"
+                 style="max-height:300px; overflow:auto;"></div>
           </div>
 
-          <hr/>
-          <div class="row g-2">
-            <div class="col-md-6"><label>Customer (optional)</label><input id="posCustomer" class="form-control"></div>
-            <div class="col-md-3"><label>Payment Method</label>
-              <select id="posPayment" class="form-control">
-                <option value="cash">Cash</option>
-                <option value="mpesa">M-PESA</option>
-                <option value="credit">Credit (Unpaid)</option>
-              </select>
-            </div>
-            <div class="col-md-3"><label>Amount Paid</label><input id="posPaidAmount" type="number" class="form-control" value="0" min="0"></div>
+        </div>
+
+        <hr/>
+
+        <!-- 💳 PAYMENT SECTION -->
+        <div class="row g-2">
+
+          <div class="col-md-6">
+            <label>Customer (optional)</label>
+            <input id="posCustomer" class="form-control" placeholder="Enter customer name">
           </div>
+
+          <div class="col-md-3">
+            <label>Payment Method</label>
+            <select id="posPayment" class="form-control">
+              <option value="cash">Cash</option>
+              <option value="mpesa">M-PESA</option>
+              <option value="credit">Credit (Unpaid)</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label>Amount Paid</label>
+            <input id="posPaidAmount" 
+                   type="number" 
+                   class="form-control" 
+                   value="0" min="0">
+          </div>
+
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button id="completeSaleBtn" class="btn btn-success" type="submit" disabled>Complete Sale</button>
-        </div>
-      </form>
-    </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+
+        <button id="completeSaleBtn" 
+                class="btn btn-success" 
+                type="submit" 
+                disabled>
+          Complete Sale
+        </button>
+      </div>
+
+    </form>
   </div>
-
+</div>
   <!-- Sales Modal (details) -->
   <div class="modal fade" id="salesModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
@@ -744,33 +818,36 @@ onSnapshot(salesCol, snap => {
 
     document.getElementById('clearCart').onclick = () => { cart = []; renderCart(); };
 
-    // POS search & modal cart
-    const posSearch = document.getElementById('posSearch');
-    posSearch.addEventListener('input', async (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      posSearchResults.innerHTML = '';
-      if (!q) return;
-      const snap = await getDocs(collection(db,'items'));
-      snap.forEach(docSnap => {
+    // ---------- POS search & modal cart ----------
+const posSearch = document.getElementById('posSearch');
+let saleCompleted = false; // Flag to track if sale completed
+const posModalEl = document.getElementById('posModal');
+
+posSearch.addEventListener('input', async (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    posSearchResults.innerHTML = '';
+    if (!q) return;
+    const snap = await getDocs(collection(db, 'items'));
+    snap.forEach(docSnap => {
         const it = docSnap.data();
         if (it.name.toLowerCase().includes(q)) {
-          const a = document.createElement('a');
-          a.className = 'list-group-item list-group-item-action cursor-pointer';
-          a.textContent = `${it.name} — ${money(it.sellingPrice)} — ${it.quantity} in stock`;
-          a.onclick = () => {
-            addToCart(docSnap.id);
-            posSearch.value = '';
-            posSearchResults.innerHTML = '';
-          };
-          posSearchResults.appendChild(a);
+            const a = document.createElement('a');
+            a.className = 'list-group-item list-group-item-action cursor-pointer';
+            a.textContent = `${it.name} — ${money(it.sellingPrice)} — ${it.quantity} in stock`;
+            a.onclick = () => {
+                addToCart(docSnap.id);
+                posSearch.value = '';
+                posSearchResults.innerHTML = '';
+            };
+            posSearchResults.appendChild(a);
         }
-      });
     });
+});
 
-    function renderPOSCartInModal(){
-      posCartList.innerHTML = '';
-      let total=0;
-      cart.forEach((c, idx) => {
+function renderPOSCartInModal() {
+    posCartList.innerHTML = '';
+    let total = 0;
+    cart.forEach((c, idx) => {
         const div = document.createElement('div');
         div.className = 'd-flex justify-content-between align-items-center mb-1';
         div.innerHTML = `<div>
@@ -778,7 +855,7 @@ onSnapshot(salesCol, snap => {
             <small class="small-muted">Unit: ${money(c.sellingPrice)}</small>
           </div>
           <div>
-            ${money(c.qty*c.sellingPrice)}
+            ${money(c.qty * c.sellingPrice)}
             <div class="mt-1">
               <button class="me-1 btn-outline-secondary btn btn-sm btn-decrease-modal" data-idx="${idx}">-</button>
               <button class="me-1 btn-outline-secondary btn btn-sm btn-increase-modal" data-idx="${idx}">+</button>
@@ -787,48 +864,71 @@ onSnapshot(salesCol, snap => {
           </div>`;
         posCartList.appendChild(div);
         total += c.qty * c.sellingPrice;
-      });
-      const footer = document.createElement('div');
-      footer.className = 'mt-2 d-flex justify-content-between';
-      footer.innerHTML = `<div><strong>Total</strong></div><div><strong>${money(total)}</strong></div>`;
-      posCartList.appendChild(footer);
+    });
+    const footer = document.createElement('div');
+    footer.className = 'mt-2 d-flex justify-content-between';
+    footer.innerHTML = `<div><strong>Total</strong></div><div><strong>${money(total)}</strong></div>`;
+    posCartList.appendChild(footer);
 
-      // wire modal controls
-      document.querySelectorAll('.btn-decrease-modal').forEach(b => b.onclick = () => { cart[Number(b.dataset.idx)].qty = Math.max(1, cart[Number(b.dataset.idx)].qty - 1); renderPOSCartInModal(); renderCart(); });
-      document.querySelectorAll('.btn-increase-modal').forEach(b => b.onclick = () => { cart[Number(b.dataset.idx)].qty++; renderPOSCartInModal(); renderCart(); });
-      document.querySelectorAll('.btn-remove-modal').forEach(b => { b.onclick = () => { cart.splice(Number(b.dataset.idx), 1); renderPOSCartInModal(); renderCart(); }});
-      updateCompleteButtonState();
+    // Wire modal controls
+    document.querySelectorAll('.btn-decrease-modal').forEach(b => b.onclick = () => { 
+        cart[Number(b.dataset.idx)].qty = Math.max(1, cart[Number(b.dataset.idx)].qty - 1); 
+        renderPOSCartInModal(); renderCart(); 
+    });
+    document.querySelectorAll('.btn-increase-modal').forEach(b => b.onclick = () => { 
+        cart[Number(b.dataset.idx)].qty++; 
+        renderPOSCartInModal(); renderCart(); 
+    });
+    document.querySelectorAll('.btn-remove-modal').forEach(b => { 
+        b.onclick = () => { cart.splice(Number(b.dataset.idx), 1); renderPOSCartInModal(); renderCart(); }
+    });
+    updateCompleteButtonState();
+}
+
+// Reset sale state and render when opening
+posModalEl.addEventListener('show.bs.modal', () => {
+    saleCompleted = false;
+    renderPOSCartInModal();
+});
+
+// Reset form ONLY if sale wasn't completed (Safe Close)
+posModalEl.addEventListener('hide.bs.modal', (event) => {
+    if (!saleCompleted) {
+        document.getElementById('posForm').reset();
+        cart = [];
+        renderCart();
+        console.log('Modal closed without completing sale — items cleared.');
+    }
+});
+
+// --- SINGLE POS form submit (Complete Sale) ---
+document.getElementById('posForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!cart.length) return alert('Cart is empty');
+    if (saleCompleted) return; // Prevent double trigger
+
+    if (!currentUser) {
+        bootstrap.Modal.getInstance(posModalEl)?.hide();
+        const el = document.getElementById('signinModal');
+        let ins = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+        ins.show();
+        return alert('Please sign in to complete the sale.');
     }
 
-    document.getElementById('posModal').addEventListener('show.bs.modal', () => renderPOSCartInModal());
+    const customer = document.getElementById('posCustomer').value.trim();
+    const payment = document.getElementById('posPayment').value;
+    const paidAmount = Number(document.getElementById('posPaidAmount').value || 0);
 
-    // POS submit -> create sale atomically, decrement stock, create unpaid if needed
-    document.getElementById('posForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!cart.length) return alert('Cart is empty');
-      if (!currentUser) {
-        // auto open signin modal
-        bootstrap.Modal.getInstance(document.getElementById('posModal'))?.hide();
-        const el = document.getElementById('signinModal'); let ins = bootstrap.Modal.getInstance(el); if(!ins) ins = new bootstrap.Modal(el); ins.show();
-        return alert('Please sign in to complete the sale.');
-      }
-
-      // validation
-      const customer = document.getElementById('posCustomer').value.trim();
-      const payment = document.getElementById('posPayment').value;
-      const paidAmount = Number(document.getElementById('posPaidAmount').value || 0);
-
-      let total = 0;
-      const items = cart.map(c => {
+    let total = 0;
+    const items = cart.map(c => {
         total += c.sellingPrice * c.qty;
         return { id: c.id, name: c.name, qty: c.qty, unitPrice: c.sellingPrice, amount: c.sellingPrice * c.qty };
-      });
+    });
 
-      if (paidAmount < 0) return alert('Paid amount invalid');
+    if (paidAmount < 0) return alert('Paid amount invalid');
 
-      // Build sale object
-      const saleId = generateSaleId();
-      const sale = {
+    const saleId = generateSaleId();
+    const sale = {
         saleId,
         items,
         total,
@@ -841,176 +941,60 @@ onSnapshot(salesCol, snap => {
         createdByEmail: currentUser.email || null,
         paid: (paidAmount >= total),
         status: (paidAmount >= total) ? 'Paid' : 'Unpaid'
-      };
+    };
 
-      // Use batched write: write sale, update items qty, create unpaid if needed
-      try {
+    try {
         completeSaleBtn.disabled = true;
         completeSaleBtn.textContent = 'Processing...';
 
         const batch = writeBatch(db);
-        // sale doc
         const saleRef = doc(collection(db, 'sales'));
         batch.set(saleRef, sale);
 
-        // stock updates - verify current stock and update
+        // stock updates
         for (const it of items) {
-          const itemRef = doc(db, 'items', it.id);
-          const snap = await getDoc(itemRef);
-          if (!snap.exists()) throw new Error(`Item missing: ${it.name}`);
-          const currentQty = snap.data().quantity || 0;
-          if (it.qty > currentQty) {
-            throw new Error(`Insufficient stock for "${it.name}". Available: ${currentQty}, requested: ${it.qty}`);
-          }
-          batch.update(itemRef, { quantity: currentQty - it.qty, updatedAt: new Date().toISOString() });
+            const itemRef = doc(db, 'items', it.id);
+            const snap = await getDoc(itemRef);
+            if (!snap.exists()) throw new Error(`Item missing: ${it.name}`);
+            const currentQty = snap.data().quantity || 0;
+            if (it.qty > currentQty) throw new Error(`Insufficient stock for "${it.name}".`);
+            batch.update(itemRef, { quantity: currentQty - it.qty, updatedAt: new Date().toISOString() });
         }
-// --- Prevent accidental save when modal closes ---
-const posModalEl = document.getElementById('posModal');
-posModalEl.addEventListener('hide.bs.modal', (event) => {
-  // This runs when modal is closing (user presses close, clicks backdrop, or presses ESC)
-  // We only clear the cart if sale was NOT completed
-  if (!saleCompleted) {
-    // Reset the POS form & cart
-    document.getElementById('posForm').reset();
-    cart = [];
-    renderCart();
-    renderPOSCartInModal();
-    console.log('Modal closed without completing sale — nothing saved.');
-  }
-});
 
-// Flag to track if sale completed
-let saleCompleted = false;
-
-// --- POS form submit (Complete Sale) ---
-document.getElementById('posForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (!cart.length) return alert('Cart is empty');
-  if (!currentUser) {
-    bootstrap.Modal.getInstance(posModalEl)?.hide();
-    const el = document.getElementById('signinModal'); 
-    let ins = bootstrap.Modal.getInstance(el); 
-    if(!ins) ins = new bootstrap.Modal(el); 
-    ins.show();
-    return alert('Please sign in to complete the sale.');
-  }
-
-  // validation
-  const customer = document.getElementById('posCustomer').value.trim();
-  const payment = document.getElementById('posPayment').value;
-  const paidAmount = Number(document.getElementById('posPaidAmount').value || 0);
-
-  let total = 0;
-  const items = cart.map(c => {
-    total += c.sellingPrice * c.qty;
-    return { id: c.id, name: c.name, qty: c.qty, unitPrice: c.sellingPrice, amount: c.sellingPrice * c.qty };
-  });
-
-  if (paidAmount < 0) return alert('Paid amount invalid');
-
-  const saleId = generateSaleId();
-  const sale = {
-    saleId,
-    items,
-    total,
-    customer: customer || null,
-    paymentMethod: payment,
-    paidAmount,
-    change: Math.max(0, paidAmount - total),
-    createdAt: serverTimestamp(),
-    createdBy: currentUser.uid,
-    createdByEmail: currentUser.email || null,
-    paid: (paidAmount >= total),
-    status: (paidAmount >= total) ? 'Paid' : 'Unpaid'
-  };
-
-  try {
-    completeSaleBtn.disabled = true;
-    completeSaleBtn.textContent = 'Processing...';
-
-    const batch = writeBatch(db);
-    const saleRef = doc(collection(db, 'sales'));
-    batch.set(saleRef, sale);
-
-    // stock updates
-    for (const it of items) {
-      const itemRef = doc(db, 'items', it.id);
-      const snap = await getDoc(itemRef);
-      if (!snap.exists()) throw new Error(`Item missing: ${it.name}`);
-      const currentQty = snap.data().quantity || 0;
-      if (it.qty > currentQty) throw new Error(`Insufficient stock for "${it.name}".`);
-      batch.update(itemRef, { quantity: currentQty - it.qty, updatedAt: new Date().toISOString() });
-    }
-
-    if (payment === 'credit' || paidAmount < total) {
-      const unpaidRef = doc(collection(db, 'unpaid_customers'));
-      batch.set(unpaidRef, {
-        saleId: saleRef.id,
-        name: customer || 'Guest',
-        amount: Math.max(0, total - paidAmount),
-        date: new Date().toISOString(),
-        createdAt: serverTimestamp(),
-        paid: false
-      });
-    }
-
-    await batch.commit();
-
-    await generateReceiptPdf(saleRef.id, { ...sale, items });
-
-    // ✅ mark sale as completed before closing
-    saleCompleted = true;
-
-    // cleanup
-    cart = [];
-    renderCart();
-    document.getElementById('posForm').reset();
-    bootstrap.Modal.getInstance(posModalEl).hide();
-    alert('Sale recorded successfully.');
-  } catch (err) {
-    console.error(err);
-    alert('Failed to complete sale: ' + (err.message || err));
-  } finally {
-    completeSaleBtn.disabled = false;
-    completeSaleBtn.textContent = 'Complete Sale';
-  }
-});
-
-        // create unpaid record if payment is credit or paidAmount < total
+        // create unpaid record if needed
         if (payment === 'credit' || paidAmount < total) {
-          const unpaidRef = doc(collection(db, 'unpaid_customers'));
-          const unpaid = {
-            saleId: saleRef.id,
-            name: customer || 'Guest',
-            amount: Math.max(0, total - paidAmount),
-            date: new Date().toISOString(),
-            createdAt: serverTimestamp(),
-            paid: false
-          };
-          batch.set(unpaidRef, unpaid);
+            const unpaidRef = doc(collection(db, 'unpaid_customers'));
+            batch.set(unpaidRef, {
+                saleId: saleRef.id,
+                name: customer || 'Guest',
+                amount: Math.max(0, total - paidAmount),
+                date: new Date().toISOString(),
+                createdAt: serverTimestamp(),
+                paid: false
+            });
         }
 
-        // commit
         await batch.commit();
 
-        // generate receipt (use saleRef.id)
+        // Mark as completed so the 'hide' listener doesn't clear work accidentally
+        saleCompleted = true;
+
         await generateReceiptPdf(saleRef.id, { ...sale, items });
 
-        // cleanup
+        // cleanup UI
         cart = [];
         renderCart();
-        bootstrap.Modal.getInstance(document.getElementById('posModal')).hide();
         document.getElementById('posForm').reset();
+        bootstrap.Modal.getInstance(posModalEl).hide();
         alert('Sale recorded successfully.');
-      } catch (err) {
+    } catch (err) {
         console.error(err);
         alert('Failed to complete sale: ' + (err.message || err));
-      } finally {
+    } finally {
         completeSaleBtn.disabled = false;
         completeSaleBtn.textContent = 'Complete Sale';
-      }
-    });
-
+    }
+});
     // ---------- Payment prompt handler (when used) ----------
     function openPaymentPromptForSale(saleId){
       document.getElementById('paymentSaleId').value = saleId;
@@ -1309,7 +1293,32 @@ document.getElementById('posForm').addEventListener('submit', async (e) => {
       const ss = String(d.getSeconds()).padStart(2,'0');
       return `S${y}${mo}${da}-${hh}${mm}${ss}-${Math.random().toString(36).slice(2,6)}`;
     }
+// Search Functionality
+const inventorySearch = document.getElementById('inventorySearch');
+const clearSearchBtn = document.getElementById('clearInventorySearch');
 
+inventorySearch.addEventListener('input', (e) => {
+  const filter = e.target.value.toLowerCase();
+  const rows = document.querySelectorAll('#inventoryTbody tr');
+
+  rows.forEach(row => {
+    // Search in Item Name (Column 0) and Category (Column 1)
+    const itemName = row.cells[0].textContent.toLowerCase();
+    const category = row.cells[1].textContent.toLowerCase();
+
+    if (itemName.includes(filter) || category.includes(filter)) {
+      row.style.display = ""; // Show
+    } else {
+      row.style.display = "none"; // Hide
+    }
+  });
+});
+
+// Clear Search button
+clearSearchBtn.onclick = () => {
+  inventorySearch.value = '';
+  inventorySearch.dispatchEvent(new Event('input')); // Trigger the filter to reset
+};
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
