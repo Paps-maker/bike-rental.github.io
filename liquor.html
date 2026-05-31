@@ -3,25 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Becky&Babek Inventory System</title>
+<title>MADOLLAR  Inventory System</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <link rel="icon" href="img/becky&babek.jpg" type="image/jpg">
+  <link rel="icon" href="img/logo.jpeg" type="image/jpg">
 <style>
-  body { background: #1c1c1c; color: #f8f9fa; }
+  /* Base Theme */
+  body { background: #1c1c1c; color: #f8f9fa; font-family: sans-serif; }
   .navbar { background: #2b1d0e; }
   .navbar-brand { font-weight: bold; color: #f8f9fa !important; }
-  .card { background: #2a2a2a; border: none; color: #fff; }
-  .nav-tabs .nav-link { color: #f8f9fa; }
-  .nav-tabs .nav-link.active { background: #d4a373; color: #000; }
+  .card { background: #2a2a2a; border: none; color: #fff; border-radius: 8px; }
+  
+  /* Tabs */
+  .nav-tabs .nav-link { color: #f8f9fa; border: none; }
+  .nav-tabs .nav-link.active { background: #d4a373; color: #000; font-weight: bold; }
+  
+  /* Buttons */
   .btn-custom { background: #d4a373; border: none; color: #000; }
   .btn-custom:hover { background: #c48c59; color: #fff; }
+  
+  /* Table & UI Elements */
   .table { color: #fff; }
-  .low-stock { background:#ff6b6b;color:#000;padding:2px 6px;border-radius:6px;font-weight:600;font-size:12px; }
-  .small-muted { color:#bdbdbd; font-size:0.9rem; }
-  .modal-backdrop { background: rgba(0,0,0,0.6); }
-  #posProduct { max-height: 200px; overflow-y: auto; }
-</style>
+  .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .low-stock { background:#ff6b6b; color:#000; padding:2px 6px; border-radius:6px; font-weight:600; font-size:12px; }
+  .small-muted { font-size: 0.85rem; color: #bdbdbd; margin-right: 8px; }
 
+  /* Mobile Optimization */
+  @media (max-width: 768px) {
+    .btn, .form-control, .form-select { min-height: 44px; } /* Finger-friendly size */
+    .modal-dialog { margin: 10px; max-width: none; }
+    h5 { font-size: 1.1rem; }
+    .col-md-4, .col-md-5, .col-md-2 { margin-bottom: 10px; }
+  }
+
+  /* Search & Results Dropdown */
+  #productResults { 
+    max-height: 300px; 
+    overflow-y: auto; 
+    width: 100% !important; 
+  }
+
+  /* Modal Styling */
+  .modal-content { background-color: #212529 !important; color: #f8f9fa !important; border: 1px solid #444; }
+  .modal-header, .modal-footer { border-color: #444; }
+  .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+
+  /* Low Stock Wrapper */
+  #lowStockWrapper {
+    padding: 5px 10px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    background-color: #2b2b2b;
+    border: 1px solid #444;
+  }
+  #lowStockWrapper:hover { background-color: #3d3d3d; }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -33,8 +72,8 @@
 <!-- Login Section -->
 <div id="loginSection" class="py-5 container">
  <div style="display: flex; align-items: center; gap: 20px;">
-  <img src="img/becky&babek.jpg" alt="Logo" style="height: 100px; width: auto;">
-  <h3 class="mb-4">Becky&Babek Liquor inventory Dashboard</h3>
+  <img src="img/logo.jpeg" alt="Logo" style="height: 100px; width: auto;">
+  <h3 class="mb-4">MADOLLAR LIQUOR PUB</h3>
 </div>
 
   <div class="mb-3">
@@ -53,11 +92,14 @@
   <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
       <div style="display: flex; align-items: center; gap: 20px;">
-  <img src="img/becky&babek.jpg" alt="Logo" style="height: 100px; width: auto;">
-  <h3 class="mb-4">Becky&Babek Liquor inventory Dashboard</h3>
+  <img src="img/logo.jpeg" alt="Logo" style="height: 100px; width: auto;">
+  <h3 class="mb-4">MADOLLAR LIQUOR PUB </h3>
 </div>
       <div class="d-flex align-items-center gap-3 ms-auto">
-        <div class="small-muted">Low stock:</div>
+        <div id="lowStockWrapper" style="cursor: pointer; display: inline-flex; align-items: center;">
+    <div class="small-muted">Low stock:</div>
+ 
+</div>
         <span id="lowStockBadge" class="bg-danger px-2 py-1 rounded text-white">0</span>
         <span id="roleBadge" class="bg-warning ms-3 text-dark badge">ADMIN</span>
         <button id="logoutBtn" class="ms-3 btn btn-sm btn-light">Logout</button>
@@ -82,22 +124,45 @@
     </ul>
 
     <div class="pt-3 tab-content">
-      <!-- Products -->
       <div class="tab-pane fade show active" id="productsTab">
-        <h5>Products</h5>
-        <div class="mb-3 row g-2">
-          <div class="col-md-4"><input id="prodName" type="text" placeholder="Product Name" class="form-control"></div>
-          <div class="col-md-2"><input id="prodPrice" type="number" placeholder="Price" class="form-control"></div>
-          <div class="col-md-2"><input id="prodStock" type="number" placeholder="Stock" class="form-control"></div>
-          <div class="col-md-2"><input id="prodMin" type="number" placeholder="Min alert" class="form-control"></div>
-          <div class="col-md-2"><button id="addProductBtn" class="w-100 btn btn-custom">Add Product</button></div>
-        </div>
-        <table class="table table-striped">
-          <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Min</th><th>Actions</th></tr></thead>
-          <tbody id="productsTable"></tbody>
-        </table>
+  <h5>Products</h5>
+  <div class="mb-3 row g-2">
+    <div class="col-md-3"><input id="prodName" type="text" placeholder="Product Name" class="form-control"></div>
+    <div class="col-md-2"><input id="prodBuyPrice" type="number" placeholder="Buy Price" class="form-control"></div>
+    <div class="col-md-2"><input id="prodPrice" type="number" placeholder="Sell Price" class="form-control"></div>
+    <div class="col-md-1"><input id="prodStock" type="number" placeholder="Stock" class="form-control"></div>
+    <div class="col-md-2"><input id="prodMin" type="number" placeholder="Min alert" class="form-control"></div>
+    <div class="col-md-2"><button id="addProductBtn" class="w-100 btn btn-custom">Add Product</button></div>
+  </div>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Buy</th>
+        <th>Sell</th>
+        <th>Stock</th>
+        <th>Min</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="productsTable"></tbody>
+  </table>
+</div>
+<div class="modal fade" id="lowStockModal" tabindex="-1" aria-labelledby="lowStockModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="lowStockModalLabel">Low Stock Alerts</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-
+      <div class="modal-body">
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
       <!-- Customers -->
       <div class="tab-pane fade" id="customersTab">
         <h5>Customers</h5>
@@ -112,57 +177,88 @@
         </table>
       </div>
 
-      <!-- POS -->
-      <div class="tab-pane fade" id="posTab">
-        <h5>POS</h5>
-        <div class="mb-3 row g-2">
-          <div class="col-md-4">
-            <label class="small-muted">Customer</label>
-            <div class="d-flex gap-2">
-              <select id="posCustomer" class="form-select"></select>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <label class="small-muted">Product</label>
-            <select id="posProduct" class="form-select"></select>
-          </div>
-          <div class="col-md-2">
-            <label class="small-muted">Qty</label>
-            <input id="posQty" type="number" value="1" class="form-control">
-          </div>
-          <div class="d-flex align-items-end col-md-2">
-            <button id="addToCartBtn" class="w-100 btn btn-primary">Add to Cart</button>
-          </div>
-        </div>
+     <div class="tab-pane fade" id="posTab">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5>Point of Sale</h5>
+    <div class="card bg-dark text-white px-3 py-2">
+      <span class="small-muted">Total</span>
+      <h5 class="mb-0" id="cartTotalDisplay">KSh 0</h5>
+    </div>
+  </div>
 
-        <ul id="cartList" class="list-group mb-3"></ul>
-
-        <div class="d-flex gap-2 mb-3">
-          <button id="checkoutBtn" class="btn btn-success">Checkout</button>
-          <button id="clearCartBtn" class="btn btn-secondary">Clear Cart</button>
-        </div>
-
-        <div id="paymentSection" class="mt-3 p-3 d-none card">
-          <div class="row g-2">
-            <div class="col-md-4">
-              <label class="small-muted">Transaction Code</label>
-              <input id="transCode" type="text" class="form-control" placeholder="e.g. MPESA12345">
-            </div>
-            <div class="col-md-4">
-              <label class="small-muted">Payment Method</label>
-              <select id="paymentMethod" class="form-select">
-                <option value="mpesa">M-PESA</option>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-              </select>
-            </div>
-            <div class="d-flex align-items-end gap-2 col-md-4">
-              <button id="paymentCompleteBtn" class="btn btn-warning">Payment Completed</button>
-              <button id="cancelPaymentBtn" class="btn-outline-light btn">Cancel</button>
-            </div>
-          </div>
-        </div>
+  <div class="row g-2">
+    <div class="col-md-4">
+      <label class="small-muted">Customer</label>
+      <div class="d-flex gap-2">
+        <select id="posCustomer" class="form-select">
+          <option value="walkin">Walk-in Customer</option>
+        </select>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">+</button>
       </div>
+    </div>
+
+    <div class="col-md-4 position-relative">
+      <label class="small-muted">Product Search</label>
+      <input type="text" id="productSearch" class="form-control" placeholder="Search product...">
+      <div id="productResults" class="dropdown-menu w-100 shadow" style="display:none; position:absolute; z-index:1000;"></div>
+    </div>
+
+    <div class="col-md-2">
+      <label class="small-muted">Qty</label>
+      <input id="posQty" type="number" value="1" class="form-control">
+    </div>
+    <div class="d-flex align-items-end col-md-2">
+      <button id="addToCartBtn" class="w-100 btn btn-primary">Add to Cart</button>
+    </div>
+  </div>
+
+  <ul id="cartList" class="list-group mt-3 mb-3"></ul>
+
+  <div class="d-flex gap-2 mb-3">
+    <button id="checkoutBtn" class="btn btn-success">Checkout</button>
+    <button id="clearCartBtn" class="btn btn-secondary">Clear Cart</button>
+  </div>
+
+  <div id="paymentSection" class="mt-3 p-3 d-none card">
+    <div class="row g-2">
+      <div class="col-md-4">
+        <label class="small-muted">Transaction Code</label>
+        <input id="transCode" type="text" class="form-control" placeholder="e.g. MPESA12345">
+      </div>
+      <div class="col-md-4">
+        <label class="small-muted">Payment Method</label>
+        <select id="paymentMethod" class="form-select">
+          <option value="mpesa">M-PESA</option>
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+        </select>
+      </div>
+      <div class="d-flex align-items-end gap-2 col-md-4">
+        <button id="paymentCompleteBtn" class="btn btn-warning">Payment Completed</button>
+        <button id="cancelPaymentBtn" class="btn btn-outline-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addCustomerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Quick Add Customer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="newCustName" class="form-control mb-2" placeholder="Customer Name">
+        <input type="text" id="newCustPhone" class="form-control" placeholder="Phone Number">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="saveCustomerBtn">Save Customer</button>
+      </div>
+    </div>
+  </div>
+</div>
 
       <!-- Sales -->
       <div class="tab-pane fade" id="salesTab">
@@ -182,13 +278,13 @@
   </div>
 </div>
 
-<!-- Edit Product Modal -->
 <div class="modal fade" id="editProductModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="bg-dark p-3 text-white modal-content">
       <h5>Edit Product</h5>
       <input id="editProdName" class="mb-2 form-control" placeholder="Name">
-      <input id="editProdPrice" type="number" class="mb-2 form-control" placeholder="Price">
+      <input id="editProdBuyingPrice" type="number" class="mb-2 form-control" placeholder="Buying Price">
+      <input id="editProdPrice" type="number" class="mb-2 form-control" placeholder="Selling Price">
       <input id="editProdStock" type="number" class="mb-2 form-control" placeholder="Stock">
       <input id="editProdMin" type="number" class="mb-2 form-control" placeholder="Min alert">
       <button id="saveEditBtn" class="w-100 btn btn-success">Save Changes</button>
@@ -221,19 +317,37 @@ const loginMsg = document.getElementById("loginMsg");
 const logoutBtn = document.getElementById("logoutBtn");
 const roleBadge = document.getElementById("roleBadge");
 let currentRole = "staff";
-const todaysSalesEl = document.getElementById("todaysSales");
 
-/* Login/Logout */
+/**
+ * Updates UI visibility based on user role.
+ * Elements with class 'admin-only' will be toggled.
+ */
+function updateUIByRole(role) {
+    currentRole = role || "staff";
+    roleBadge.textContent = currentRole.toUpperCase();
+    
+    const adminElements = document.querySelectorAll(".admin-only");
+    adminElements.forEach(el => {
+        if (currentRole === "admin") {
+            el.classList.remove("d-none");
+        } else {
+            el.classList.add("d-none");
+        }
+    });
+}
+
+/* Login/Logout with Forced Refresh */
 loginBtn.onclick = async () => {
   try {
     const userCredential = await auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value);
-    const token = await userCredential.user.getIdTokenResult();
-    currentRole = token.claims.role || "staff";
+    // Force refresh to get latest claims immediately
+    const token = await userCredential.user.getIdTokenResult(true);
+    updateUIByRole(token.claims.role);
+    
     loginSection.classList.add("d-none");
     dashboard.classList.remove("d-none");
-    roleBadge.textContent = currentRole.toUpperCase();
     initDashboard();
-  } catch(e){ loginMsg.textContent = e.message; }
+  } catch(e) { loginMsg.textContent = e.message; }
 };
 
 logoutBtn.onclick = () => {
@@ -242,113 +356,149 @@ logoutBtn.onclick = () => {
   loginSection.classList.remove("d-none");
 };
 
-auth.onAuthStateChanged(user => {
-  if(user){
-    user.getIdTokenResult().then(token=>{
-      currentRole = token.claims.role || "staff";
-      loginSection.classList.add("d-none");
-      dashboard.classList.remove("d-none");
-      roleBadge.textContent = currentRole.toUpperCase();
-      initDashboard();
-    });
+/* Auth State Observer */
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    // Always force refresh on load to ensure current role is applied
+    const token = await user.getIdTokenResult(true);
+    updateUIByRole(token.claims.role);
+    
+    loginSection.classList.add("d-none");
+    dashboard.classList.remove("d-none");
+    initDashboard();
   } else {
     dashboard.classList.add("d-none");
     loginSection.classList.remove("d-none");
   }
 });
-
 /* Initialize Dashboard */
-function initDashboard(){
+function initDashboard() {
   /* Products */
-  let productsCache=[];
-  const prodName=document.getElementById("prodName");
-  const prodPrice=document.getElementById("prodPrice");
-  const prodStock=document.getElementById("prodStock");
-  const prodMin=document.getElementById("prodMin");
-  const addProductBtn=document.getElementById("addProductBtn");
-  const productsTable=document.getElementById("productsTable");
-  let editProductId=null;
+  let productsCache = [];
+  const prodName = document.getElementById("prodName");
+  const prodBuyPrice = document.getElementById("prodBuyPrice");
+  const prodPrice = document.getElementById("prodPrice");
+  const prodStock = document.getElementById("prodStock");
+  const prodMin = document.getElementById("prodMin");
+  const addProductBtn = document.getElementById("addProductBtn");
+  const productsTable = document.getElementById("productsTable");
+  let editProductId = null;
 
-  addProductBtn.onclick = async ()=>{
-    if(currentRole!=="admin") return alert("Admins only");
-    if(!prodName.value||!prodPrice.value||!prodStock.value) return;
+  addProductBtn.onclick = async () => {
+    if (currentRole !== "admin") return alert("Admins only");
+    if (!prodName.value || !prodPrice.value || !prodStock.value) return;
+    
     await db.collection("products").add({
       name: prodName.value,
+      buyPrice: parseFloat(prodBuyPrice.value) || 0,
       price: parseFloat(prodPrice.value),
       stock: parseInt(prodStock.value),
-      min: parseInt(prodMin.value)||0
+      min: parseInt(prodMin.value) || 0
     });
-    prodName.value=prodPrice.value=prodStock.value=prodMin.value="";
+    prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
   };
 
-  db.collection("products").onSnapshot(snap=>{
+  db.collection("products").onSnapshot(snap => {
     productsCache = snap.docs;
     renderProducts(productsCache);
     document.getElementById("productCount").textContent = snap.size;
 
     const posProduct = document.getElementById("posProduct");
-    posProduct.innerHTML="";
-    snap.docs.forEach(doc=>{
-      const p=doc.data();
-      const option = document.createElement("option");
-      option.value = doc.id;
-      option.textContent = p.name+" - KSh "+p.price;
-      option.dataset.price = p.price;
-      posProduct.appendChild(option);
-    });
+    if (posProduct) {
+      posProduct.innerHTML = "";
+      snap.docs.forEach(doc => {
+        const p = doc.data();
+        const option = document.createElement("option");
+        option.value = doc.id;
+        option.textContent = p.name + " - KSh " + p.price;
+        option.dataset.price = p.price;
+        posProduct.appendChild(option);
+      });
+    }
   });
 
-  function renderProducts(docs){
-    const lowStockBadge=document.getElementById("lowStockBadge");
-    productsTable.innerHTML="";
-    let lowCount=0;
-    docs.forEach(doc=>{
-      const p=doc.data();
-      if(p.stock<=p.min) lowCount++;
-      let actions="";
-      if(currentRole==="admin"){
-        actions=`<button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
-                 <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>`;
+  function renderProducts(docs) {
+    const lowStockBadge = document.getElementById("lowStockBadge");
+    const lowStockWrapper = document.getElementById("lowStockWrapper"); // Added wrapper
+    productsTable.innerHTML = "";
+    let lowStockItems = [];
+
+    // Sort alphabetically by name
+    const sortedDocs = [...docs].sort((a, b) => 
+      a.data().name.localeCompare(b.data().name)
+    );
+
+    sortedDocs.forEach(doc => {
+      const p = doc.data();
+      if (p.stock <= p.min) lowStockItems.push(p);
+      
+      let actions = "";
+      let buyPriceCell = "";
+      
+      if (currentRole === "admin") {
+        buyPriceCell = `<td>KSh ${p.buyPrice || 0}</td>`;
+        actions = `<button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
+                   <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>`;
       }
-      productsTable.innerHTML+=`<tr>
+
+      productsTable.innerHTML += `<tr>
         <td>${p.name}</td>
+        ${currentRole === "admin" ? buyPriceCell : ""}
         <td>KSh ${p.price}</td>
         <td>${p.stock}</td>
         <td>${p.min}</td>
         <td>${actions}</td>
       </tr>`;
     });
-    lowStockBadge.textContent=lowCount;
 
-    document.querySelectorAll(".delBtn").forEach(btn=>{
-      btn.onclick=async()=>{ await db.collection("products").doc(btn.dataset.id).delete(); };
+    // Update Badge and Modal Logic for the Wrapper
+    if (lowStockBadge) lowStockBadge.textContent = lowStockItems.length;
+
+    if (lowStockWrapper) {
+      lowStockWrapper.style.cursor = "pointer";
+      lowStockWrapper.onclick = () => {
+        const modalBody = document.querySelector("#lowStockModal .modal-body");
+        if (modalBody) {
+          modalBody.innerHTML = lowStockItems.length > 0 
+            ? lowStockItems.map(p => `<p><strong>${p.name}</strong>: ${p.stock} remaining</p>`).join('')
+            : "<p>All stock levels are healthy.</p>";
+          new bootstrap.Modal(document.getElementById("lowStockModal")).show();
+        }
+      };
+    }
+
+    // Event Listeners for buttons
+    document.querySelectorAll(".delBtn").forEach(btn => {
+      btn.onclick = async () => { await db.collection("products").doc(btn.dataset.id).delete(); };
     });
 
-    document.querySelectorAll(".editBtn").forEach(btn=>{
-      btn.onclick=()=>{
-        editProductId=btn.dataset.id;
-        const p=docs.find(d=>d.id===editProductId).data();
-        document.getElementById("editProdName").value=p.name;
-        document.getElementById("editProdPrice").value=p.price;
-        document.getElementById("editProdStock").value=p.stock;
-        document.getElementById("editProdMin").value=p.min;
+    document.querySelectorAll(".editBtn").forEach(btn => {
+      btn.onclick = () => {
+        editProductId = btn.dataset.id;
+        const p = docs.find(d => d.id === editProductId).data();
+        document.getElementById("editProdName").value = p.name;
+        document.getElementById("editProdPrice").value = p.price;
+        if(document.getElementById("editProdBuyPrice")) document.getElementById("editProdBuyPrice").value = p.buyPrice || 0;
+        document.getElementById("editProdStock").value = p.stock;
+        document.getElementById("editProdMin").value = p.min;
         new bootstrap.Modal(document.getElementById("editProductModal")).show();
       };
     });
   }
 
-  document.getElementById("saveEditBtn")?.addEventListener("click", async()=>{
-    if(!editProductId) return;
-    const editProdName=document.getElementById("editProdName").value;
-    const editProdPrice=parseFloat(document.getElementById("editProdPrice").value);
-    const editProdStock=parseInt(document.getElementById("editProdStock").value);
-    const editProdMin=parseInt(document.getElementById("editProdMin").value);
-    await db.collection("products").doc(editProductId).update({
-      name: editProdName,
-      price: editProdPrice,
-      stock: editProdStock,
-      min: editProdMin
-    });
+  document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
+    if (!editProductId) return;
+    const updateData = {
+      name: document.getElementById("editProdName").value,
+      price: parseFloat(document.getElementById("editProdPrice").value),
+      stock: parseInt(document.getElementById("editProdStock").value),
+      min: parseInt(document.getElementById("editProdMin").value)
+    };
+    if(document.getElementById("editProdBuyPrice")) {
+        updateData.buyPrice = parseFloat(document.getElementById("editProdBuyPrice").value);
+    }
+    
+    await db.collection("products").doc(editProductId).update(updateData);
     bootstrap.Modal.getInstance(document.getElementById("editProductModal")).hide();
   });
 
@@ -389,166 +539,144 @@ function initDashboard(){
     document.getElementById("customerCount").textContent = snap.size;
   });
 
-  /* POS */
-  const posProductEl = document.getElementById("posProduct");
-  const posQty=document.getElementById("posQty");
-  const addToCartBtn=document.getElementById("addToCartBtn");
-  const cartList=document.getElementById("cartList");
-  const checkoutBtn=document.getElementById("checkoutBtn");
-  const clearCartBtn=document.getElementById("clearCartBtn");
-  const paymentSection=document.getElementById("paymentSection");
-  const paymentCompleteBtn=document.getElementById("paymentCompleteBtn");
-  const cancelPaymentBtn=document.getElementById("cancelPaymentBtn");
-  const transCode=document.getElementById("transCode");
-  const paymentMethod=document.getElementById("paymentMethod");
+ /* POS */
+const posProductEl = document.getElementById("posProduct");
+const posQty = document.getElementById("posQty");
+const addToCartBtn = document.getElementById("addToCartBtn");
+const cartList = document.getElementById("cartList");
+const checkoutBtn = document.getElementById("checkoutBtn");
+const clearCartBtn = document.getElementById("clearCartBtn");
+const paymentSection = document.getElementById("paymentSection");
+const paymentCompleteBtn = document.getElementById("paymentCompleteBtn");
+const cancelPaymentBtn = document.getElementById("cancelPaymentBtn");
+const transCode = document.getElementById("transCode");
+const paymentMethod = document.getElementById("paymentMethod");
 
-  let cart=[];
-  function renderCart(){
-    cartList.innerHTML="";
-    cart.forEach((c,i)=>{
-      const li=document.createElement("li");
-      li.className="list-group-item d-flex justify-content-between align-items-center";
-      li.textContent=`${c.name} x${c.qty} = KSh ${(c.price*c.qty).toFixed(2)}`;
-      const rmBtn=document.createElement("button");
-      rmBtn.className="btn btn-sm btn-danger"; rmBtn.textContent="x";
-      rmBtn.onclick=()=>{ cart.splice(i,1); renderCart(); };
-      li.appendChild(rmBtn);
-      cartList.appendChild(li);
-    });
-  }
+// Added elements for UI enhancements
+const productSearch = document.getElementById("productSearch");
+const productResults = document.getElementById("productResults");
+const cartTotalDisplay = document.getElementById("cartTotalDisplay");
+const saveCustomerBtn = document.getElementById("saveCustomerBtn");
+let selectedProduct = null;
+let cart = [];
 
-  addToCartBtn.onclick=()=>{
-    const prod=productsCache.find(p=>p.id===posProductEl.value)?.data();
-    if(!prod) return;
-    cart.push({id:posProductEl.value, name:prod.name, price:prod.price, qty:parseInt(posQty.value)});
-    renderCart();
-  };
-
-  clearCartBtn.onclick=()=>{ cart=[]; renderCart(); };
-
-  checkoutBtn.onclick=()=>{ if(cart.length===0) return alert("Cart empty"); paymentSection.classList.remove("d-none"); };
-  cancelPaymentBtn.onclick=()=>{ paymentSection.classList.add("d-none"); };
-
- 
-  // PAYMENT COMPLETED - REDUCE STOCK
-   paymentCompleteBtn.onclick = async () => {
-    if(cart.length === 0) return alert("Cart is empty");
-
-    const customerId = posCustomer.value;
-    const payment = paymentMethod.value;
-    const transaction = transCode.value;
-    const customerName = posCustomer.selectedOptions[0].text;
-    let total = cart.reduce((a,b) => a + b.price * b.qty, 0);
-    const items = cart.map(c => ({ name: c.name, price: c.price, qty: c.qty }));
-
-    try {
-      // Save Sale
-      await db.collection("sales").add({ 
-        customer: customerName, 
-        items, 
-        total, 
-        payment, 
-        transaction, 
-        date: new Date() 
-      });
-
-      // Reduce stock with transaction
-      for(const c of cart){
-        const prodRef = db.collection("products").doc(c.id);
-        await db.runTransaction(async (t) => {
-          const prodSnap = await t.get(prodRef);
-          if(!prodSnap.exists) return;
-          const currentStock = prodSnap.data().stock || 0;
-          const newStock = Math.max(currentStock - c.qty, 0);
-          t.update(prodRef, { stock: newStock });
-        });
-      }
-
-      // Reset
-      cart = [];
-      renderCart();
-      paymentSection.classList.add("d-none");
-      transCode.value = "";
-      alert("Sale completed and stock updated!");
-    } catch(e){
-      console.error("Error completing sale:", e);
-      alert("Error: "+e.message);
-    }
-  };
-  /* Sales Table */
-  const salesTable = document.getElementById("salesTable");
-  db.collection("sales").onSnapshot(snap=>{
-    salesTable.innerHTML="";
-    let todayTotal=0;
-
-    snap.docs.forEach(doc=>{
-      const s=doc.data();
-      const date=s.date.toDate();
-      const dateStr=date.toLocaleString();
-      if(date.toDateString()===new Date().toDateString()) todayTotal+=s.total;
-
-      let actions="";
-      if(currentRole==="admin") actions=`<button class="btn btn-sm btn-danger delSaleBtn" data-id="${doc.id}">Delete</button> `;
-      actions += `<button class="btn btn-sm btn-success downloadBtn" data-id="${doc.id}">Download</button>`;
-
-      salesTable.innerHTML+=`<tr>
-        <td>${s.customer}</td>
-        <td>${s.items.map(i=>i.name+" x"+i.qty).join(", ")}</td>
-        <td>KSh ${s.total}</td>
-        <td>${s.payment}</td>
-        <td>${s.transaction}</td>
-        <td>${dateStr}</td>
-        <td>${actions}</td>
-      </tr>`;
-    });
-
-    todaysSalesEl.textContent="KSh "+todayTotal;
-
-    if(currentRole==="admin"){
-      document.querySelectorAll(".delSaleBtn").forEach(btn=>{
-        btn.onclick=async()=>{ if(confirm("Delete this sale?")) await db.collection("sales").doc(btn.dataset.id).delete(); };
-      });
-    }
-
-    document.querySelectorAll(".downloadBtn").forEach(btn=>{
-      btn.onclick=()=>downloadSale(btn.dataset.id);
-    });
+function renderCart() {
+  cartList.innerHTML = "";
+  let runningTotal = 0;
+  cart.forEach((c, i) => {
+    runningTotal += (c.price * c.qty);
+    const li = document.createElement("li");
+    li.className = "list-group-item d-flex justify-content-between align-items-center";
+    li.textContent = `${c.name} x${c.qty} = KSh ${(c.price * c.qty).toFixed(2)}`;
+    const rmBtn = document.createElement("button");
+    rmBtn.className = "btn btn-sm btn-danger"; rmBtn.textContent = "x";
+    rmBtn.onclick = () => { cart.splice(i, 1); renderCart(); };
+    li.appendChild(rmBtn);
+    cartList.appendChild(li);
   });
+  if (cartTotalDisplay) cartTotalDisplay.textContent = `KSh ${runningTotal.toFixed(2)}`;
+}
 
-  window.downloadSale = async (id) => {
-    const docSnap = await db.collection("sales").doc(id).get();
-    if(!docSnap.exists) return;
-    const s = docSnap.data();
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("Becky&Babek Liquors", 105, 20, null, null, "center");
-    doc.setFontSize(12);
-    doc.text(`Date: ${s.date.toDate().toLocaleString()}`, 14, 30);
-    doc.text(`Customer: ${s.customer}`, 14, 36);
-    doc.text(`Payment: ${s.payment}`, 14, 42);
-    doc.text(`Transaction: ${s.transaction}`, 14, 48);
-    doc.text("Items:", 14, 56);
-    let startY = 62;
-    s.items.forEach((item,index)=>{
-      doc.text(`${index+1}. ${item.name} x${item.qty} = KSh ${(item.price*item.qty).toFixed(2)}`,16,startY);
-      startY +=6;
+// Search Logic
+productSearch.oninput = (e) => {
+  const val = e.target.value.toLowerCase();
+  if (!val) { productResults.style.display = "none"; return; }
+  const matches = productsCache.filter(p => p.data().name.toLowerCase().includes(val));
+  productResults.innerHTML = matches.map(m => `
+    <a class="dropdown-item" href="#" onclick="event.preventDefault(); selectProd('${m.id}', '${m.data().name}', ${m.data().price})">
+      ${m.data().name} - <strong>KSh ${m.data().price}</strong>
+    </a>
+  `).join('');
+  productResults.style.display = matches.length ? "block" : "none";
+};
+
+window.selectProd = (id, name, price) => {
+  productSearch.value = name;
+  selectedProduct = { id, name, price };
+  productResults.style.display = "none";
+};
+
+// Add to Cart Logic
+addToCartBtn.onclick = () => {
+  const prodData = selectedProduct || productsCache.find(p => p.id === posProductEl.value)?.data();
+  if (!prodData) return;
+  
+  cart.push({ 
+    id: prodData.id || selectedProduct.id, 
+    name: prodData.name, 
+    price: prodData.price, 
+    qty: parseInt(posQty.value) 
+  });
+  
+  new Audio("https://actions.google.com/sounds/v1/ui/beep_short.ogg").play();
+  renderCart();
+  selectedProduct = null;
+  productSearch.value = "";
+};
+
+// Quick-Add Customer Logic
+saveCustomerBtn.onclick = async () => {
+  const name = document.getElementById("newCustName").value;
+  const phone = document.getElementById("newCustPhone").value;
+  if (!name) return alert("Enter a name");
+  try {
+    const docRef = await db.collection("customers").add({ name, phone });
+    const select = document.getElementById("posCustomer");
+    const opt = document.createElement("option");
+    opt.value = docRef.id;
+    opt.textContent = name;
+    select.appendChild(opt);
+    select.value = docRef.id;
+    bootstrap.Modal.getInstance(document.getElementById('addCustomerModal')).hide();
+    alert("Customer saved!");
+  } catch (e) { alert("Error: " + e.message); }
+};
+
+clearCartBtn.onclick = () => { cart = []; renderCart(); };
+checkoutBtn.onclick = () => { if (cart.length === 0) return alert("Cart empty"); paymentSection.classList.remove("d-none"); };
+cancelPaymentBtn.onclick = () => { paymentSection.classList.add("d-none"); };
+
+// PAYMENT COMPLETED
+paymentCompleteBtn.onclick = async () => {
+  if (cart.length === 0) return alert("Cart is empty");
+  const posCustomer = document.getElementById("posCustomer");
+  const customerName = (posCustomer.value && posCustomer.value !== "walkin") 
+                       ? posCustomer.selectedOptions[0].text 
+                       : "Walk-in Customer";
+  
+  try {
+    await db.collection("sales").add({ 
+      customer: customerName, 
+      items: cart.map(c => ({ name: c.name, price: c.price, qty: c.qty })), 
+      total: cart.reduce((a, b) => a + b.price * b.qty, 0), 
+      payment: paymentMethod.value, 
+      transaction: transCode.value, 
+      date: new Date() 
     });
-    doc.text(`Total: KSh ${s.total.toFixed(2)}`, 14, startY+4);
-    doc.text("Thank you for your purchase!",105,startY+14,null,null,"center");
-    doc.save(`receipt_${id}.pdf`);
-  };
-  // Store all sales in a variable so we can export them
-let allSales = [];
 
-db.collection("sales").onSnapshot(snap => {
+    for (const c of cart) {
+      const prodRef = db.collection("products").doc(c.id);
+      await db.runTransaction(async (t) => {
+        const snap = await t.get(prodRef);
+        t.update(prodRef, { stock: Math.max((snap.data().stock || 0) - c.qty, 0) });
+      });
+    }
+    cart = []; renderCart(); paymentSection.classList.add("d-none"); transCode.value = "";
+    alert("Sale completed and stock updated!");
+  } catch (e) { alert("Error: " + e.message); }
+};
+  /* Sales Table */
+const salesTable = document.getElementById("salesTable");
+let allSales = []; // Global variable for exports
+
+db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
   salesTable.innerHTML = "";
-  allSales = []; // reset
+  allSales = []; 
   let todayTotal = 0;
 
   snap.docs.forEach(doc => {
     const s = doc.data();
-    allSales.push({ id: doc.id, ...s }); // store for later download
+    allSales.push({ id: doc.id, ...s }); 
 
     const date = s.date.toDate();
     const dateStr = date.toLocaleString();
@@ -573,7 +701,7 @@ db.collection("sales").onSnapshot(snap => {
 
   todaysSalesEl.textContent = "KSh " + todayTotal;
 
-  // Delete buttons
+  // Buttons Logic
   if (currentRole === "admin") {
     document.querySelectorAll(".delSaleBtn").forEach(btn => {
       btn.onclick = async () => {
@@ -582,33 +710,83 @@ db.collection("sales").onSnapshot(snap => {
     });
   }
 
-  // Single sale receipt
   document.querySelectorAll(".downloadBtn").forEach(btn => {
     btn.onclick = () => downloadSale(btn.dataset.id);
   });
 });
 
-/* Download all sales as PDF */
+/* Professional Individual Receipt */
+window.downloadSale = async (id) => {
+  const s = allSales.find(sale => sale.id === id);
+  if(!s) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  
+  // Design Layout
+  doc.setFontSize(18);
+  doc.text("MADOLLAR LIQUOR PUB", 105, 20, null, null, "center");
+  doc.setFontSize(10);
+  doc.text("Official Receipt", 105, 26, null, null, "center");
+  doc.line(10, 30, 200, 30);
+  
+  doc.setFontSize(11);
+  doc.text(`Date: ${s.date.toDate().toLocaleString()}`, 14, 40);
+  doc.text(`Customer: ${s.customer}`, 14, 46);
+  doc.text(`Payment: ${s.payment}`, 14, 52);
+  doc.text(`Transaction: ${s.transaction}`, 14, 58);
+  
+  doc.setFontSize(12);
+  doc.text("Items:", 14, 70);
+  
+  let startY = 78;
+  s.items.forEach((item, index) => {
+    doc.text(`${index+1}. ${item.name} (${item.qty} x ${item.price})`, 16, startY);
+    doc.text(`KSh ${(item.price * item.qty).toFixed(2)}`, 190, startY, null, null, "right");
+    startY += 8;
+  });
+  
+  doc.line(10, startY + 4, 200, startY + 4);
+  doc.text(`Total: KSh ${s.total.toFixed(2)}`, 190, startY + 12, null, null, "right");
+  doc.text("Thank you for your purchase!", 105, startY + 25, null, null, "center");
+  
+  doc.save(`receipt_${id}.pdf`);
+};
+
+/* Professional Download all sales as PDF */
 document.getElementById("downloadAllPDF").onclick = () => {
   if (allSales.length === 0) return alert("No sales to export");
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text(" Becky&Babek Liquor - Sales Report", 105, 20, null, null, "center");
-  let startY = 30;
-  allSales.forEach((s, idx) => {
-    doc.setFontSize(10);
-    doc.text(`${idx+1}. ${s.customer} | ${s.items.map(i=>i.name+" x"+i.qty).join(", ")} | KSh ${s.total} | ${s.payment} | ${s.transaction} | ${s.date.toDate().toLocaleString()}`, 14, startY);
-    startY += 6;
-    if (startY > 280) { // add new page if too long
-      doc.addPage();
-      startY = 20;
+
+  // Header
+  doc.setFontSize(18);
+  doc.text("Sales Report: MADOLLAR LIQUOR PUB", 105, 15, null, null, "center");
+  doc.setFontSize(10);
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 21, null, null, "center");
+
+  // Professional AutoTable
+  doc.autoTable({
+    startY: 30,
+    head: [['Customer', 'Items', 'Payment', 'Total (KSh)']],
+    body: allSales.map(s => [
+      s.customer, 
+      s.items.map(i => `${i.name} x${i.qty}`).join(", "), 
+      s.payment, 
+      s.total.toLocaleString()
+    ]),
+    theme: 'grid', // 'striped' or 'grid' look professional
+    headStyles: { fillColor: [41, 128, 185], textColor: 255 }, // Professional blue header
+    styles: { fontSize: 9, cellPadding: 2 },
+    didDrawPage: (data) => {
+      // Footer page number
+      doc.text(`Page ${doc.internal.getNumberOfPages()}`, 105, 285, null, null, "center");
     }
   });
+
   doc.save("all_sales_report.pdf");
 };
 
-/* Download all sales as CSV */
+/* CSV Export remains unchanged */
 document.getElementById("downloadAllCSV").onclick = () => {
   if (allSales.length === 0) return alert("No sales to export");
   let csv = "Customer,Items,Total,Payment,Transaction,Date\n";
@@ -628,6 +806,8 @@ document.getElementById("downloadAllCSV").onclick = () => {
 
 }
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
