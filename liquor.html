@@ -59,6 +59,23 @@
     border: 1px solid #444;
   }
   #lowStockWrapper:hover { background-color: #3d3d3d; }
+  .card {
+    border-radius: 12px;
+    transition: transform 0.2s;
+}
+
+.card .text-muted {
+    color: #bdc3c7 !important; /* Light grey for labels */
+}
+
+.card h5 {
+    color: #ffffff !important; /* Bright white for sales figures */
+}
+
+/* Ensure the primary color is bright enough to show on dark backgrounds */
+.text-primary {
+    color: #5dade2 !important; /* A brighter blue that pops on dark backgrounds */
+}
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <!-- Firebase SDKs -->
@@ -110,7 +127,20 @@
   <div class="py-4 container">
     <!-- Dashboard Cards -->
    <div class="mb-4 row g-3">
-  <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Today's Sales</div><h4 id="todaysSales">KSh 0</h4></div></div>
+  <div class="col-sm-4">
+    <div class="p-3 card shadow-sm border-0">
+    <div class="d-flex justify-content-between">
+        <div>
+            <div class="small text-muted">Today's Sales</div>
+            <h5 id="todaysSales" class="fw-bold mb-0">KSh 0</h5>
+        </div>
+        <div class="text-end">
+            <div class="small text-muted">Monthly Sales</div>
+            <h5 id="monthlySales" class="fw-bold mb-0 text-primary">KSh 0</h5>
+        </div>
+    </div>
+</div>
+</div>
   <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Customers</div><h4 id="customerCount">0</h4></div></div>
   <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Products</div><h4 id="productCount">0</h4></div></div>
 
@@ -145,6 +175,9 @@
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#requisitionTab">Requisition</button>
 </li>
     </ul>
+    <div class="col-sm-4">
+    
+</div>
 
     <div class="pt-3 tab-content">
       <div class="tab-pane fade show active" id="productsTab">
@@ -476,6 +509,7 @@ function initDashboard() {
   /* Products */
   
   const todaysSalesEl = document.getElementById("todaysSales");
+  const monthlySalesEl = document.getElementById("monthlySales");
   const prodName = document.getElementById("prodName");
   const prodBuyPrice = document.getElementById("prodBuyPrice");
   const prodPrice = document.getElementById("prodPrice");
@@ -905,7 +939,13 @@ let allSales = [];
 db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
     allSales = [];
     let todayTotal = 0;
-    const today = new Date().toDateString();
+    let monthlyTotal = 0;
+    const itemCounts = {}; // Track item quantities for the dashboard
+    
+    const now = new Date();
+    const today = now.toDateString();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
     
     if (salesTable) salesTable.innerHTML = "";
 
@@ -913,15 +953,27 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
         const s = doc.data();
         allSales.push({ id: doc.id, ...s });
         
-        if (s.date.toDate().toDateString() === today) todayTotal += s.total;
-
+        const saleDate = s.date.toDate();
+        
+        // 1. Calculate Totals
+        if (saleDate.toDateString() === today) todayTotal += s.total;
+        if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
+            monthlyTotal += s.total;
+        }
+        
+        // 2. Count Item Frequencies
+        s.items.forEach(item => {
+            itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
+        });
+        
+        // 3. Render Table
         if (salesTable) {
             let actions = `
                 <button class="btn btn-sm btn-success" onclick="downloadSale('${doc.id}')">📄</button>
                 ${currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteSale('${doc.id}')">🗑️</button>` : ''}
             `;
             salesTable.innerHTML += `<tr>
-                <td>${s.date.toDate().toLocaleDateString()}</td>
+                <td>${saleDate.toLocaleDateString()}</td>
                 <td>${s.customer}</td>
                 <td>${s.items.map(i => i.name + " x" + i.qty).join(", ")}</td>
                 <td>KSh ${s.total.toLocaleString()}</td>
@@ -930,8 +982,26 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
         }
     });
 
+    // 4. Update Sales Cards
     if (typeof todaysSalesEl !== 'undefined') todaysSalesEl.textContent = "KSh " + todayTotal.toLocaleString();
-    
+    if (typeof monthlySalesEl !== 'undefined') monthlySalesEl.textContent = "KSh " + monthlyTotal.toLocaleString();
+
+    // 5. Update Top/Bottom Selling Items (Most to Least)
+    const topItemsList = document.getElementById("topItemsList");
+    if (topItemsList) {
+        const sortedItems = Object.entries(itemCounts)
+            .sort((a, b) => b[1] - a[1]); // b[1] - a[1] = Most to Least
+
+        topItemsList.innerHTML = sortedItems.length > 0 
+            ? sortedItems.map(item => `
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-truncate" style="max-width: 150px;">${item[0]}</span>
+                    <span class="fw-bold text-primary">${item[1]} sold</span>
+                </div>`).join("")
+            : "<small>No sales data</small>";
+    }
+
+
     // --- DYNAMIC PROGRESS BAR UPDATE ---
     const progressBar = document.getElementById("salesProgressBar");
     const targetLabel = document.getElementById("targetLabel");
