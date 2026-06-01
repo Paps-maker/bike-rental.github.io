@@ -1007,25 +1007,24 @@ window.downloadSale = async (id) => {
 
     // 1. Header Section
     doc.setFontSize(22);
-    doc.setTextColor(41, 128, 185); // Professional Blue
+    doc.setTextColor(41, 128, 185); 
     doc.text("MADOLLAR LIQUOR PUB", 105, 20, null, null, "center");
     
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text("P.O. Box , Nairobi, Kenya", 105, 26, null, null, "center");
-    doc.line(10, 32, 200, 32); // Horizontal line
+    doc.line(10, 32, 200, 32);
 
     // 2. Transaction Details
     doc.setFontSize(11);
     doc.setTextColor(0);
     doc.text(`Customer: ${s.customer}`, 14, 42);
-    doc.text(`Phone: ${s.phone || 'N/A'}`, 14, 48);
-    doc.text(`Date: ${dateStr}`, 14, 54);
-    doc.text(`Transaction: ${s.transaction}`, 14, 60);
+    doc.text(`Date: ${dateStr}`, 14, 48);
+    doc.text(`Transaction: ${s.transaction}`, 14, 54);
 
     // 3. Items Table
     doc.autoTable({
-        startY: 70,
+        startY: 65,
         head: [['Item', 'Qty', 'Price', 'Subtotal']],
         body: s.items.map(i => [
             i.name, 
@@ -1037,14 +1036,34 @@ window.downloadSale = async (id) => {
         headStyles: { fillColor: [41, 128, 185] }
     });
 
-    // 4. Footer Section
-    const finalY = doc.lastAutoTable.finalY + 10;
+    // 4. Totals and M-Pesa Section
+    let currentY = doc.lastAutoTable.finalY + 10;
+    
     doc.setFontSize(14);
-    doc.text(`TOTAL AMOUNT: KSh ${s.total.toLocaleString()}`, 196, finalY, null, null, "right");
+    doc.text(`TOTAL AMOUNT: KSh ${s.total.toLocaleString()}`, 196, currentY, null, null, "right");
+    
+    // M-Pesa Design Box
+    currentY += 15;
+    doc.setDrawColor(41, 128, 185);
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(14, currentY, 182, 35, 3, 3, 'FD'); // Background box
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 150, 0); // M-Pesa Green
+    doc.text("PAY VIA M-PESA", 105, currentY + 8, null, null, "center");
     
     doc.setFontSize(10);
-    doc.text("Thank you for your purchase!", 105, finalY + 20, null, null, "center");
-    doc.text("Please keep this receipt for your records.", 105, finalY + 26, null, null, "center");
+    doc.setTextColor(0);
+    doc.text("Lipa na M-PESA , Buy Goods & Services", 105, currentY + 15, null, null, "center");
+    doc.setFontSize(14);
+    doc.text(`TILL NUMBER: 3234719`, 105, currentY + 23, null, null, "center");
+    doc.setFontSize(10);
+    doc.text(`Account Name: MADOLLA`, 105, currentY + 30, null, null, "center");
+
+    // 5. Footer
+    doc.setFontSize(9);
+    doc.setTextColor(150);
+    doc.text("Thank you for your purchase!", 105, 280, null, null, "center");
 
     doc.save(`Receipt_${s.customer.replace(/\s+/g, '_')}_${id.substring(0,5)}.pdf`);
 };
