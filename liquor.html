@@ -393,18 +393,18 @@ function initDashboard() {
   let editProductId = null;
 
   addProductBtn.onclick = async () => {
-    if (currentRole !== "admin") return alert("Admins only");
-    if (!prodName.value || !prodPrice.value || !prodStock.value) return;
-    
-    await db.collection("products").add({
-      name: prodName.value,
-      buyPrice: parseFloat(prodBuyPrice.value) || 0,
-      price: parseFloat(prodPrice.value),
-      stock: parseInt(prodStock.value),
-      min: parseInt(prodMin.value) || 0
-    });
-    prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
-  };
+  if (currentRole !== "admin") return alert("Admins only");
+  if (!prodName.value || !prodPrice.value || !prodStock.value) return;
+  
+  await db.collection("products").add({
+    name: prodName.value,
+    buyPrice: parseFloat(prodBuyPrice.value) || 0,
+    price: parseFloat(prodPrice.value),
+    stock: parseInt(prodStock.value),
+    min: parseInt(prodMin.value) || 0
+  });
+  prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
+};
   // 2. NEW: Save Edit Logic
 document.getElementById("saveEditBtn").onclick = async () => {
   if (!editProductId) return;
