@@ -510,33 +510,31 @@ document.getElementById("saveEditBtn").onclick = async () => {
       };
     }
 
-   // 4. Attach Listeners ONLY if Admin
-    if (currentRole === "admin") {
-        document.querySelectorAll(".delBtn").forEach(btn => {
-            btn.onclick = async () => { 
-                if (confirm("Delete this product?")) {
-                    await db.collection("products").doc(btn.dataset.id).delete(); 
-                }
-            };
-        });
+  // 3. Attach Listeners ONLY if Admin
+  if (currentRole === "admin") {
+    document.querySelectorAll(".delBtn").forEach(btn => {
+      btn.onclick = async () => { await db.collection("products").doc(btn.dataset.id).delete(); };
+    });
 
-        document.querySelectorAll(".editBtn").forEach(btn => {
-            btn.onclick = () => {
-                editProductId = btn.dataset.id;
-                const p = docs.find(d => d.id === editProductId).data();
-                
-                // Populate modal inputs with data from the document
-                document.getElementById("editProdName").value = p.name || "";
-                document.getElementById("editProdBuyingPrice").value = p.buyPrice || 0;
-                document.getElementById("editProdPrice").value = p.price || 0;
-                document.getElementById("editProdStock").value = p.stock || 0;
-                document.getElementById("editProdMin").value = p.min || 0;
-                
-                // Trigger the modal
-                new bootstrap.Modal(document.getElementById("editProductModal")).show();
-            };
-        });
-    }
+    document.querySelectorAll(".editBtn").forEach(btn => {
+    btn.onclick = () => {
+        editProductId = btn.dataset.id;
+        const p = docs.find(d => d.id === editProductId).data();
+        
+        // Ensure these IDs match your HTML exactly
+        document.getElementById("editProdName").value = p.name;
+        document.getElementById("editProdBuyingPrice").value = p.buyPrice || 0; // Updated ID
+        document.getElementById("editProdPrice").value = p.price;
+        document.getElementById("editProdStock").value = p.stock;
+        document.getElementById("editProdMin").value = p.min;
+        
+        // Use Bootstrap's instance manager to show the modal
+        const editModal = new bootstrap.Modal(document.getElementById("editProductModal"));
+        editModal.show();
+    };
+});
+  }
+
 
   /* Customers */
   const custName=document.getElementById("custName");
