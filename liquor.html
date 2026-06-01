@@ -405,6 +405,29 @@ function initDashboard() {
     });
     prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
   };
+  // 2. NEW: Save Edit Logic
+document.getElementById("saveEditBtn").onclick = async () => {
+  if (!editProductId) return;
+  
+  try {
+    await db.collection("products").doc(editProductId).update({
+      name: document.getElementById("editProdName").value,
+      buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
+      price: parseFloat(document.getElementById("editProdPrice").value),
+      stock: parseInt(document.getElementById("editProdStock").value),
+      min: parseInt(document.getElementById("editProdMin").value) || 0
+    });
+
+    // Close the modal cleanly
+    const modalEl = document.getElementById('editProductModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+    
+    alert("Product updated!");
+  } catch (e) {
+    alert("Update failed: " + e.message);
+  }
+};
 
   db.collection("products").onSnapshot(snap => {
     productsCache = snap.docs;
