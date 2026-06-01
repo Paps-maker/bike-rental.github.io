@@ -1060,10 +1060,13 @@ window.downloadSale = async (id) => {
     doc.setFontSize(10);
     doc.text(`Account Name: MADOLLA`, 105, currentY + 30, null, null, "center");
 
-    // 5. Footer
-    doc.setFontSize(9);
-    doc.setTextColor(150);
-    doc.text("Thank you for your purchase!", 105, 280, null, null, "center");
+   // 5. Professional Thank You Footer
+    doc.setFontSize(16);
+    doc.setTextColor(41, 128, 185);
+    doc.text("THANK YOU FOR YOUR PURCHASE!", 105, 270, null, null, "center");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text("We appreciate", 105, 276, null, null, "center");
 
     doc.save(`Receipt_${s.customer.replace(/\s+/g, '_')}_${id.substring(0,5)}.pdf`);
 };
