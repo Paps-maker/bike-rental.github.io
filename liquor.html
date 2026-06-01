@@ -141,6 +141,9 @@
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customersTab">Customers</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#posTab">POS</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#salesTab">Sales</button></li>
+      <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#requisitionTab">Requisition</button>
+</li>
     </ul>
 
     <div class="pt-3 tab-content">
@@ -284,7 +287,38 @@
     </div>
   </div>
 </div>
-
+<div class="tab-pane fade" id="requisitionTab">
+    <div class="card p-3 mt-3">
+        <h5>Create Stock Requisition List</h5>
+        <div class="row">
+            <div class="col-md-5">
+                <select id="stockProductSelect" class="form-control"></select>
+            </div>
+            <div class="col-md-3">
+                <input type="number" id="restockQty" class="form-control" value="1" min="1">
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary" onclick="addToRequisition()">Add to List</button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Qty</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="requisitionTableBody">
+                    </tbody>
+            </table>
+        </div>
+        
+        <button class="btn btn-success mt-3" onclick="downloadRequisitionPDF()">Download Requisition PDF</button>
+    </div>
+</div>
      <div class="tab-pane fade" id="salesTab">
     <h5>Sales Reporting</h5>
     
@@ -338,6 +372,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+// --- GLOBAL VARIABLES (Only declare these once) ---
+window.productsCache = [];
+window.requisitionItems = [];
+window.currentExpectedSales = 0;
 
 /* Auth elements */
 
@@ -407,7 +445,7 @@ auth.onAuthStateChanged(async (user) => {
 /* Initialize Dashboard */
 function initDashboard() {
   /* Products */
-  let productsCache = [];
+  
   const todaysSalesEl = document.getElementById("todaysSales");
   const prodName = document.getElementById("prodName");
   const prodBuyPrice = document.getElementById("prodBuyPrice");
@@ -455,7 +493,7 @@ document.getElementById("saveEditBtn").onclick = async () => {
   }
 };
 // Initialize at the top of your script
-let currentExpectedSales = 0;
+
  db.collection("products").onSnapshot(snap => {
     productsCache = snap.docs;
     renderProducts(productsCache);
@@ -476,22 +514,30 @@ let currentExpectedSales = 0;
     document.getElementById("totalBuyValue").textContent = `KSh ${totalCost.toLocaleString()}`;
     document.getElementById("totalSellValue").textContent = `KSh ${totalExpected.toLocaleString()}`;
 
-    // --- CRITICAL UPDATE: Set the target for the Sales listener ---
-    // This allows your Sales listener to know what the target is
+    // --- CRITICAL UPDATE: Set the dynamic target for the Sales listener ---
+    // Note: If you implement the manual override, this variable will be updated by your settings logic
     currentExpectedSales = totalExpected * 0.5; 
-    // -------------------------------------------------------------
 
+    // --- UPDATE POS DROPDOWN ---
     const posProduct = document.getElementById("posProduct");
     if (posProduct) {
-      posProduct.innerHTML = "";
-      snap.docs.forEach(doc => {
-        const p = doc.data();
-        const option = document.createElement("option");
-        option.value = doc.id;
-        option.textContent = p.name + " - KSh " + p.price;
-        option.dataset.price = p.price;
-        posProduct.appendChild(option);
-      });
+        posProduct.innerHTML = "";
+        snap.docs.forEach(doc => {
+            const p = doc.data();
+            const option = document.createElement("option");
+            option.value = doc.id;
+            option.textContent = `${p.name} - KSh ${p.price}`;
+            option.dataset.price = p.price;
+            posProduct.appendChild(option);
+        });
+    }
+
+    // --- UPDATE REQUISITION DROPDOWN ---
+    const stockProductSelect = document.getElementById("stockProductSelect");
+    if (stockProductSelect) {
+        stockProductSelect.innerHTML = snap.docs.map(doc => 
+            `<option value="${doc.id}">${doc.data().name}</option>`
+        ).join('');
     }
 });
 
@@ -1035,6 +1081,88 @@ document.getElementById("downloadAllPDF").onclick = () => {
     doc.save("Full_Sales_History_Report.pdf");
 };
 }
+/* --- Requisition Logic --- */
+
+// Ensure global scope variables are defined and attached to window
+window.requisitionItems = window.requisitionItems || [];
+
+// Add item to the list
+window.addToRequisition = () => {
+    const select = document.getElementById("stockProductSelect");
+    const qtyInput = document.getElementById("restockQty");
+    const qty = qtyInput.value;
+
+    if (!select || !select.value) return alert("Please select a product first.");
+    
+    // Find product from the global productsCache
+    // Ensure productsCache is defined globally at the top of your script
+    const prodDoc = typeof productsCache !== 'undefined' ? productsCache.find(p => p.id === select.value) : null;
+    
+    if (!prodDoc) {
+        console.error("Cache:", productsCache);
+        return alert("Error: Product data not found. Ensure the product list has loaded.");
+    }
+    
+    const prod = prodDoc.data();
+    
+    // Add to the global tracking array
+    window.requisitionItems.push({ id: select.value, name: prod.name, qty: qty });
+    
+    // Refresh the table UI
+    window.renderRequisitionTable();
+    
+    // Optional: reset input
+    qtyInput.value = "1";
+};
+
+// Render the Table rows
+window.renderRequisitionTable = () => {
+    const tbody = document.getElementById("requisitionTableBody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = ""; // Clear existing table rows
+    
+    window.requisitionItems.forEach((item, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.qty}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="removeFromRequisition(${index})">Remove</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+};
+
+// Remove item from the list
+window.removeFromRequisition = (index) => {
+    window.requisitionItems.splice(index, 1);
+    window.renderRequisitionTable();
+};
+
+// Download the PDF
+window.downloadRequisitionPDF = () => {
+    if (window.requisitionItems.length === 0) return alert("List is empty");
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(20);
+    doc.text("STOCK REQUISITION FORM", 105, 15, null, null, "center");
+    doc.setFontSize(12);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 25);
+    
+    doc.autoTable({
+        startY: 35,
+        head: [['Product Name', 'Quantity Requested']],
+        body: window.requisitionItems.map(item => [item.name, item.qty]),
+        theme: 'striped',
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    doc.save(`Requisition_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
+};
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
