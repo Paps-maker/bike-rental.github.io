@@ -293,6 +293,7 @@
 </div>
 
 <!-- Scripts -->
+ 
 <script type="module">
 const firebaseConfig = {
   apiKey: "AIzaSyDS83HjWpOSH6BCd3_0w8Lv7_3MgQzw_h0",
@@ -308,6 +309,7 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* Auth elements */
+
 const loginSection = document.getElementById("loginSection");
 const dashboard = document.getElementById("dashboard");
 const loginBtn = document.getElementById("loginBtn");
@@ -375,6 +377,7 @@ auth.onAuthStateChanged(async (user) => {
 function initDashboard() {
   /* Products */
   let productsCache = [];
+  const todaysSalesEl = document.getElementById("todaysSales");
   const prodName = document.getElementById("prodName");
   const prodBuyPrice = document.getElementById("prodBuyPrice");
   const prodPrice = document.getElementById("prodPrice");
@@ -665,7 +668,7 @@ paymentCompleteBtn.onclick = async () => {
     alert("Sale completed and stock updated!");
   } catch (e) { alert("Error: " + e.message); }
 };
-  /* Sales Table */
+ /* Sales Table */
 const salesTable = document.getElementById("salesTable");
 let allSales = []; // Global variable for exports
 
@@ -687,6 +690,7 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
       actions += `<button class="btn btn-sm btn-danger delSaleBtn" data-id="${doc.id}">Delete</button> `;
     actions += `<button class="btn btn-sm btn-success downloadBtn" data-id="${doc.id}">Download</button>`;
 
+    // Add row to DOM
     salesTable.innerHTML += `
       <tr>
         <td>${s.customer}</td>
@@ -701,7 +705,7 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
 
   todaysSalesEl.textContent = "KSh " + todayTotal;
 
-  // Buttons Logic
+  // Buttons Logic: Attach listeners to the buttons now that they exist in the DOM
   if (currentRole === "admin") {
     document.querySelectorAll(".delSaleBtn").forEach(btn => {
       btn.onclick = async () => {
@@ -714,7 +718,6 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
     btn.onclick = () => downloadSale(btn.dataset.id);
   });
 });
-
 /* Professional Individual Receipt */
 window.downloadSale = async (id) => {
   const s = allSales.find(sale => sale.id === id);
