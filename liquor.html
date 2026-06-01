@@ -205,7 +205,7 @@
         </table>
       </div>
 
-     <div class="tab-pane fade" id="posTab">
+    <div class="tab-pane fade" id="posTab">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5>Point of Sale</h5>
     <div class="card bg-dark text-white px-3 py-2">
@@ -219,12 +219,12 @@
       <label class="small-muted">Customer</label>
       <div class="d-flex gap-2">
         <select id="posCustomer" class="form-select">
-          <option value="walkin">Walk-in Customer</option>
+          <option value="">Guest</option>
         </select>
         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">+</button>
       </div>
     </div>
-
+   
     <div class="col-md-4 position-relative">
       <label class="small-muted">Product Search</label>
       <input type="text" id="productSearch" class="form-control" placeholder="Search product...">
@@ -305,11 +305,14 @@
         <div class="table-responsive">
             <table class="table table-bordered table-striped mt-3">
                 <thead>
-                    <tr>
-                        <th>Product Name</th>
-                        <th>Qty</th>
-                        <th>Action</th>
-                    </tr>
+                   <thead>
+    <tr>
+        <th>Product Name</th>
+        <th>Buy Price</th>
+        <th>Qty</th>
+        <th>Action</th>
+    </tr>
+</thead>
                 </thead>
                 <tbody id="requisitionTableBody">
                     </tbody>
@@ -642,30 +645,39 @@ document.getElementById("saveEditBtn").onclick = async () => {
     custName.value=custPhone.value="";
   };
 
-  db.collection("customers").onSnapshot(snap=>{
-    customersTable.innerHTML="";
-    posCustomer.innerHTML="";
-    snap.forEach(doc=>{
-      const c=doc.data();
-      let actions="";
-      if(currentRole==="admin") actions=`<button class="btn btn-sm btn-danger delCustBtn" data-id="${doc.id}">Delete</button>`;
-      customersTable.innerHTML+=`<tr>
-        <td>${c.name}</td><td>${c.phone}</td><td>${actions}</td>
-      </tr>`;
+  /* Customers Listener */
+db.collection("customers").onSnapshot(snap => {
+    customersTable.innerHTML = "";
+    
+    // 1. Reset dropdown to Guest FIRST
+    posCustomer.innerHTML = '<option value="">Guest</option>';
+    
+    snap.forEach(doc => {
+        const c = doc.data();
+        
+        // Populate Table
+        let actions = "";
+        if(currentRole === "admin") {
+            actions = `<button class="btn btn-sm btn-danger delCustBtn" data-id="${doc.id}">Delete</button>`;
+        }
+        customersTable.innerHTML += `<tr>
+            <td>${c.name}</td><td>${c.phone}</td><td>${actions}</td>
+        </tr>`;
 
-      const option = document.createElement("option");
-      option.value=doc.id; option.textContent=c.name;
-      posCustomer.appendChild(option);
+        // 2. Add customer to dropdown
+        const option = document.createElement("option");
+        option.value = doc.id; 
+        option.textContent = c.name;
+        posCustomer.appendChild(option);
     });
 
-    if(currentRole==="admin"){
-      document.querySelectorAll(".delCustBtn").forEach(btn=>{
-        btn.onclick=async()=>{ await db.collection("customers").doc(btn.dataset.id).delete(); };
-      });
+    if(currentRole === "admin"){
+        document.querySelectorAll(".delCustBtn").forEach(btn => {
+            btn.onclick = async() => { await db.collection("customers").doc(btn.dataset.id).delete(); };
+        });
     }
     document.getElementById("customerCount").textContent = snap.size;
-  });
-
+});
  /* POS */
 const posProductEl = document.getElementById("posProduct");
 const posQty = document.getElementById("posQty");
@@ -709,13 +721,13 @@ productSearch.oninput = (e) => {
   const val = e.target.value.toLowerCase();
   if (!val) { productResults.style.display = "none"; return; }
   
-  const matches = productsCache.filter(p => p.data().name.toLowerCase().includes(val));
+  const matches = window.productsCache.filter(p => p.data().name.toLowerCase().includes(val));
   productResults.innerHTML = matches.map(m => {
     const p = m.data();
     const isOutOfStock = parseInt(p.stock) <= 0;
     return `
       <a class="dropdown-item ${isOutOfStock ? 'text-muted' : ''}" href="#" 
-         onclick="event.preventDefault(); ${isOutOfStock ? "alert('Item is out of stock!')" : `selectProd('${m.id}', '${p.name}', ${p.price})`}">
+         onclick="event.preventDefault(); ${isOutOfStock ? "alert('Item is out of stock!')" : `window.selectProd('${m.id}', '${p.name}', ${p.price})`}">
         ${p.name} - <strong>KSh ${p.price}</strong> ${isOutOfStock ? "(Out of Stock)" : ""}
       </a>
     `;
@@ -732,8 +744,8 @@ window.selectProd = (id, name, price) => {
 // Add to Cart Logic
 addToCartBtn.onclick = () => {
   const prodData = selectedProduct 
-    ? productsCache.find(p => p.id === selectedProduct.id)?.data() 
-    : productsCache.find(p => p.id === posProductEl.value)?.data();
+    ? window.productsCache.find(p => p.id === selectedProduct.id)?.data() 
+    : window.productsCache.find(p => p.id === posProductEl.value)?.data();
 
   if (!prodData) return alert("Please select a product");
 
@@ -784,9 +796,9 @@ paymentCompleteBtn.onclick = async () => {
   if (cart.length === 0) return alert("Cart is empty");
   
   const posCustomer = document.getElementById("posCustomer");
-  const customerName = (posCustomer.value && posCustomer.value !== "walkin") 
-                       ? posCustomer.selectedOptions[0].text 
-                       : "Walk-in Customer";
+  const customerName = (posCustomer.value && posCustomer.value !== "") 
+                        ? posCustomer.selectedOptions[0].text 
+                        : "Guest";
   
   try {
     // Check stock one final time before finalizing sale
@@ -812,6 +824,7 @@ paymentCompleteBtn.onclick = async () => {
       });
     }
     cart = []; renderCart(); paymentSection.classList.add("d-none"); transCode.value = "";
+    posCustomer.value = "";
     alert("Sale completed and stock updated!");
   } catch (e) { alert("Error: " + e.message); }
 };
@@ -1090,28 +1103,33 @@ window.requisitionItems = window.requisitionItems || [];
 window.addToRequisition = () => {
     const select = document.getElementById("stockProductSelect");
     const qtyInput = document.getElementById("restockQty");
-    const qty = qtyInput.value;
+    const qty = parseInt(qtyInput.value) || 0;
 
     if (!select || !select.value) return alert("Please select a product first.");
+    if (qty <= 0) return alert("Please enter a valid quantity.");
     
-    // Find product from the global productsCache
-    // Ensure productsCache is defined globally at the top of your script
-    const prodDoc = typeof productsCache !== 'undefined' ? productsCache.find(p => p.id === select.value) : null;
+    // Find product from the global window.productsCache
+    const prodDoc = window.productsCache ? window.productsCache.find(p => p.id === select.value) : null;
     
     if (!prodDoc) {
-        console.error("Cache:", productsCache);
+        console.error("Cache:", window.productsCache);
         return alert("Error: Product data not found. Ensure the product list has loaded.");
     }
     
     const prod = prodDoc.data();
     
-    // Add to the global tracking array
-    window.requisitionItems.push({ id: select.value, name: prod.name, qty: qty });
+    // Add to the global tracking array with buying price
+    window.requisitionItems.push({ 
+        id: select.value, 
+        name: prod.name, 
+        qty: qty,
+        buyPrice: parseFloat(prod.buyPrice) || 0 
+    });
     
     // Refresh the table UI
     window.renderRequisitionTable();
     
-    // Optional: reset input
+    // Reset input
     qtyInput.value = "1";
 };
 
@@ -1126,9 +1144,10 @@ window.renderRequisitionTable = () => {
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${item.name}</td>
+            <td>KSh ${item.buyPrice.toLocaleString()}</td>
             <td>${item.qty}</td>
             <td>
-                <button class="btn btn-sm btn-danger" onclick="removeFromRequisition(${index})">Remove</button>
+                <button class="btn btn-sm btn-danger" onclick="window.removeFromRequisition(${index})">Remove</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -1155,8 +1174,12 @@ window.downloadRequisitionPDF = () => {
     
     doc.autoTable({
         startY: 35,
-        head: [['Product Name', 'Quantity Requested']],
-        body: window.requisitionItems.map(item => [item.name, item.qty]),
+        head: [['Product Name', 'Buy Price (KSh)', 'Qty']],
+        body: window.requisitionItems.map(item => [
+            item.name, 
+            item.buyPrice.toLocaleString(), 
+            item.qty
+        ]),
         theme: 'striped',
         headStyles: { fillColor: [41, 128, 185] }
     });
