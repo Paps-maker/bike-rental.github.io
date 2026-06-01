@@ -359,6 +359,32 @@
     </div>
   </div>
 </div>
+    <!-- Toast Container (Centered via CSS) -->
+<div class="toast-container position-fixed p-3">
+  <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header" id="toastHeader">
+      <strong class="me-auto" id="toastTitle">Notification</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastBody"></div>
+  </div>
+</div>
+<style>
+/* Centering and Dark Theme (As before) */
+.toast-container { top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: 350px; z-index: 9999; }
+#liveToast { border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); background: #2c3e50; color: #ecf0f1; border: none; overflow: hidden; }
+.toast-body { padding: 25px; text-align: center; color: white; }
+
+/* The Success Tick Animation */
+.checkmark-circle { width: 50px; height: 50px; margin: 0 auto 15px; border-radius: 50%; stroke: #2ecc71; stroke-width: 4; stroke-miterlimit: 10; fill: none; animation: scale .3s ease-in-out; }
+.checkmark { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke .6s cubic-bezier(0.65, 0, 0.45, 1) forwards .3s; }
+@keyframes stroke { 100% { stroke-dashoffset: 0; } }
+@keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+
+/* Spinner */
+.spinner-loader { width: 40px; height: 40px; border: 4px solid #34495e; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
 
 <!-- Scripts -->
  
@@ -791,42 +817,85 @@ clearCartBtn.onclick = () => { cart = []; renderCart(); };
 checkoutBtn.onclick = () => { if (cart.length === 0) return alert("Cart empty"); paymentSection.classList.remove("d-none"); };
 cancelPaymentBtn.onclick = () => { paymentSection.classList.add("d-none"); };
 
-// PAYMENT COMPLETED
+function showToast(title, message, type = 'loading') {
+    document.getElementById("toastTitle").textContent = title;
+    const body = document.getElementById("toastBody");
+
+    if (type === 'loading') {
+        body.innerHTML = `<div class="spinner-loader"></div><div>${message}</div>`;
+    } else if (type === 'success') {
+        body.innerHTML = `
+            <svg class="checkmark-circle" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="25" fill="none"/>
+                <path class="checkmark" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+            <div>${message}</div>`;
+    } else {
+        body.innerHTML = `<div style="font-size:40px; color:#e74c3c;">✕</div><div>${message}</div>`;
+    }
+
+    const toastEl = document.getElementById('liveToast');
+    // Don't auto-hide if it's still loading
+    const toast = new bootstrap.Toast(toastEl, { autohide: type !== 'loading' });
+    toast.show();
+}
+/* PAYMENT COMPLETED */
 paymentCompleteBtn.onclick = async () => {
-  if (cart.length === 0) return alert("Cart is empty");
-  
-  const posCustomer = document.getElementById("posCustomer");
-  const customerName = (posCustomer.value && posCustomer.value !== "") 
+    if (cart.length === 0) return showToast("Warning", "Cart is empty", "error");
+
+    const posCustomer = document.getElementById("posCustomer");
+    const customerName = (posCustomer.value && posCustomer.value !== "") 
                         ? posCustomer.selectedOptions[0].text 
                         : "Guest";
-  
-  try {
-    // Check stock one final time before finalizing sale
-    for (const c of cart) {
-        const snap = await db.collection("products").doc(c.id).get();
-        if ((snap.data().stock || 0) < c.qty) throw new Error(`${c.name} has run out of stock.`);
-    }
 
-    await db.collection("sales").add({ 
-      customer: customerName, 
-      items: cart.map(c => ({ name: c.name, price: c.price, qty: c.qty })), 
-      total: cart.reduce((a, b) => a + b.price * b.qty, 0), 
-      payment: paymentMethod.value, 
-      transaction: transCode.value, 
-      date: new Date() 
-    });
+    // 1. Immediate UI Feedback
+    paymentSection.classList.add("d-none");
+    showToast("Processing", "Finalizing your sale...", "loading");
 
-    for (const c of cart) {
-      const prodRef = db.collection("products").doc(c.id);
-      await db.runTransaction(async (t) => {
-        const snap = await t.get(prodRef);
-        t.update(prodRef, { stock: Math.max((snap.data().stock || 0) - c.qty, 0) });
-      });
-    }
-    cart = []; renderCart(); paymentSection.classList.add("d-none"); transCode.value = "";
-    posCustomer.value = "";
-    alert("Sale completed and stock updated!");
-  } catch (e) { alert("Error: " + e.message); }
+    // 2. Background Processing
+    (async () => {
+        try {
+            // Check stock
+            for (const c of cart) {
+                const snap = await db.collection("products").doc(c.id).get();
+                if ((snap.data().stock || 0) < c.qty) throw new Error(`${c.name} has run out of stock.`);
+            }
+
+            // Add Sale
+            await db.collection("sales").add({ 
+                customer: customerName, 
+                items: cart.map(c => ({ name: c.name, price: c.price, qty: c.qty })), 
+                total: cart.reduce((a, b) => a + b.price * b.qty, 0), 
+                payment: paymentMethod.value, 
+                transaction: transCode.value, 
+                date: new Date() 
+            });
+
+            // Update Stock
+            for (const c of cart) {
+                const prodRef = db.collection("products").doc(c.id);
+                await db.runTransaction(async (t) => {
+                    const snap = await t.get(prodRef);
+                    t.update(prodRef, { stock: Math.max((snap.data().stock || 0) - c.qty, 0) });
+                });
+            }
+
+            // Reset UI
+            cart = []; 
+            renderCart(); 
+            transCode.value = "";
+            posCustomer.value = "";
+            
+            // Show Success Animation
+            showToast("Success", "Sale completed and stock updated!", "success");
+
+        } catch (e) {
+            // Show Error Animation
+            showToast("Error", e.message, "error");
+            // Re-open the payment section if there was an error
+            paymentSection.classList.remove("d-none");
+        }
+    })();
 };
 /* Sales Table & Reporting */
 const salesTable = document.getElementById("salesTable");
