@@ -126,27 +126,32 @@
     <div class="pt-3 tab-content">
       <div class="tab-pane fade show active" id="productsTab">
   <h5>Products</h5>
-  <div class="mb-3 row g-2">
-    <div class="col-md-3"><input id="prodName" type="text" placeholder="Product Name" class="form-control"></div>
-    <div class="col-md-2"><input id="prodBuyPrice" type="number" placeholder="Buy Price" class="form-control"></div>
-    <div class="col-md-2"><input id="prodPrice" type="number" placeholder="Sell Price" class="form-control"></div>
-    <div class="col-md-1"><input id="prodStock" type="number" placeholder="Stock" class="form-control"></div>
-    <div class="col-md-2"><input id="prodMin" type="number" placeholder="Min alert" class="form-control"></div>
-    <div class="col-md-2"><button id="addProductBtn" class="w-100 btn btn-custom">Add Product</button></div>
+<div class="mb-3 row g-2">
+  <div class="col-md-3">
+    <input id="prodName" type="text" placeholder="Product Name" class="form-control">
   </div>
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Buy</th>
-        <th>Sell</th>
-        <th>Stock</th>
-        <th>Min</th>
-        <th>Actions</th>
-      </tr>
+  <div class="col-md-2 admin-only">
+    <input id="prodBuyPrice" type="number" placeholder="Buy Price" class="form-control">
+  </div>
+  <div class="col-md-2">
+    <input id="prodPrice" type="number" placeholder="Sell Price" class="form-control">
+  </div>
+  <div class="col-md-1">
+    <input id="prodStock" type="number" placeholder="Stock" class="form-control">
+  </div>
+  <div class="col-md-2">
+    <input id="prodMin" type="number" placeholder="Min alert" class="form-control">
+  </div>
+  <div class="col-md-2 admin-only">
+    <button id="addProductBtn" class="w-100 btn btn-custom">Add Product</button>
+  </div>
+</div>
+
+<table class="table table-striped">
+  <thead id="productsHead">
     </thead>
-    <tbody id="productsTable"></tbody>
-  </table>
+  <tbody id="productsTable"></tbody>
+</table>
 </div>
 <div class="modal fade" id="lowStockModal" tabindex="-1" aria-labelledby="lowStockModalLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -420,13 +425,24 @@ function initDashboard() {
     }
   });
 
-  function renderProducts(docs) {
+ function renderProducts(docs) {
+    const productsHead = document.getElementById("productsHead");
+    const productsTable = document.getElementById("productsTable");
     const lowStockBadge = document.getElementById("lowStockBadge");
-    const lowStockWrapper = document.getElementById("lowStockWrapper"); // Added wrapper
+    const lowStockWrapper = document.getElementById("lowStockWrapper");
+    
     productsTable.innerHTML = "";
     let lowStockItems = [];
 
-    // Sort alphabetically by name
+    // 1. Build Header Dynamically
+    let headerHTML = `<tr><th>Name</th>`;
+    if (currentRole === "admin") headerHTML += `<th>Buy</th>`;
+    headerHTML += `<th>Sell</th><th>Stock</th><th>Min</th>`;
+    if (currentRole === "admin") headerHTML += `<th>Actions</th>`;
+    headerHTML += `</tr>`;
+    productsHead.innerHTML = headerHTML;
+
+    // 2. Sort and Build Body
     const sortedDocs = [...docs].sort((a, b) => 
       a.data().name.localeCompare(b.data().name)
     );
@@ -435,26 +451,27 @@ function initDashboard() {
       const p = doc.data();
       if (p.stock <= p.min) lowStockItems.push(p);
       
-      let actions = "";
-      let buyPriceCell = "";
+      let row = `<tr><td>${p.name}</td>`;
       
       if (currentRole === "admin") {
-        buyPriceCell = `<td>KSh ${p.buyPrice || 0}</td>`;
-        actions = `<button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
-                   <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>`;
+        row += `<td>KSh ${p.buyPrice || 0}</td>`;
       }
-
-      productsTable.innerHTML += `<tr>
-        <td>${p.name}</td>
-        ${currentRole === "admin" ? buyPriceCell : ""}
-        <td>KSh ${p.price}</td>
-        <td>${p.stock}</td>
-        <td>${p.min}</td>
-        <td>${actions}</td>
-      </tr>`;
+      
+      row += `<td>KSh ${p.price}</td>
+              <td>${p.stock}</td>
+              <td>${p.min}</td>`;
+      
+      if (currentRole === "admin") {
+        row += `<td>
+                  <button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
+                  <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>
+                </td>`;
+      }
+      row += `</tr>`;
+      productsTable.innerHTML += row;
     });
 
-    // Update Badge and Modal Logic for the Wrapper
+    // 3. Low Stock Badge and Modal Logic
     if (lowStockBadge) lowStockBadge.textContent = lowStockItems.length;
 
     if (lowStockWrapper) {
@@ -470,41 +487,25 @@ function initDashboard() {
       };
     }
 
-    // Event Listeners for buttons
-    document.querySelectorAll(".delBtn").forEach(btn => {
-      btn.onclick = async () => { await db.collection("products").doc(btn.dataset.id).delete(); };
-    });
+    // 4. Attach Listeners ONLY if Admin
+    if (currentRole === "admin") {
+        document.querySelectorAll(".delBtn").forEach(btn => {
+            btn.onclick = async () => { await db.collection("products").doc(btn.dataset.id).delete(); };
+        });
 
-    document.querySelectorAll(".editBtn").forEach(btn => {
-      btn.onclick = () => {
-        editProductId = btn.dataset.id;
-        const p = docs.find(d => d.id === editProductId).data();
-        document.getElementById("editProdName").value = p.name;
-        document.getElementById("editProdPrice").value = p.price;
-        if(document.getElementById("editProdBuyPrice")) document.getElementById("editProdBuyPrice").value = p.buyPrice || 0;
-        document.getElementById("editProdStock").value = p.stock;
-        document.getElementById("editProdMin").value = p.min;
-        new bootstrap.Modal(document.getElementById("editProductModal")).show();
-      };
-    });
-  }
-
-  document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
-    if (!editProductId) return;
-    const updateData = {
-      name: document.getElementById("editProdName").value,
-      price: parseFloat(document.getElementById("editProdPrice").value),
-      stock: parseInt(document.getElementById("editProdStock").value),
-      min: parseInt(document.getElementById("editProdMin").value)
-    };
-    if(document.getElementById("editProdBuyPrice")) {
-        updateData.buyPrice = parseFloat(document.getElementById("editProdBuyPrice").value);
+        document.querySelectorAll(".editBtn").forEach(btn => {
+            btn.onclick = () => {
+                editProductId = btn.dataset.id;
+                const p = docs.find(d => d.id === editProductId).data();
+                document.getElementById("editProdName").value = p.name;
+                document.getElementById("editProdPrice").value = p.price;
+                document.getElementById("editProdStock").value = p.stock;
+                document.getElementById("editProdMin").value = p.min;
+                new bootstrap.Modal(document.getElementById("editProductModal")).show();
+            };
+        });
     }
-    
-    await db.collection("products").doc(editProductId).update(updateData);
-    bootstrap.Modal.getInstance(document.getElementById("editProductModal")).hide();
-  });
-
+}
   /* Customers */
   const custName=document.getElementById("custName");
   const custPhone=document.getElementById("custPhone");
