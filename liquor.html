@@ -420,7 +420,7 @@
 </style>
 
 <!-- Scripts -->
- 
+ <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script type="module">
 const firebaseConfig = {
   apiKey: "AIzaSyDS83HjWpOSH6BCd3_0w8Lv7_3MgQzw_h0",
@@ -666,10 +666,24 @@ document.getElementById("saveEditBtn").onclick = async () => {
       };
     }
 
-  // 3. Attach Listeners ONLY if Admin
+ // 3. Attach Listeners ONLY if Admin
   if (currentRole === "admin") {
     document.querySelectorAll(".delBtn").forEach(btn => {
-      btn.onclick = async () => { await db.collection("products").doc(btn.dataset.id).delete(); };
+      btn.onclick = async () => { 
+        // Using SweetAlert2 for a custom popup
+        const result = await Swal.fire({
+          title: 'Are you sure?',
+          text: "You won't be able to revert this!",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          confirmButtonText: 'Yes, delete it!'
+        });
+
+        if (result.isConfirmed) {
+          await db.collection("products").doc(btn.dataset.id).delete(); 
+        }
+      };
     });
 
     document.querySelectorAll(".editBtn").forEach(btn => {
