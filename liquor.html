@@ -1368,23 +1368,45 @@ window.renderRequisitionTable = () => {
     });
 };
 
-// 3. Edit item quantity
+// 3. Edit item quantity and price type
 window.editRequisitionItem = async (index) => {
     const item = window.requisitionItems[index];
-    const { value: newQty } = await Swal.fire({
+    
+    const { value: formValues } = await Swal.fire({
         title: `Edit ${item.name}`,
-        input: 'number',
-        inputValue: item.qty,
-        inputLabel: 'Quantity',
-        showCancelButton: true
+        html:
+            '<label>Quantity</label>' +
+            `<input id="swal-input1" type="number" class="swal2-input" value="${item.qty}">` +
+            '<label>Price Type</label>' +
+            `<select id="swal-input2" class="swal2-select" style="display:flex;">` +
+            `<option value="sellPrice" ${item.priceType === 'sellPrice' ? 'selected' : ''}>Sell Price</option>` +
+            `<option value="buyPrice" ${item.priceType === 'buyPrice' ? 'selected' : ''}>Buy Price</option>` +
+            `</select>`,
+        focusConfirm: false,
+        showCancelButton: true,
+        preConfirm: () => {
+            return {
+                qty: document.getElementById('swal-input1').value,
+                priceType: document.getElementById('swal-input2').value
+            }
+        }
     });
 
-    if (newQty && parseInt(newQty) > 0) {
-        window.requisitionItems[index].qty = parseInt(newQty);
+    if (formValues && parseInt(formValues.qty) > 0) {
+        // Update the item data
+        window.requisitionItems[index].qty = parseInt(formValues.qty);
+        window.requisitionItems[index].priceType = formValues.priceType;
+        
+        // Recalculate the price based on the selected type from the product cache
+        const prodDoc = window.productsCache.find(p => p.id === item.id);
+        const prod = prodDoc.data();
+        window.requisitionItems[index].price = formValues.priceType === "buyPrice" 
+            ? (parseFloat(prod.buyPrice) || 0) 
+            : (parseFloat(prod.price) || 0);
+
         window.renderRequisitionTable();
     }
 };
-
 // 4. Remove item with SweetAlert2
 window.confirmRemove = async (index) => {
     const item = window.requisitionItems[index];
