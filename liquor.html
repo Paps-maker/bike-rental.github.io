@@ -325,29 +325,37 @@
 <div class="tab-pane fade" id="requisitionTab">
     <div class="card p-3 mt-3">
         <h5>Create Stock Requisition List</h5>
-        <div class="row">
-            <div class="col-md-5">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label for="stockProductSelect" class="form-label small">Product</label>
                 <select id="stockProductSelect" class="form-control"></select>
             </div>
             <div class="col-md-3">
+                <label for="priceTypeSelect" class="form-label small">Price Type</label>
+               <select id="priceTypeSelect" class="form-control">
+    <option value="sellPrice">Sell Price</option>
+    <option value="buyPrice">Buy Price</option>
+</select>
+            </div>
+            <div class="col-md-2">
+                <label for="restockQty" class="form-label small">Qty</label>
                 <input type="number" id="restockQty" class="form-control" value="1" min="1">
             </div>
-            <div class="col-md-4">
-                <button class="btn btn-primary" onclick="addToRequisition()">Add to List</button>
+            <div class="col-md-4 d-flex align-items-end">
+                <button class="btn btn-primary w-100" onclick="addToRequisition()">Add to List</button>
             </div>
         </div>
         
         <div class="table-responsive">
             <table class="table table-bordered table-striped mt-3">
                 <thead>
-                   <thead>
-    <tr>
-        <th>Product Name</th>
-        <th>Buy Price</th>
-        <th>Qty</th>
-        <th>Action</th>
-    </tr>
-</thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Price Type</th>
+                        <th>Price</th>
+                        <th>Qty</th>
+                        <th>Action</th>
+                    </tr>
                 </thead>
                 <tbody id="requisitionTableBody">
                     </tbody>
@@ -1307,94 +1315,112 @@ document.getElementById("downloadAllPDF").onclick = () => {
 }
 /* --- Requisition Logic --- */
 
-// Ensure global scope variables are defined and attached to window
 window.requisitionItems = window.requisitionItems || [];
 
-// Add item to the list
+// 1. Add item to the list
 window.addToRequisition = () => {
     const select = document.getElementById("stockProductSelect");
     const qtyInput = document.getElementById("restockQty");
+    const priceType = document.getElementById("priceTypeSelect").value;
     const qty = parseInt(qtyInput.value) || 0;
 
     if (!select || !select.value) return alert("Please select a product first.");
     if (qty <= 0) return alert("Please enter a valid quantity.");
     
-    // Find product from the global window.productsCache
     const prodDoc = window.productsCache ? window.productsCache.find(p => p.id === select.value) : null;
-    
-    if (!prodDoc) {
-        console.error("Cache:", window.productsCache);
-        return alert("Error: Product data not found. Ensure the product list has loaded.");
-    }
+    if (!prodDoc) return alert("Error: Product data not found.");
     
     const prod = prodDoc.data();
+    const price = priceType === "buyPrice" ? (parseFloat(prod.buyPrice) || 0) : (parseFloat(prod.price) || 0);
     
-    // Add to the global tracking array with buying price
     window.requisitionItems.push({ 
         id: select.value, 
         name: prod.name, 
         qty: qty,
-        buyPrice: parseFloat(prod.buyPrice) || 0 
+        priceType: priceType,
+        price: price
     });
     
-    // Refresh the table UI
     window.renderRequisitionTable();
-    
-    // Reset input
     qtyInput.value = "1";
 };
 
-// Render the Table rows
+// 2. Render Table with Edit and Remove
 window.renderRequisitionTable = () => {
     const tbody = document.getElementById("requisitionTableBody");
     if (!tbody) return;
     
-    tbody.innerHTML = ""; // Clear existing table rows
+    tbody.innerHTML = ""; 
     
     window.requisitionItems.forEach((item, index) => {
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${item.name}</td>
-            <td>KSh ${item.buyPrice.toLocaleString()}</td>
+            <td>${item.priceType === 'buyPrice' ? 'Buy Price' : 'Sell Price'}</td>
+            <td>KSh ${item.price.toLocaleString()}</td>
             <td>${item.qty}</td>
             <td>
-                <button class="btn btn-sm btn-danger" onclick="window.removeFromRequisition(${index})">Remove</button>
+                <button class="btn btn-sm btn-warning" onclick="window.editRequisitionItem(${index})">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="window.confirmRemove(${index})">Remove</button>
             </td>
         `;
         tbody.appendChild(row);
     });
 };
 
-// Remove item from the list
-window.removeFromRequisition = (index) => {
-    window.requisitionItems.splice(index, 1);
-    window.renderRequisitionTable();
+// 3. Edit item quantity
+window.editRequisitionItem = async (index) => {
+    const item = window.requisitionItems[index];
+    const { value: newQty } = await Swal.fire({
+        title: `Edit ${item.name}`,
+        input: 'number',
+        inputValue: item.qty,
+        inputLabel: 'Quantity',
+        showCancelButton: true
+    });
+
+    if (newQty && parseInt(newQty) > 0) {
+        window.requisitionItems[index].qty = parseInt(newQty);
+        window.renderRequisitionTable();
+    }
 };
 
-// Download the PDF
+// 4. Remove item with SweetAlert2
+window.confirmRemove = async (index) => {
+    const item = window.requisitionItems[index];
+    const result = await Swal.fire({
+        title: 'Remove item?',
+        text: `Are you sure you want to remove "${item.name}" from the list?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, remove it!'
+    });
+
+    if (result.isConfirmed) {
+        window.requisitionItems.splice(index, 1);
+        window.renderRequisitionTable();
+    }
+};
+
+// 5. Download PDF
 window.downloadRequisitionPDF = () => {
     if (window.requisitionItems.length === 0) return alert("List is empty");
     
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
-    doc.setFontSize(20);
     doc.text("STOCK REQUISITION FORM", 105, 15, null, null, "center");
-    doc.setFontSize(12);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 25);
     
     doc.autoTable({
         startY: 35,
-        head: [['Product Name', 'Buy Price (KSh)', 'Qty']],
+        head: [['Product Name', 'Price Type', 'Price (KSh)', 'Qty']],
         body: window.requisitionItems.map(item => [
             item.name, 
-            item.buyPrice.toLocaleString(), 
+            item.priceType === 'buyPrice' ? 'Buy Price' : 'Sell Price',
+            item.price.toLocaleString(), 
             item.qty
-        ]),
-        theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] }
+        ])
     });
-
     doc.save(`Requisition_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
 };
 </script>
