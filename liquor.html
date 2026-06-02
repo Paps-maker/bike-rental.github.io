@@ -667,30 +667,55 @@ document.getElementById("saveEditBtn").onclick = async () => {
     }
 
  // 3. Attach Listeners ONLY if Admin
-  if (currentRole === "admin") {
-    document.querySelectorAll(".delBtn").forEach(btn => {
-      btn.onclick = async () => { 
-        // Using SweetAlert2 for a custom popup
-        const result = await Swal.fire({
-          title: 'Are you sure?',
-          text: "You won't be able to revert this!",
-          icon: 'warning',
+if (currentRole === "admin") {
+  document.querySelectorAll(".delBtn").forEach(btn => {
+    btn.onclick = async () => { 
+      const id = btn.dataset.id;
+      const docRef = db.collection("products").doc(id);
+      
+      // Get the product name from your existing 'docs' array
+      const product = docs.find(d => d.id === id).data();
+      const productName = product.name || "this product";
+
+      // Using SweetAlert2 for a custom popup
+      const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: `You are about to delete "${productName}". This cannot be undone!`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+      });
+
+      if (result.isConfirmed) {
+        // Capture data before deleting
+        const productData = product;
+        
+        await docRef.delete(); 
+
+        // Show Undo toast/popup with product name
+        const toast = await Swal.fire({
+          title: 'Deleted!',
+          text: `"${productName}" has been deleted.`,
+          icon: 'success',
           showCancelButton: true,
-          confirmButtonColor: '#d33',
-          confirmButtonText: 'Yes, delete it!'
+          cancelButtonText: 'Undo',
+          confirmButtonText: 'OK'
         });
 
-        if (result.isConfirmed) {
-          await db.collection("products").doc(btn.dataset.id).delete(); 
+        // If they click "Undo"
+        if (toast.dismiss === Swal.DismissReason.cancel) {
+          await docRef.set(productData);
+          Swal.fire('Restored!', `"${productName}" has been restored.`, 'success');
         }
-      };
-    });
+      }
+    };
+  });
 
-    document.querySelectorAll(".editBtn").forEach(btn => {
+  document.querySelectorAll(".editBtn").forEach(btn => {
     btn.onclick = () => {
-        editProductId = btn.dataset.id;
-        const p = docs.find(d => d.id === editProductId).data();
-        
+      editProductId = btn.dataset.id;
+      const p = docs.find(d => d.id === editProductId).data();
         // Ensure these IDs match your HTML exactly
         document.getElementById("editProdName").value = p.name;
         document.getElementById("editProdBuyingPrice").value = p.buyPrice || 0; // Updated ID
