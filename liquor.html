@@ -1257,13 +1257,20 @@ window.downloadSale = async (id) => {
     doc.setFontSize(10);
     doc.text(`Account Name: MADOLLA`, 105, currentY + 30, null, null, "center");
 
-   // 5. Professional Thank You Footer
-    doc.setFontSize(16);
-    doc.setTextColor(41, 128, 185);
-    doc.text("THANK YOU FOR YOUR PURCHASE!", 105, 270, null, null, "center");
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text("We appreciate", 105, 276, null, null, "center");
+   // Professional Thank You Footer
+doc.setFontSize(16);
+doc.setTextColor(41, 128, 185);
+doc.text("THANK YOU FOR YOUR PURCHASE!", 105, 245, null, null, "center");
+
+doc.setFontSize(10);
+doc.setTextColor(100);
+doc.text("We appreciate.", 105, 252, null, null, "center");
+
+// Developer Branding
+doc.setFontSize(8);
+doc.setTextColor(150);
+doc.text("System Developed by Stones Web & System Solutions", 105, 260, null, null, "center");
+doc.text("Tel: 0790427109 , Email: livingstoneoduor21@gmail.com", 105, 265, null, null, "center");
 
     doc.save(`Receipt_${s.customer.replace(/\s+/g, '_')}_${id.substring(0,5)}.pdf`);
 };
