@@ -1457,20 +1457,19 @@ window.addSelectedToRequisition = () => {
     bootstrap.Modal.getInstance(document.getElementById("productSelectorModal")).hide();
 };
 
-// 3. Render Table with Subtotal & Grand Total
+// 3. Render Table with Conditional Subtotal & Buy-Price Only Grand Total
 window.renderRequisitionTable = () => {
     const tbody = document.getElementById("requisitionTableBody");
     const totalDisplay = document.getElementById("grandTotalValue");
     if (!tbody) return;
     
     tbody.innerHTML = ""; 
-    let grandTotal = 0;
+    let buyPriceTotal = 0;
 
     window.requisitionItems.forEach((item, index) => {
-        const subtotal = item.price * item.qty;
-        grandTotal += subtotal;
+        const subtotal = item.priceType === 'buyPrice' ? (item.price * item.qty) : 0;
+        buyPriceTotal += subtotal;
         
-        // Show subtotal only if Buy Price, otherwise dash
         const subtotalDisplay = item.priceType === 'buyPrice' ? `KSh ${subtotal.toLocaleString()}` : "-";
         
         const row = document.createElement("tr");
@@ -1496,7 +1495,7 @@ window.renderRequisitionTable = () => {
     });
 
     if (totalDisplay) {
-        totalDisplay.innerText = `KSh ${grandTotal.toLocaleString()}`;
+        totalDisplay.innerText = buyPriceTotal > 0 ? `Grand Total: KSh ${buyPriceTotal.toLocaleString()}` : "";
     }
 };
 
@@ -1528,6 +1527,7 @@ window.confirmRemove = async (index) => {
     }
 };
 
+// 5. Download PDF (Buy-Price Only Totals)
 window.downloadRequisitionPDF = () => {
     if (window.requisitionItems.length === 0) return Swal.fire("Empty", "List is empty", "warning");
     const { jsPDF } = window.jspdf;
@@ -1538,9 +1538,8 @@ window.downloadRequisitionPDF = () => {
     doc.setFontSize(10);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 22, null, null, "center");
     
-    // Map items including the index + 1 for numbering
     const tableData = window.requisitionItems.map((i, index) => [
-        index + 1, // Numbering
+        index + 1,
         i.name, 
         i.priceType === 'buyPrice' ? 'Buy Price' : 'Sell Price', 
         i.price.toLocaleString(), 
@@ -1548,17 +1547,19 @@ window.downloadRequisitionPDF = () => {
         i.priceType === 'buyPrice' ? (i.price * i.qty).toLocaleString() : '-'
     ]);
     
-    // Add total row (spans columns to reach the total)
-    const total = window.requisitionItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    tableData.push(['', '', '', '', 'TOTAL', total.toLocaleString()]);
+    const buyPriceTotal = window.requisitionItems
+        .filter(i => i.priceType === 'buyPrice')
+        .reduce((sum, i) => sum + (i.price * i.qty), 0);
+
+    if (buyPriceTotal > 0) {
+        tableData.push(['', '', '', '', 'TOTAL', buyPriceTotal.toLocaleString()]);
+    }
 
     doc.autoTable({
         startY: 30,
         head: [['No.', 'Product Name', 'Price Type', 'Price (KSh)', 'Qty', 'Subtotal']],
         body: tableData,
-        columnStyles: {
-            0: { cellWidth: 10 } // Keeps the number column thin and neat
-        }
+        columnStyles: { 0: { cellWidth: 10 } }
     });
     doc.save(`Requisition_${new Date().toLocaleDateString()}.pdf`);
 };
