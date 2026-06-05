@@ -362,20 +362,26 @@
 </div>
         
         <div class="table-responsive">
-            <table class="table table-bordered table-striped mt-3">
-                <thead>
-                    <tr>
-                        <th>Product Name</th>
-                        <th>Price Type</th>
-                        <th>Price</th>
-                        <th>Qty</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="requisitionTableBody">
-                    </tbody>
-            </table>
-        </div>
+    <table class="table table-bordered table-striped mt-3">
+        <thead>
+    <tr>
+        <th>Product Name</th>
+        <th>Price Type</th>
+        <th>Price</th>
+        <th>Qty</th>
+        <th>Subtotal</th> <th>Action</th>
+    </tr>
+</thead>
+        <tbody id="requisitionTableBody">
+            </tbody>
+        <tfoot id="requisitionTableFooter">
+            <tr class="table-dark">
+                <th colspan="3" class="text-end">Grand Total:</th>
+                <th id="grandTotalValue" colspan="2">KSh 0</th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
         
         <button class="btn btn-success mt-3" onclick="downloadRequisitionPDF()">
             Download Requisition PDF
@@ -1419,7 +1425,7 @@ window.openProductSelector = () => {
     modal.show();
 };
 
-// Select All / Search Logic (Kept as is)
+// Select All / Search Logic
 document.getElementById("selectAll").onclick = (e) => {
     document.querySelectorAll(".prod-checkbox").forEach(cb => cb.checked = e.target.checked);
 };
@@ -1430,7 +1436,7 @@ document.getElementById('searchProd').oninput = (e) => {
     });
 };
 
-// 2. Add Selected items
+// 2. Add Selected items (Auto-fills stock for Sell Price)
 window.addSelectedToRequisition = () => {
     const priceType = document.getElementById("priceTypeSelect").value;
     const selected = document.querySelectorAll(".prod-checkbox:checked");
@@ -1439,10 +1445,11 @@ window.addSelectedToRequisition = () => {
         const prodDoc = window.productsCache.find(p => p.id === cb.value);
         if (prodDoc) {
             const prod = prodDoc.data();
-            const price = priceType === "buyPrice" ? (parseFloat(prod.buyPrice) || 0) : (parseFloat(prod.price) || 0);
+            const defaultQty = (priceType === "sellPrice") ? (parseInt(prod.stock) || 0) : 1;
+            const price = (priceType === "buyPrice") ? (parseFloat(prod.buyPrice) || 0) : (parseFloat(prod.price) || 0);
             
             if (!window.requisitionItems.find(item => item.id === prodDoc.id)) {
-                window.requisitionItems.push({ id: prodDoc.id, name: prod.name, qty: 1, priceType, price });
+                window.requisitionItems.push({ id: prodDoc.id, name: prod.name, qty: defaultQty, priceType, price });
             }
         }
     });
@@ -1450,13 +1457,22 @@ window.addSelectedToRequisition = () => {
     bootstrap.Modal.getInstance(document.getElementById("productSelectorModal")).hide();
 };
 
-// 3. Render Table with Inline Price Type and Qty Edit
+// 3. Render Table with Subtotal & Grand Total
 window.renderRequisitionTable = () => {
     const tbody = document.getElementById("requisitionTableBody");
+    const totalDisplay = document.getElementById("grandTotalValue");
     if (!tbody) return;
     
     tbody.innerHTML = ""; 
+    let grandTotal = 0;
+
     window.requisitionItems.forEach((item, index) => {
+        const subtotal = item.price * item.qty;
+        grandTotal += subtotal;
+        
+        // Show subtotal only if Buy Price, otherwise dash
+        const subtotalDisplay = item.priceType === 'buyPrice' ? `KSh ${subtotal.toLocaleString()}` : "-";
+        
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${item.name}</td>
@@ -1471,12 +1487,17 @@ window.renderRequisitionTable = () => {
                 <input type="number" class="form-control form-control-sm" value="${item.qty}" min="1" 
                        onchange="window.updateQty(${index}, this.value)" style="width: 80px;">
             </td>
+            <td class="fw-bold">${subtotalDisplay}</td>
             <td>
                 <button class="btn btn-sm btn-danger" onclick="window.confirmRemove(${index})">Remove</button>
             </td>
         `;
         tbody.appendChild(row);
     });
+
+    if (totalDisplay) {
+        totalDisplay.innerText = `KSh ${grandTotal.toLocaleString()}`;
+    }
 };
 
 // Handle Price Type change
@@ -1485,7 +1506,6 @@ window.updatePriceType = (index, newType) => {
     const prodDoc = window.productsCache.find(p => p.id === item.id);
     const prod = prodDoc.data();
     
-    // Update data
     item.priceType = newType;
     item.price = newType === "buyPrice" ? (parseFloat(prod.buyPrice) || 0) : (parseFloat(prod.price) || 0);
     
@@ -1499,7 +1519,7 @@ window.updateQty = (index, newQty) => {
     window.renderRequisitionTable();
 };
 
-// 4. Remove item & 5. PDF (Kept as is)
+// 4. Remove item
 window.confirmRemove = async (index) => {
     const result = await Swal.fire({ title: 'Remove item?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
     if (result.isConfirmed) {
@@ -1508,15 +1528,32 @@ window.confirmRemove = async (index) => {
     }
 };
 
+// 5. Download PDF
 window.downloadRequisitionPDF = () => {
     if (window.requisitionItems.length === 0) return Swal.fire("Empty", "List is empty", "warning");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    doc.text("STOCK REQUISITION FORM", 105, 15, null, null, "center");
+    
+    doc.setFontSize(16);
+    doc.text("MADOLLAR PUB STOCK REQUISITION", 105, 15, null, null, "center");
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 22, null, null, "center");
+    
+    const tableData = window.requisitionItems.map(i => [
+        i.name, 
+        i.priceType === 'buyPrice' ? 'Buy Price' : 'Sell Price', 
+        i.price.toLocaleString(), 
+        i.qty,
+        i.priceType === 'buyPrice' ? (i.price * i.qty).toLocaleString() : '-'
+    ]);
+    
+    const total = window.requisitionItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    tableData.push(['', '', '', 'TOTAL', total.toLocaleString()]);
+
     doc.autoTable({
-        startY: 35,
-        head: [['Product Name', 'Price Type', 'Price (KSh)', 'Qty']],
-        body: window.requisitionItems.map(i => [i.name, i.priceType, i.price.toLocaleString(), i.qty])
+        startY: 30,
+        head: [['Product Name', 'Price Type', 'Price (KSh)', 'Qty', 'Subtotal']],
+        body: tableData
     });
     doc.save(`Requisition_${new Date().toLocaleDateString()}.pdf`);
 };
