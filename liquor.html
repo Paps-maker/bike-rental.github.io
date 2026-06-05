@@ -1528,7 +1528,6 @@ window.confirmRemove = async (index) => {
     }
 };
 
-// 5. Download PDF
 window.downloadRequisitionPDF = () => {
     if (window.requisitionItems.length === 0) return Swal.fire("Empty", "List is empty", "warning");
     const { jsPDF } = window.jspdf;
@@ -1539,7 +1538,9 @@ window.downloadRequisitionPDF = () => {
     doc.setFontSize(10);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 22, null, null, "center");
     
-    const tableData = window.requisitionItems.map(i => [
+    // Map items including the index + 1 for numbering
+    const tableData = window.requisitionItems.map((i, index) => [
+        index + 1, // Numbering
         i.name, 
         i.priceType === 'buyPrice' ? 'Buy Price' : 'Sell Price', 
         i.price.toLocaleString(), 
@@ -1547,13 +1548,17 @@ window.downloadRequisitionPDF = () => {
         i.priceType === 'buyPrice' ? (i.price * i.qty).toLocaleString() : '-'
     ]);
     
+    // Add total row (spans columns to reach the total)
     const total = window.requisitionItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    tableData.push(['', '', '', 'TOTAL', total.toLocaleString()]);
+    tableData.push(['', '', '', '', 'TOTAL', total.toLocaleString()]);
 
     doc.autoTable({
         startY: 30,
-        head: [['Product Name', 'Price Type', 'Price (KSh)', 'Qty', 'Subtotal']],
-        body: tableData
+        head: [['No.', 'Product Name', 'Price Type', 'Price (KSh)', 'Qty', 'Subtotal']],
+        body: tableData,
+        columnStyles: {
+            0: { cellWidth: 10 } // Keeps the number column thin and neat
+        }
     });
     doc.save(`Requisition_${new Date().toLocaleDateString()}.pdf`);
 };
