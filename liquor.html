@@ -517,57 +517,87 @@ auth.onAuthStateChanged(async (user) => {
 /* Initialize Dashboard */
 function initDashboard() {
   /* Products */
-  
-  const todaysSalesEl = document.getElementById("todaysSales");
-  const monthlySalesEl = document.getElementById("monthlySales");
-  const prodName = document.getElementById("prodName");
-  const prodBuyPrice = document.getElementById("prodBuyPrice");
-  const prodPrice = document.getElementById("prodPrice");
-  const prodStock = document.getElementById("prodStock");
-  const prodMin = document.getElementById("prodMin");
-  const addProductBtn = document.getElementById("addProductBtn");
-  const productsTable = document.getElementById("productsTable");
-  let editProductId = null;
 
-  addProductBtn.onclick = async () => {
-  if (currentRole !== "admin") return alert("Admins only");
-  if (!prodName.value || !prodPrice.value || !prodStock.value) return;
-  
-  await db.collection("products").add({
-    name: prodName.value,
-    buyPrice: parseFloat(prodBuyPrice.value) || 0,
-    price: parseFloat(prodPrice.value),
-    stock: parseInt(prodStock.value),
-    min: parseInt(prodMin.value) || 0
-  });
-  prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
-};
-  // 2. NEW: Save Edit Logic
-document.getElementById("saveEditBtn").onclick = async () => {
-  if (!editProductId) return;
-  
-  try {
-    await db.collection("products").doc(editProductId).update({
-      name: document.getElementById("editProdName").value,
-      buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
-      price: parseFloat(document.getElementById("editProdPrice").value),
-      stock: parseInt(document.getElementById("editProdStock").value),
-      min: parseInt(document.getElementById("editProdMin").value) || 0
+const todaysSalesEl = document.getElementById("todaysSales");
+const monthlySalesEl = document.getElementById("monthlySales");
+const prodName = document.getElementById("prodName");
+const prodBuyPrice = document.getElementById("prodBuyPrice");
+const prodPrice = document.getElementById("prodPrice");
+const prodStock = document.getElementById("prodStock");
+const prodMin = document.getElementById("prodMin");
+const addProductBtn = document.getElementById("addProductBtn");
+const productsTable = document.getElementById("productsTable");
+let editProductId = null;
+
+addProductBtn.onclick = async () => {
+    if (currentRole !== "admin") return Swal.fire("Access Denied", "Admins only", "error");
+    if (!prodName.value || !prodPrice.value || !prodStock.value) return;
+
+    // Check for duplicates
+    const newName = prodName.value.trim().toLowerCase();
+    const isDuplicate = productsCache.some(doc => 
+        doc.data().name.trim().toLowerCase() === newName
+    );
+
+    if (isDuplicate) {
+        return Swal.fire({
+            icon: 'error',
+            title: 'Oops...',
+            text: `The product '${prodName.value}' already exists!`,
+            background: '#212529',
+            color: '#fff'
+        });
+    }
+
+    await db.collection("products").add({
+        name: prodName.value,
+        buyPrice: parseFloat(prodBuyPrice.value) || 0,
+        price: parseFloat(prodPrice.value),
+        stock: parseInt(prodStock.value),
+        min: parseInt(prodMin.value) || 0
     });
-
-    // Close the modal cleanly
-    const modalEl = document.getElementById('editProductModal');
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
     
-    alert("Product updated!");
-  } catch (e) {
-    alert("Update failed: " + e.message);
-  }
+    Swal.fire("Success!", "Product added successfully", "success");
+    prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
 };
-// Initialize at the top of your script
 
- db.collection("products").onSnapshot(snap => {
+// 2. NEW: Save Edit Logic
+document.getElementById("saveEditBtn").onclick = async () => {
+    if (!editProductId) return;
+
+    const editName = document.getElementById("editProdName").value.trim().toLowerCase();
+    
+    // Check if new name exists (excluding the product we are currently editing)
+    const isDuplicate = productsCache.some(doc => 
+        doc.id !== editProductId && doc.data().name.trim().toLowerCase() === editName
+    );
+
+    if (isDuplicate) {
+        return Swal.fire("Duplicate Detected", "Another product already uses this name.", "warning");
+    }
+
+    try {
+        await db.collection("products").doc(editProductId).update({
+            name: document.getElementById("editProdName").value,
+            buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
+            price: parseFloat(document.getElementById("editProdPrice").value),
+            stock: parseInt(document.getElementById("editProdStock").value),
+            min: parseInt(document.getElementById("editProdMin").value) || 0
+        });
+
+        // Close the modal cleanly
+        const modalEl = document.getElementById('editProductModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+
+        Swal.fire("Updated!", "Product details saved.", "success");
+    } catch (e) {
+        Swal.fire("Error", "Update failed: " + e.message, "error");
+    }
+};
+
+// Initialize at the top of your script
+db.collection("products").onSnapshot(snap => {
     productsCache = snap.docs;
     renderProducts(productsCache);
     document.getElementById("productCount").textContent = snap.size;
