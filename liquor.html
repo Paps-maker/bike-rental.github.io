@@ -419,6 +419,8 @@
         </div>
     </div>
 </div>
+
+
      <div class="tab-pane fade" id="salesTab">
     <h5>Sales Reporting</h5>
     
@@ -570,10 +572,8 @@ auth.onAuthStateChanged(async (user) => {
 });
 /* Initialize Dashboard */
 function initDashboard() {
- /* Products */
+ /* --- Products Management & Quick Restock --- */
 
-const todaysSalesEl = document.getElementById("todaysSales");
-const monthlySalesEl = document.getElementById("monthlySales");
 const prodName = document.getElementById("prodName");
 const prodBuyPrice = document.getElementById("prodBuyPrice");
 const prodPrice = document.getElementById("prodPrice");
@@ -583,24 +583,16 @@ const addProductBtn = document.getElementById("addProductBtn");
 const productsTable = document.getElementById("productsTable");
 let editProductId = null;
 
+// 1. Add New Product
 addProductBtn.onclick = async () => {
     if (currentRole !== "admin") return Swal.fire("Access Denied", "Admins only", "error");
     if (!prodName.value || !prodPrice.value || !prodStock.value) return;
 
-    // Check for duplicates
     const newName = prodName.value.trim().toLowerCase();
-    const isDuplicate = productsCache.some(doc => 
-        doc.data().name.trim().toLowerCase() === newName
-    );
+    const isDuplicate = productsCache.some(doc => doc.data().name.trim().toLowerCase() === newName);
 
     if (isDuplicate) {
-        return Swal.fire({
-            icon: 'error',
-            title: 'Oops...',
-            text: `The product '${prodName.value}' already exists!`,
-            background: '#212529',
-            color: '#fff'
-        });
+        return Swal.fire({ icon: 'error', title: 'Oops...', text: `The product '${prodName.value}' already exists!`, background: '#212529', color: '#fff' });
     }
 
     await db.collection("products").add({
@@ -615,20 +607,49 @@ addProductBtn.onclick = async () => {
     prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
 };
 
-// 2. NEW: Save Edit Logic
+// 2. Quick Restock Function (Updates stock + logs to stock_history)
+window.quickRestock = async (productId, productName) => {
+    const inputEl = document.getElementById(`restockInput-${productId}`);
+    const amountToAdd = parseInt(inputEl.value);
+
+    if (!amountToAdd || amountToAdd <= 0) {
+        return Swal.fire("Invalid", "Please enter a valid quantity to add.", "warning");
+    }
+
+    try {
+        const batch = db.batch();
+        
+        // Update product stock using atomic increment
+        const prodRef = db.collection("products").doc(productId);
+        batch.update(prodRef, {
+            stock: firebase.firestore.FieldValue.increment(amountToAdd)
+        });
+
+        // Add to history
+        const historyRef = db.collection("stock_history").doc();
+        batch.set(historyRef, {
+            productId: productId,
+            productName: productName,
+            addedQty: amountToAdd,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await batch.commit();
+
+        inputEl.value = ""; 
+        Swal.fire("Restocked!", `${amountToAdd} added to ${productName}.`, "success");
+    } catch (e) {
+        Swal.fire("Error", "Could not update stock: " + e.message, "error");
+    }
+};
+
+// 3. Save Edit Logic
 document.getElementById("saveEditBtn").onclick = async () => {
     if (!editProductId) return;
-
     const editName = document.getElementById("editProdName").value.trim().toLowerCase();
-    
-    // Check if new name exists (excluding the product we are currently editing)
-    const isDuplicate = productsCache.some(doc => 
-        doc.id !== editProductId && doc.data().name.trim().toLowerCase() === editName
-    );
+    const isDuplicate = productsCache.some(doc => doc.id !== editProductId && doc.data().name.trim().toLowerCase() === editName);
 
-    if (isDuplicate) {
-        return Swal.fire("Duplicate Detected", "Another product already uses this name.", "warning");
-    }
+    if (isDuplicate) return Swal.fire("Duplicate Detected", "Another product already uses this name.", "warning");
 
     try {
         await db.collection("products").doc(editProductId).update({
@@ -639,18 +660,68 @@ document.getElementById("saveEditBtn").onclick = async () => {
             min: parseInt(document.getElementById("editProdMin").value) || 0
         });
 
-        // Close the modal cleanly
-        const modalEl = document.getElementById('editProductModal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editProductModal'));
         if (modal) modal.hide();
-
         Swal.fire("Updated!", "Product details saved.", "success");
     } catch (e) {
         Swal.fire("Error", "Update failed: " + e.message, "error");
     }
 };
 
-// Initialize at the top of your script
+function renderProducts(docs) {
+    const productsHead = document.getElementById("productsHead");
+    const productsTable = document.getElementById("productsTable");
+    const lowStockBadge = document.getElementById("lowStockBadge");
+    const lowStockWrapper = document.getElementById("lowStockWrapper");
+    
+    productsTable.innerHTML = "";
+    let lowStockItems = [];
+
+    // 1. Build Header
+    let headerHTML = `<tr><th>Name</th>`;
+    if (currentRole === "admin") headerHTML += `<th>Buy</th>`;
+    headerHTML += `<th>Sell</th><th>Stock</th><th>Min</th>`;
+    if (currentRole === "admin") headerHTML += `<th>Inventory Adjustment</th><th>Actions</th>`;
+    headerHTML += `</tr>`;
+    productsHead.innerHTML = headerHTML;
+
+    // 2. Sort and Build Body
+    const sortedDocs = [...docs].sort((a, b) => a.data().name.localeCompare(b.data().name));
+
+    sortedDocs.forEach(doc => {
+        const p = doc.data();
+        if (p.stock <= p.min) lowStockItems.push(p);
+        
+        let row = `<tr><td>${p.name}</td>`;
+        if (currentRole === "admin") row += `<td>KSh ${p.buyPrice || 0}</td>`;
+        row += `<td>KSh ${p.price}</td><td>${p.stock}</td><td>${p.min}</td>`;
+        
+        if (currentRole === "admin") {
+            row += `
+            <td>
+                <div class="input-group input-group-sm" style="width: 250px;">
+                    <input type="number" id="restockInput-${doc.id}" class="form-control" placeholder="Qty" style="max-width: 60px;">
+                    <input type="text" id="reasonInput-${doc.id}" class="form-control" placeholder="Reason (e.g. Sale/Stock In)" style="max-width: 100px;">
+                    <button class="btn btn-sm btn-success" onclick="window.adjustStock('${doc.id}', '${p.name}', 'add')">+</button>
+                    <button class="btn btn-sm btn-danger" onclick="window.adjustStock('${doc.id}', '${p.name}', 'reduce')">-</button>
+                </div>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
+                <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>
+            </td>`;
+        }
+        row += `</tr>`;
+        productsTable.innerHTML += row;
+    });
+
+    if (lowStockBadge && lowStockWrapper) {
+        lowStockBadge.textContent = lowStockItems.length;
+        lowStockWrapper.style.display = lowStockItems.length > 0 ? "" : "none";
+    }
+}
+
+// 5. Initialize
 db.collection("products").onSnapshot(snap => {
     productsCache = snap.docs;
     renderProducts(productsCache);
@@ -707,7 +778,7 @@ searchInput.addEventListener("input", (e) => {
     }
 });
 
- function renderProducts(docs) {
+function renderProducts(docs) {
     const productsHead = document.getElementById("productsHead");
     const productsTable = document.getElementById("productsTable");
     const lowStockBadge = document.getElementById("lowStockBadge");
@@ -720,7 +791,9 @@ searchInput.addEventListener("input", (e) => {
     let headerHTML = `<tr><th>Name</th>`;
     if (currentRole === "admin") headerHTML += `<th>Buy</th>`;
     headerHTML += `<th>Sell</th><th>Stock</th><th>Min</th>`;
-    if (currentRole === "admin") headerHTML += `<th>Actions</th>`;
+    
+    // Add Restock column for Admins
+    if (currentRole === "admin") headerHTML += `<th>Quick Restock</th><th>Actions</th>`;
     headerHTML += `</tr>`;
     productsHead.innerHTML = headerHTML;
 
@@ -743,15 +816,29 @@ searchInput.addEventListener("input", (e) => {
               <td>${p.stock}</td>
               <td>${p.min}</td>`;
       
+      // Admin: Add Restock input + Edit/Delete buttons
       if (currentRole === "admin") {
-        row += `<td>
-                  <button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
-                  <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>
-                </td>`;
+        row += `
+          <td>
+            <div class="input-group input-group-sm" style="width: 130px;">
+                <input type="number" id="restockInput-${doc.id}" class="form-control" placeholder="Qty">
+                <button class="btn btn-sm btn-success" onclick="window.quickRestock('${doc.id}', '${p.name}')">+</button>
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
+            <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>
+          </td>`;
       }
       row += `</tr>`;
       productsTable.innerHTML += row;
     });
+
+    // 3. Update Low Stock Badge (Optional cleanup)
+    if (lowStockBadge && lowStockWrapper) {
+        lowStockBadge.textContent = lowStockItems.length;
+        lowStockWrapper.style.display = lowStockItems.length > 0 ? "" : "none";
+    }
 
     // 3. Low Stock Badge and Modal Logic
     if (lowStockBadge) lowStockBadge.textContent = lowStockItems.length;
@@ -1563,6 +1650,7 @@ window.downloadRequisitionPDF = () => {
     });
     doc.save(`Requisition_${new Date().toLocaleDateString()}.pdf`);
 };
+
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
