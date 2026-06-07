@@ -670,115 +670,99 @@ paymentCompleteBtn.onclick = async () => {
     })();
 };
 /* --- SECURED ATTENDANCE LOGIC --- */
-const OFFICE_LAT = -1.27805; 
-const OFFICE_LON = 36.78965; 
-const MAX_DISTANCE = 0.005; 
+const OFFICE_LAT = -1.27805; // REPLACE with your office Latitude
+const OFFICE_LON = 36.78965; // REPLACE with your office Longitude
+const MAX_DISTANCE = 0.005;    // Max distance in degrees (approx 50m)
 
-// Helper: Fingerprint the device to prevent "buddy punching"
-const getDeviceId = () => {
-    let id = localStorage.getItem("dev_id");
-    if (!id) {
-        id = 'dev_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem("dev_id", id);
-    }
-    return id;
-};
-
-// 1. Secured Clock In
-window.clockIn = async () => {
-    if (!window.auth.currentUser) return;
-
-    // Check device binding
-    const userDocRef = window.db.collection("users").doc(window.auth.currentUser.uid);
-    const userDoc = await userDocRef.get();
-    const deviceId = getDeviceId();
+// 1. Global Live Listener
+db.collection("attendance").orderBy("clockIn", "desc").onSnapshot(snap => {
+    const attendanceTable = document.getElementById("attendanceTable");
+    if (!attendanceTable) return;
     
-    if (!userDoc.exists || !userDoc.data().deviceId) {
-        await userDocRef.set({ deviceId: deviceId, email: window.auth.currentUser.email }, { merge: true });
-    } else if (userDoc.data().deviceId !== deviceId) {
-        return Swal.fire("Access Denied", "This account is linked to another device.", "error");
-    }
+    attendanceTable.innerHTML = ""; 
+    snap.forEach(doc => {
+        const a = doc.data();
+        if (!a.clockIn) return; 
 
-    // Geolocation check
+        const isStaff = currentRole !== 'admin';
+        if (isStaff && a.staffEmail !== auth.currentUser?.email) return;
+
+        const isAdmin = currentRole === 'admin';
+        attendanceTable.innerHTML += `<tr>
+            <td>${a.date}</td>
+            ${isAdmin ? `<td>${a.staffEmail}</td>` : ''}
+            <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
+            <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : 'Ongoing'}</td>
+            ${isAdmin ? `<td><button class="btn btn-sm btn-danger" onclick="window.deleteAttendanceRecord('${doc.id}')">Delete</button></td>` : ''}
+        </tr>`;
+    });
+});
+
+// 2. Secured Clock In
+window.clockIn = async () => {
+    if (!auth.currentUser) return;
+
+    // Check Geolocation
     navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
         const distance = Math.sqrt(Math.pow(latitude - OFFICE_LAT, 2) + Math.pow(longitude - OFFICE_LON, 2));
 
         if (distance > MAX_DISTANCE) {
-            return Swal.fire("Access Denied", "You are too far from the office.", "error");
+            return Swal.fire("Access Denied", "You are too far from the office to clock in.", "error");
         }
 
         const today = new Date().toLocaleDateString();
-        const check = await window.db.collection("attendance")
-            .where("staffEmail", "==", window.auth.currentUser.email)
+        const check = await db.collection("attendance")
+            .where("staffEmail", "==", auth.currentUser.email)
             .where("date", "==", today).get();
 
-        if (!check.empty) return Swal.fire("Already Checked In", "Already clocked in today.", "warning");
+        if (!check.empty) return Swal.fire("Already Checked In", "You have already clocked in today.", "warning");
 
-        await window.db.collection("attendance").add({
-            staffEmail: window.auth.currentUser.email,
+        await db.collection("attendance").add({
+            staffEmail: auth.currentUser.email,
             date: today,
             clockIn: firebase.firestore.FieldValue.serverTimestamp(),
             clockOut: null,
-            deviceId: deviceId
+            location: { lat: latitude, lon: longitude } // Storing for audit
         });
-        Swal.fire("Clocked In", "Verified location and device recorded.", "success");
-    }, (err) => Swal.fire("Location Required", "Enable GPS to clock in.", "warning"), { enableHighAccuracy: true });
+        Swal.fire("Clocked In", "Verified location recorded.", "success");
+
+    }, (err) => {
+        Swal.fire("Location Required", "Please enable location services to clock in.", "warning");
+    }, { enableHighAccuracy: true });
 };
 
-// 2. Clock Out
+// 3. Clock Out (No location requirement, or repeat logic above if needed)
 window.clockOut = async () => {
-    if (!window.auth.currentUser) return;
+    if (!auth.currentUser) return;
     const today = new Date().toLocaleDateString();
-    const query = await window.db.collection("attendance")
-        .where("staffEmail", "==", window.auth.currentUser.email)
+    const query = await db.collection("attendance")
+        .where("staffEmail", "==", auth.currentUser.email)
         .where("date", "==", today)
         .where("clockOut", "==", null).get();
 
     if (query.empty) return Swal.fire("Error", "No active shift found.", "error");
 
     await query.docs[0].ref.update({ clockOut: firebase.firestore.FieldValue.serverTimestamp() });
-    Swal.fire("Clocked Out", "Shift ended successfully.", "info");
+    Swal.fire("Clocked Out", "Shift ended successfully", "info");
 };
 
-// 3. Live Listener
-window.db.collection("attendance").orderBy("clockIn", "desc").onSnapshot(snap => {
-    const table = document.getElementById("attendanceTable");
-    if (!table) return;
-    table.innerHTML = ""; 
-    snap.forEach(doc => {
-        const a = doc.data();
-        if (window.currentRole !== 'admin' && a.staffEmail !== window.auth.currentUser?.email) return;
-
-        table.innerHTML += `<tr>
-            <td>${a.date}</td>
-            ${window.currentRole === 'admin' ? `<td>${a.staffEmail}</td>` : ''}
-            <td>${a.clockIn?.toDate().toLocaleTimeString()}</td>
-            <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : 'Ongoing'}</td>
-            ${window.currentRole === 'admin' ? `<td><button class="btn btn-sm btn-danger" onclick="window.deleteAttendanceRecord('${doc.id}')">Delete</button></td>` : ''}
-        </tr>`;
-    });
-});
-
-// 4. Admin Delete
+// 4. Delete & Export (Keep your existing functions)
 window.deleteAttendanceRecord = async (id) => {
-    const result = await Swal.fire({ title: 'Delete this record?', icon: 'warning', showCancelButton: true });
-    if (result.isConfirmed) await window.db.collection("attendance").doc(id).delete();
+    const result = await Swal.fire({ title: 'Delete?', icon: 'warning', showCancelButton: true });
+    if (result.isConfirmed) await db.collection("attendance").doc(id).delete();
 };
 
-// 5. PDF Export
 window.exportAttendance = async () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    let query = window.db.collection("attendance").orderBy("clockIn", "desc");
-    if (window.currentRole !== 'admin') query = query.where("staffEmail", "==", window.auth.currentUser.email);
+    let query = db.collection("attendance").orderBy("clockIn", "desc");
+    if (currentRole !== 'admin') query = query.where("staffEmail", "==", auth.currentUser.email);
     const snap = await query.get();
-    
     let tableData = snap.docs.map(d => {
         const a = d.data();
         return [a.date, a.staffEmail, a.clockIn?.toDate().toLocaleTimeString(), a.clockOut?.toDate().toLocaleTimeString() || 'Ongoing'];
     });
-    
     doc.text("Staff Attendance Report", 14, 10);
     doc.autoTable({ head: [['Date', 'Staff', 'Clock In', 'Clock Out']], body: tableData });
     doc.save("Attendance_Report.pdf");
