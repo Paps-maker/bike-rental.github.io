@@ -187,14 +187,15 @@
 
     <!-- Tabs -->
     <ul class="nav nav-tabs" id="mainTabs">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#productsTab">Products</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customersTab">Customers</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#posTab">POS</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#salesTab">Sales</button></li>
-      <li class="nav-item admin-only d-none">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#productsTab">Products</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customersTab">Customers</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#posTab">POS</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#salesTab">Sales</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#attendanceTab">Staff Clock in & out</button></li>
+  <li class="nav-item admin-only d-none">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#requisitionTab">Requisition</button>
-</li>
-    </ul>
+  </li>
+</ul>
     <div class="col-sm-4">
     
 </div>
@@ -467,6 +468,36 @@
     </div>
     <div class="toast-body" id="toastBody"></div>
   </div>
+</div>
+      <div class="tab-pane fade" id="attendanceTab">
+    <div class="p-3">
+        <h4>Staff Clock in & out</h4>
+        
+        <div class="mb-3">
+           <button onclick="window.clockIn()" class="btn btn-success">Clock In</button>
+<button onclick="window.clockOut()" class="btn btn-danger">Clock Out</button>
+        </div>
+        
+        <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5>Records</h5>
+                <button class="btn btn-primary mb-3 admin-only d-none" onclick="exportAttendance()">Download PDF Report</button>
+            </div>
+            
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th class="admin-only d-none">Staff</th>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th class="admin-only d-none">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceTable"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
 <style>
 /* Centering and Dark Theme (As before) */
@@ -1161,6 +1192,88 @@ paymentCompleteBtn.onclick = async () => {
             paymentSection.classList.remove("d-none");
         }
     })();
+};
+  /* --- ATTENDANCE LOGIC --- */
+// 1. Global Live Listener (Must be at the top level to stay active)
+db.collection("attendance").orderBy("clockIn", "desc").onSnapshot(snap => {
+    const attendanceTable = document.getElementById("attendanceTable");
+    if (!attendanceTable) return;
+    
+    attendanceTable.innerHTML = ""; 
+    
+    snap.forEach(doc => {
+        const a = doc.data();
+        if (!a.clockIn) return; 
+
+        // Filter: Staff see only their own, Admins see all
+        const isStaff = currentRole !== 'admin';
+        if (isStaff && a.staffEmail !== auth.currentUser?.email) return;
+
+        const isAdmin = currentRole === 'admin';
+        
+        attendanceTable.innerHTML += `<tr>
+            <td>${a.date}</td>
+            ${isAdmin ? `<td>${a.staffEmail}</td>` : ''}
+            <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
+            <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : 'Ongoing'}</td>
+            ${isAdmin ? `<td><button class="btn btn-sm btn-danger" onclick="window.deleteAttendanceRecord('${doc.id}')">Delete</button></td>` : ''}
+        </tr>`;
+    });
+});
+
+// 2. Helper Functions
+window.deleteAttendanceRecord = async (id) => {
+    const result = await Swal.fire({ title: 'Delete record?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
+    if (result.isConfirmed) await db.collection("attendance").doc(id).delete();
+};
+
+window.clockIn = async () => {
+    if (!auth.currentUser) return;
+    const today = new Date().toLocaleDateString();
+    const check = await db.collection("attendance")
+        .where("staffEmail", "==", auth.currentUser.email)
+        .where("date", "==", today).get();
+
+    if (!check.empty) return Swal.fire("Already Checked In", "You have already clocked in today.", "warning");
+
+    await db.collection("attendance").add({
+        staffEmail: auth.currentUser.email,
+        date: today,
+        clockIn: firebase.firestore.FieldValue.serverTimestamp(),
+        clockOut: null
+    });
+    Swal.fire("Clocked In", "Time recorded successfully", "success");
+};
+
+window.clockOut = async () => {
+    if (!auth.currentUser) return;
+    const today = new Date().toLocaleDateString();
+    const query = await db.collection("attendance")
+        .where("staffEmail", "==", auth.currentUser.email)
+        .where("date", "==", today)
+        .where("clockOut", "==", null).get();
+
+    if (query.empty) return Swal.fire("Error", "No active shift found.", "error");
+
+    await query.docs[0].ref.update({ clockOut: firebase.firestore.FieldValue.serverTimestamp() });
+    Swal.fire("Clocked Out", "Shift ended successfully", "info");
+};
+
+window.exportAttendance = async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let query = db.collection("attendance").orderBy("clockIn", "desc");
+    if (currentRole !== 'admin') query = query.where("staffEmail", "==", auth.currentUser.email);
+    
+    const snap = await query.get();
+    let tableData = snap.docs.map(d => {
+        const a = d.data();
+        return [a.date, a.staffEmail, a.clockIn?.toDate().toLocaleTimeString(), a.clockOut?.toDate().toLocaleTimeString() || 'Ongoing'];
+    });
+
+    doc.text("Staff Attendance Report", 14, 10);
+    doc.autoTable({ head: [['Date', 'Staff', 'Clock In', 'Clock Out']], body: tableData });
+    doc.save("Attendance_Report.pdf");
 };
 /* Sales Table & Reporting */
 const salesTable = document.getElementById("salesTable");
