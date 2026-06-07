@@ -1193,24 +1193,25 @@ paymentCompleteBtn.onclick = async () => {
         }
     })();
 };
-  /* --- ATTENDANCE LOGIC --- */
-// 1. Global Live Listener (Must be at the top level to stay active)
+/* --- SECURED ATTENDANCE LOGIC --- */
+const OFFICE_LAT = -1.27805; // REPLACE with your office Latitude
+const OFFICE_LON = 36.78965; // REPLACE with your office Longitude
+const MAX_DISTANCE = 0.005;    // Max distance in degrees (approx 50m)
+
+// 1. Global Live Listener
 db.collection("attendance").orderBy("clockIn", "desc").onSnapshot(snap => {
     const attendanceTable = document.getElementById("attendanceTable");
     if (!attendanceTable) return;
     
     attendanceTable.innerHTML = ""; 
-    
     snap.forEach(doc => {
         const a = doc.data();
         if (!a.clockIn) return; 
 
-        // Filter: Staff see only their own, Admins see all
         const isStaff = currentRole !== 'admin';
         if (isStaff && a.staffEmail !== auth.currentUser?.email) return;
 
         const isAdmin = currentRole === 'admin';
-        
         attendanceTable.innerHTML += `<tr>
             <td>${a.date}</td>
             ${isAdmin ? `<td>${a.staffEmail}</td>` : ''}
@@ -1221,30 +1222,41 @@ db.collection("attendance").orderBy("clockIn", "desc").onSnapshot(snap => {
     });
 });
 
-// 2. Helper Functions
-window.deleteAttendanceRecord = async (id) => {
-    const result = await Swal.fire({ title: 'Delete record?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
-    if (result.isConfirmed) await db.collection("attendance").doc(id).delete();
-};
-
+// 2. Secured Clock In
 window.clockIn = async () => {
     if (!auth.currentUser) return;
-    const today = new Date().toLocaleDateString();
-    const check = await db.collection("attendance")
-        .where("staffEmail", "==", auth.currentUser.email)
-        .where("date", "==", today).get();
 
-    if (!check.empty) return Swal.fire("Already Checked In", "You have already clocked in today.", "warning");
+    // Check Geolocation
+    navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        const distance = Math.sqrt(Math.pow(latitude - OFFICE_LAT, 2) + Math.pow(longitude - OFFICE_LON, 2));
 
-    await db.collection("attendance").add({
-        staffEmail: auth.currentUser.email,
-        date: today,
-        clockIn: firebase.firestore.FieldValue.serverTimestamp(),
-        clockOut: null
-    });
-    Swal.fire("Clocked In", "Time recorded successfully", "success");
+        if (distance > MAX_DISTANCE) {
+            return Swal.fire("Access Denied", "You are too far from the office to clock in.", "error");
+        }
+
+        const today = new Date().toLocaleDateString();
+        const check = await db.collection("attendance")
+            .where("staffEmail", "==", auth.currentUser.email)
+            .where("date", "==", today).get();
+
+        if (!check.empty) return Swal.fire("Already Checked In", "You have already clocked in today.", "warning");
+
+        await db.collection("attendance").add({
+            staffEmail: auth.currentUser.email,
+            date: today,
+            clockIn: firebase.firestore.FieldValue.serverTimestamp(),
+            clockOut: null,
+            location: { lat: latitude, lon: longitude } // Storing for audit
+        });
+        Swal.fire("Clocked In", "Verified location recorded.", "success");
+
+    }, (err) => {
+        Swal.fire("Location Required", "Please enable location services to clock in.", "warning");
+    }, { enableHighAccuracy: true });
 };
 
+// 3. Clock Out (No location requirement, or repeat logic above if needed)
 window.clockOut = async () => {
     if (!auth.currentUser) return;
     const today = new Date().toLocaleDateString();
@@ -1259,18 +1271,22 @@ window.clockOut = async () => {
     Swal.fire("Clocked Out", "Shift ended successfully", "info");
 };
 
+// 4. Delete & Export (Keep your existing functions)
+window.deleteAttendanceRecord = async (id) => {
+    const result = await Swal.fire({ title: 'Delete?', icon: 'warning', showCancelButton: true });
+    if (result.isConfirmed) await db.collection("attendance").doc(id).delete();
+};
+
 window.exportAttendance = async () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     let query = db.collection("attendance").orderBy("clockIn", "desc");
     if (currentRole !== 'admin') query = query.where("staffEmail", "==", auth.currentUser.email);
-    
     const snap = await query.get();
     let tableData = snap.docs.map(d => {
         const a = d.data();
         return [a.date, a.staffEmail, a.clockIn?.toDate().toLocaleTimeString(), a.clockOut?.toDate().toLocaleTimeString() || 'Ongoing'];
     });
-
     doc.text("Staff Attendance Report", 14, 10);
     doc.autoTable({ head: [['Date', 'Staff', 'Clock In', 'Clock Out']], body: tableData });
     doc.save("Attendance_Report.pdf");
