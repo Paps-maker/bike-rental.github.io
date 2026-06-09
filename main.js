@@ -627,17 +627,37 @@ paymentCompleteBtn.onclick = async () => {
     // 2. Background Processing
     (async () => {
         try {
-            // Check stock
+            const processedItems = [];
+            let totalAmount = 0;
+            
             for (const c of cart) {
                 const snap = await db.collection("products").doc(c.id).get();
-                if ((snap.data().stock || 0) < c.qty) throw new Error(`${c.name} has run out of stock.`);
+                const pData = snap.data();
+                
+                if (!pData) throw new Error(`Product ${c.name} not found.`);
+                if ((pData.stock || 0) < c.qty) throw new Error(`${c.name} has run out of stock.`);
+                
+                // Ensure values are numbers to prevent calculation errors
+                const sellPrice = parseFloat(c.price) || 0;
+                const costPrice = parseFloat(pData.buyPrice) || 0;
+                const qty = parseInt(c.qty) || 0;
+                
+                totalAmount += (sellPrice * qty);
+                
+                // Save the cost at the time of sale
+                processedItems.push({ 
+                    name: c.name, 
+                    price: sellPrice, 
+                    qty: qty,
+                    cost: parseFloat(pData.buyPrice) || 0 // This will now always be a number
+                });
             }
 
             // Add Sale
             await db.collection("sales").add({ 
                 customer: customerName, 
-                items: cart.map(c => ({ name: c.name, price: c.price, qty: c.qty })), 
-                total: cart.reduce((a, b) => a + b.price * b.qty, 0), 
+                items: processedItems, 
+                total: totalAmount, 
                 payment: paymentMethod.value, 
                 transaction: transCode.value, 
                 date: new Date() 
@@ -648,7 +668,8 @@ paymentCompleteBtn.onclick = async () => {
                 const prodRef = db.collection("products").doc(c.id);
                 await db.runTransaction(async (t) => {
                     const snap = await t.get(prodRef);
-                    t.update(prodRef, { stock: Math.max((snap.data().stock || 0) - c.qty, 0) });
+                    const currentStock = parseInt(snap.data().stock) || 0;
+                    t.update(prodRef, { stock: Math.max(currentStock - c.qty, 0) });
                 });
             }
 
@@ -658,13 +679,10 @@ paymentCompleteBtn.onclick = async () => {
             transCode.value = "";
             posCustomer.value = "";
             
-            // Show Success Animation
             showToast("Success", "Sale completed and stock updated!", "success");
 
         } catch (e) {
-            // Show Error Animation
             showToast("Error", e.message, "error");
-            // Re-open the payment section if there was an error
             paymentSection.classList.remove("d-none");
         }
     })();
@@ -776,12 +794,24 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
     allSales = [];
     let todayTotal = 0;
     let monthlyTotal = 0;
+    
+    // Profit Variables
+    let dailyProfit = 0;
+    let totalProfit = 0;
+    
     const itemCounts = {}; // Track item quantities for the dashboard
     
     const now = new Date();
     const today = now.toDateString();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+
+    // Create a local lookup map of names to Buy Prices
+    const costMap = {};
+    window.productsCache.forEach(doc => {
+        const p = doc.data();
+        costMap[p.name.trim().toLowerCase()] = parseFloat(p.buyPrice) || 0;
+    });
     
     if (salesTable) salesTable.innerHTML = "";
 
@@ -790,17 +820,29 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
         allSales.push({ id: doc.id, ...s });
         
         const saleDate = s.date.toDate();
+        let saleCost = 0;
         
-        // 1. Calculate Totals
-        if (saleDate.toDateString() === today) todayTotal += s.total;
-        if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
-            monthlyTotal += s.total;
-        }
-        
-        // 2. Count Item Frequencies
+        // 2. Count Item Frequencies AND Calculate Cost
         s.items.forEach(item => {
             itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
+            
+            // Look up the buyPrice from the cache
+            const name = item.name.trim().toLowerCase();
+            const buyPrice = costMap[name] || 0;
+            saleCost += (buyPrice * item.qty);
         });
+
+        const profit = parseFloat(s.total) - saleCost;
+        totalProfit += profit;
+        
+        // 1. Calculate Totals
+        if (saleDate.toDateString() === today) {
+            todayTotal += parseFloat(s.total);
+            dailyProfit += profit;
+        }
+        if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
+            monthlyTotal += parseFloat(s.total);
+        }
         
         // 3. Render Table
         if (salesTable) {
@@ -812,7 +854,7 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
                 <td>${saleDate.toLocaleDateString()}</td>
                 <td>${s.customer}</td>
                 <td>${s.items.map(i => i.name + " x" + i.qty).join(", ")}</td>
-                <td>KSh ${s.total.toLocaleString()}</td>
+                <td>KSh ${parseFloat(s.total).toLocaleString()}</td>
                 <td>${actions}</td>
             </tr>`;
         }
@@ -822,11 +864,17 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
     if (typeof todaysSalesEl !== 'undefined') todaysSalesEl.textContent = "KSh " + todayTotal.toLocaleString();
     if (typeof monthlySalesEl !== 'undefined') monthlySalesEl.textContent = "KSh " + monthlyTotal.toLocaleString();
 
+    // Update Profit Cards (New)
+    const dailyProfitEl = document.getElementById("dailyProfit");
+    const totalProfitEl = document.getElementById("totalProfit");
+    if (dailyProfitEl) dailyProfitEl.textContent = "KSh " + dailyProfit.toLocaleString();
+    if (totalProfitEl) totalProfitEl.textContent = "KSh " + totalProfit.toLocaleString();
+
     // 5. Update Top/Bottom Selling Items (Most to Least)
     const topItemsList = document.getElementById("topItemsList");
     if (topItemsList) {
         const sortedItems = Object.entries(itemCounts)
-            .sort((a, b) => b[1] - a[1]); // b[1] - a[1] = Most to Least
+            .sort((a, b) => b[1] - a[1]); 
 
         topItemsList.innerHTML = sortedItems.length > 0 
             ? sortedItems.map(item => `
