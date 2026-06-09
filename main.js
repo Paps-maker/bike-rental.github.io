@@ -1208,6 +1208,9 @@ window.renderRequisitionTable = () => {
     tbody.innerHTML = ""; 
     let buyPriceTotal = 0;
 
+    // Sort items alphabetically by name A-Z before rendering
+    window.requisitionItems.sort((a, b) => a.name.localeCompare(b.name));
+
     window.requisitionItems.forEach((item, index) => {
         const subtotal = item.priceType === 'buyPrice' ? (item.price * item.qty) : 0;
         buyPriceTotal += subtotal;
