@@ -726,7 +726,7 @@ window.clockIn = async () => {
         const distance = Math.sqrt(Math.pow(latitude - OFFICE_LAT, 2) + Math.pow(longitude - OFFICE_LON, 2));
 
         if (distance > MAX_DISTANCE) {
-            return Swal.fire("Access Denied", "You are too far from the office to clock in.", "error");
+            return Swal.fire("Access Denied", "You are too far from the working location please arrive at your work location for you to clock in.", "error");
         }
 
         const today = new Date().toLocaleDateString();
