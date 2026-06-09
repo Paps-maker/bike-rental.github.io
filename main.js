@@ -1243,7 +1243,6 @@ window.renderRequisitionTable = () => {
         totalDisplay.innerText = buyPriceTotal > 0 ? `Grand Total: KSh ${buyPriceTotal.toLocaleString()}` : "";
     }
 };
-
 // Handle Price Type change
 window.updatePriceType = (index, newType) => {
     const item = window.requisitionItems[index];
