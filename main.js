@@ -28,35 +28,6 @@ function toFraction(val) {
     const divisor = gcd(numerator, denominator);
     return `${numerator / divisor}/${denominator / divisor}`;
 }
-/* --- GLOBAL HELPERS --- */
-window.toFraction = function(val) {
-    const decimal = parseFloat(val);
-    if (isNaN(decimal)) return "0";
-    if (decimal % 1 === 0) return decimal.toString();
-    
-    // Round to handle floating point noise
-    const rounded = Math.round(decimal * 1000) / 1000;
-    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
-    
-    const denominator = 1000;
-    const numerator = Math.round(rounded * denominator);
-    const divisor = gcd(numerator, denominator);
-    
-    return `${numerator / divisor}/${denominator / divisor}`;
-};
-
-window.toMixedFraction = function(val) {
-    const num = parseFloat(val);
-    if (isNaN(num)) return "0";
-    const whole = Math.floor(num);
-    const fraction = num - whole;
-    
-    if (fraction === 0) return whole.toString();
-    
-    // Use the existing toFraction helper for the decimal part
-    const fracStr = window.toFraction(fraction);
-    return whole > 0 ? `${whole} ${fracStr}` : fracStr;
-};
 
 // --- GLOBAL VARIABLES ---
 window.productsCache = [];
@@ -134,92 +105,81 @@ const addProductBtn = document.getElementById("addProductBtn");
 const productsTable = document.getElementById("productsTable");
 let editProductId = null;
 
-// 1. Add New Product
+/* --- GLOBAL HELPERS --- */
+window.toFraction = function(val) {
+    const decimal = parseFloat(val);
+    if (isNaN(decimal)) return "0";
+    if (decimal % 1 === 0) return decimal.toString();
+    
+    // Round to handle floating point noise
+    const rounded = Math.round(decimal * 1000) / 1000;
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    
+    const denominator = 1000;
+    const numerator = Math.round(rounded * denominator);
+    const divisor = gcd(numerator, denominator);
+    
+    return `${numerator / divisor}/${denominator / divisor}`;
+};
+
+window.toMixedFraction = function(val) {
+    const num = parseFloat(val);
+    if (isNaN(num)) return "0";
+    const whole = Math.floor(num);
+    const fraction = num - whole;
+    
+    if (fraction === 0) return whole.toString();
+    
+    // Use the existing toFraction helper for the decimal part
+    const fracStr = window.toFraction(fraction);
+    return whole > 0 ? `${whole} ${fracStr}` : fracStr;
+};
+
+/* --- PRODUCT MANAGEMENT (Updated for Fractions) --- */
+
+// 1. Add Product
 addProductBtn.onclick = async () => {
     if (currentRole !== "admin") return Swal.fire("Access Denied", "Admins only", "error");
     if (!prodName.value || !prodPrice.value || !prodStock.value) return;
 
-    const newName = prodName.value.trim().toLowerCase();
-    const isDuplicate = productsCache.some(doc => doc.data().name.trim().toLowerCase() === newName);
-
-    if (isDuplicate) {
-        return Swal.fire({ icon: 'error', title: 'Oops...', text: `The product '${prodName.value}' already exists!`, background: '#212529', color: '#fff' });
-    }
-
     await db.collection("products").add({
-    name: prodName.value,
-    buyPrice: parseFloat(prodBuyPrice.value) || 0,
-    price: parseFloat(prodPrice.value) || 0,
-    // Use parseFloat to allow fractions like 0.333 or 0.5
-    stock: parseFloat(prodStock.value) || 0,
-    // Use parseFloat to allow fractional alert thresholds
-    min: parseFloat(prodMin.value) || 0
-});
-    Swal.fire("Success!", "Product added successfully", "success");
+        name: prodName.value,
+        buyPrice: parseFloat(prodBuyPrice.value) || 0,
+        price: parseFloat(prodPrice.value) || 0,
+        stock: parseFloat(prodStock.value) || 0, // Using parseFloat
+        min: parseFloat(prodMin.value) || 0      // Using parseFloat
+    });
+    Swal.fire("Success!", "Product added", "success");
     prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
 };
 
-// 2. Quick Restock Function (Updates stock + logs to stock_history)
+// 2. Quick Restock
 window.quickRestock = async (productId, productName) => {
     const inputEl = document.getElementById(`restockInput-${productId}`);
-    const amountToAdd = parseInt(inputEl.value);
+    const amountToAdd = parseFloat(inputEl.value); 
 
-    if (!amountToAdd || amountToAdd <= 0) {
-        return Swal.fire("Invalid", "Please enter a valid quantity to add.", "warning");
-    }
+    if (!amountToAdd || amountToAdd <= 0) return Swal.fire("Invalid", "Enter valid quantity", "warning");
 
-    try {
-        const batch = db.batch();
-        
-        // Update product stock using atomic increment
-        const prodRef = db.collection("products").doc(productId);
-        batch.update(prodRef, {
-            stock: firebase.firestore.FieldValue.increment(amountToAdd)
-        });
-
-        // Add to history
-        const historyRef = db.collection("stock_history").doc();
-        batch.set(historyRef, {
-            productId: productId,
-            productName: productName,
-            addedQty: amountToAdd,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        await batch.commit();
-
-        inputEl.value = ""; 
-        Swal.fire("Restocked!", `${amountToAdd} added to ${productName}.`, "success");
-    } catch (e) {
-        Swal.fire("Error", "Could not update stock: " + e.message, "error");
-    }
+    await db.collection("products").doc(productId).update({
+        stock: firebase.firestore.FieldValue.increment(amountToAdd)
+    });
+    
+    inputEl.value = ""; 
+    Swal.fire("Restocked!", `Added to ${productName}`, "success");
 };
 
-// 3. Save Edit Logic
+// 3. Save Edit
 document.getElementById("saveEditBtn").onclick = async () => {
     if (!editProductId) return;
-    const editName = document.getElementById("editProdName").value.trim().toLowerCase();
-    const isDuplicate = productsCache.some(doc => doc.id !== editProductId && doc.data().name.trim().toLowerCase() === editName);
-
-    if (isDuplicate) return Swal.fire("Duplicate Detected", "Another product already uses this name.", "warning");
-
-    try {
-        await db.collection("products").doc(editProductId).update({
-            name: document.getElementById("editProdName").value,
-            buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
-            price: parseFloat(document.getElementById("editProdPrice").value),
-            stock: parseInt(document.getElementById("editProdStock").value),
-            min: parseInt(document.getElementById("editProdMin").value) || 0
-        });
-
-        const modal = bootstrap.Modal.getInstance(document.getElementById('editProductModal'));
-        if (modal) modal.hide();
-        Swal.fire("Updated!", "Product details saved.", "success");
-    } catch (e) {
-        Swal.fire("Error", "Update failed: " + e.message, "error");
-    }
+    await db.collection("products").doc(editProductId).update({
+        name: document.getElementById("editProdName").value,
+        buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
+        price: parseFloat(document.getElementById("editProdPrice").value),
+        stock: parseFloat(document.getElementById("editProdStock").value), 
+        min: parseFloat(document.getElementById("editProdMin").value) || 0
+    });
+    Swal.fire("Updated!", "Product details saved.", "success");
 };
-
 // First render function: Includes Inventory Adjustment and Reason Input
 function renderProducts(docs) {
     const productsHead = document.getElementById("productsHead");
@@ -371,7 +331,7 @@ function renderProducts(docs) {
         row += `<td>KSh ${p.buyPrice || 0}</td>`;
       }
       
-     row += `<td>KSh ${p.price}</td>
+      row += `<td>KSh ${p.price}</td>
         <td>${toMixedFraction(p.stock)}</td>
         <td>${toMixedFraction(p.min)}</td>`;
       
