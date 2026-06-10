@@ -1150,8 +1150,7 @@ window.downloadSale = async (id) => {
     doc.text("Tel: 0790427109 , Email: livingstoneoduor21@gmail.com", 105, 265, null, "center");
 
     doc.save(`Receipt_${s.customer.replace(/\s+/g, '_')}_${id.substring(0,5)}.pdf`);
-};
-document.getElementById("downloadAllPDF").onclick = () => {
+};document.getElementById("downloadAllPDF").onclick = () => {
     if (allSales.length === 0) return alert("No sales data available.");
 
     const { jsPDF } = window.jspdf;
