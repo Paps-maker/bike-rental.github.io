@@ -1209,7 +1209,7 @@ window.openProductSelector = () => {
         list.innerHTML += `<tr>
             <td><input type="checkbox" class="prod-checkbox" value="${doc.id}"></td>
             <td>${p.name}</td>
-            <td>${p.stock}</td>
+            <td>${toMixedFraction(p.stock)}</td>
         </tr>`;
     });
     
@@ -1228,7 +1228,7 @@ document.getElementById('searchProd').oninput = (e) => {
     });
 };
 
-// 2. Add Selected items (Auto-fills stock for Sell Price)
+// 2. Add Selected items
 window.addSelectedToRequisition = () => {
     const priceType = document.getElementById("priceTypeSelect").value;
     const selected = document.querySelectorAll(".prod-checkbox:checked");
@@ -1237,7 +1237,8 @@ window.addSelectedToRequisition = () => {
         const prodDoc = window.productsCache.find(p => p.id === cb.value);
         if (prodDoc) {
             const prod = prodDoc.data();
-            const defaultQty = (priceType === "sellPrice") ? (parseInt(prod.stock) || 0) : 1;
+            // Use parseFloat for fractional stock
+            const defaultQty = (priceType === "sellPrice") ? (parseFloat(prod.stock) || 0) : 1;
             const price = (priceType === "buyPrice") ? (parseFloat(prod.buyPrice) || 0) : (parseFloat(prod.price) || 0);
             
             if (!window.requisitionItems.find(item => item.id === prodDoc.id)) {
@@ -1249,7 +1250,7 @@ window.addSelectedToRequisition = () => {
     bootstrap.Modal.getInstance(document.getElementById("productSelectorModal")).hide();
 };
 
-// 3. Render Table with Conditional Subtotal & Buy-Price Only Grand Total
+// 3. Render Table
 window.renderRequisitionTable = () => {
     const tbody = document.getElementById("requisitionTableBody");
     const totalDisplay = document.getElementById("grandTotalValue");
@@ -1258,7 +1259,6 @@ window.renderRequisitionTable = () => {
     tbody.innerHTML = ""; 
     let buyPriceTotal = 0;
 
-    // Sort items alphabetically by name A-Z before rendering
     window.requisitionItems.sort((a, b) => a.name.localeCompare(b.name));
 
     window.requisitionItems.forEach((item, index) => {
@@ -1278,8 +1278,11 @@ window.renderRequisitionTable = () => {
             </td>
             <td>KSh ${item.price.toLocaleString()}</td>
             <td>
-                <input type="number" class="form-control form-control-sm" value="${item.qty}" min="1" 
-                       onchange="window.updateQty(${index}, this.value)" style="width: 80px;">
+                <div class="d-flex align-items-center">
+                    <input type="number" step="any" class="form-control form-control-sm" value="${item.qty}" min="0.1" 
+                           onchange="window.updateQty(${index}, this.value)" style="width: 60px;">
+                    ${(item.qty % 1 !== 0) ? `<span class="ms-2 badge bg-secondary">${toMixedFraction(item.qty)}</span>` : ''}
+                </div>
             </td>
             <td class="fw-bold">${subtotalDisplay}</td>
             <td>
@@ -1290,29 +1293,26 @@ window.renderRequisitionTable = () => {
     });
 
     if (totalDisplay) {
-        totalDisplay.innerText = buyPriceTotal > 0 ? `Grand Total: KSh ${buyPriceTotal.toLocaleString()}` : "";
+        totalDisplay.innerText = buyPriceTotal > 0 ? `KSh ${buyPriceTotal.toLocaleString()}` : "KSh 0";
     }
 };
-// Handle Price Type change
+
+// 4. Updates
 window.updatePriceType = (index, newType) => {
     const item = window.requisitionItems[index];
     const prodDoc = window.productsCache.find(p => p.id === item.id);
     const prod = prodDoc.data();
-    
     item.priceType = newType;
     item.price = newType === "buyPrice" ? (parseFloat(prod.buyPrice) || 0) : (parseFloat(prod.price) || 0);
-    
     window.renderRequisitionTable();
 };
 
-// Handle Quantity change
 window.updateQty = (index, newQty) => {
-    const qty = parseInt(newQty);
-    if (qty > 0) window.requisitionItems[index].qty = qty;
+    const qty = parseFloat(newQty);
+    if (!isNaN(qty) && qty > 0) window.requisitionItems[index].qty = qty;
     window.renderRequisitionTable();
 };
 
-// 4. Remove item
 window.confirmRemove = async (index) => {
     const result = await Swal.fire({ title: 'Remove item?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
     if (result.isConfirmed) {
@@ -1321,7 +1321,7 @@ window.confirmRemove = async (index) => {
     }
 };
 
-// 5. Download PDF (Buy-Price Only Totals)
+// 5. Download PDF (Now uses toMixedFraction for Qty)
 window.downloadRequisitionPDF = () => {
     if (window.requisitionItems.length === 0) return Swal.fire("Empty", "List is empty", "warning");
     const { jsPDF } = window.jspdf;
@@ -1337,7 +1337,7 @@ window.downloadRequisitionPDF = () => {
         i.name, 
         i.priceType === 'buyPrice' ? 'Buy Price' : 'Sell Price', 
         i.price.toLocaleString(), 
-        i.qty,
+        toMixedFraction(i.qty), // Used the helper here for PDF display
         i.priceType === 'buyPrice' ? (i.price * i.qty).toLocaleString() : '-'
     ]);
     
