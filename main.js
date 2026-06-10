@@ -342,9 +342,9 @@ function renderProducts(docs) {
         row += `<td>KSh ${p.buyPrice || 0}</td>`;
       }
       
-      row += `<td>KSh ${p.price}</td>
-              <td>${p.stock}</td>
-              <td>${p.min}</td>`;
+     row += `<td>KSh ${p.price}</td>
+        <td>${toMixedFraction(p.stock)}</td>
+        <td>${toMixedFraction(p.min)}</td>`;
       
       // Admin: Add Restock input + Edit/Delete buttons
       if (currentRole === "admin") {
