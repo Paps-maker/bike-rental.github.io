@@ -17,6 +17,17 @@ firebase.initializeApp(firebaseConfig);
 // Attach core services to window for global access
 window.auth = firebase.auth();
 window.db = firebase.firestore();
+function toFraction(val) {
+    const decimal = parseFloat(val);
+    if (isNaN(decimal)) return "0";
+    if (decimal % 1 === 0) return decimal.toString();
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    const len = decimal.toString().split('.')[1]?.length || 0;
+    const denominator = Math.pow(10, len);
+    const numerator = decimal * denominator;
+    const divisor = gcd(numerator, denominator);
+    return `${numerator / divisor}/${denominator / divisor}`;
+}
 
 // --- GLOBAL VARIABLES ---
 window.productsCache = [];
@@ -107,13 +118,14 @@ addProductBtn.onclick = async () => {
     }
 
     await db.collection("products").add({
-        name: prodName.value,
-        buyPrice: parseFloat(prodBuyPrice.value) || 0,
-        price: parseFloat(prodPrice.value),
-        stock: parseInt(prodStock.value),
-        min: parseInt(prodMin.value) || 0
-    });
-    
+    name: prodName.value,
+    buyPrice: parseFloat(prodBuyPrice.value) || 0,
+    price: parseFloat(prodPrice.value) || 0,
+    // Use parseFloat to allow fractions like 0.333 or 0.5
+    stock: parseFloat(prodStock.value) || 0,
+    // Use parseFloat to allow fractional alert thresholds
+    min: parseFloat(prodMin.value) || 0
+});
     Swal.fire("Success!", "Product added successfully", "success");
     prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
 };
@@ -239,16 +251,20 @@ db.collection("products").onSnapshot(snap => {
     renderProducts(productsCache);
     document.getElementById("productCount").textContent = snap.size;
 
-    // --- CALCULATION LOGIC ---
-    let totalCost = 0;
-    let totalExpected = 0;
+   // --- CALCULATION LOGIC ---
+let totalCost = 0;
+let totalExpected = 0;
 
-    snap.docs.forEach(doc => {
-        const p = doc.data();
-        const stock = parseInt(p.stock) || 0;
-        totalCost += (parseFloat(p.buyPrice) || 0) * stock;
-        totalExpected += (parseFloat(p.price) || 0) * stock;
-    });
+snap.docs.forEach(doc => {
+    const p = doc.data();
+    // Changed parseInt to parseFloat to support fractional stock
+    const stock = parseFloat(p.stock) || 0;
+    totalCost += (parseFloat(p.buyPrice) || 0) * stock;
+    totalExpected += (parseFloat(p.price) || 0) * stock;
+});
+
+document.getElementById("totalBuyValue").textContent = `KSh ${totalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+document.getElementById("totalSellValue").textContent = `KSh ${totalExpected.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     
     // 1. Add Search Input listener
     const searchInput = document.getElementById("searchInput");
@@ -547,21 +563,37 @@ addToCartBtn.onclick = () => {
 
   if (!prodData) return alert("Please select a product");
 
-  const currentStock = parseInt(prodData.stock) || 0;
-  const requestedQty = parseInt(posQty.value) || 0;
+  // Helper function to handle fractions like "1/2" or "3/4"
+  const parseQty = (val) => {
+    if (typeof val === 'string' && val.includes('/')) {
+      const parts = val.split('/');
+      // Ensure we have two parts to avoid division by zero or NaN
+      if (parts.length === 2) {
+        return parseFloat(parts[0]) / parseFloat(parts[1]);
+      }
+    }
+    return parseFloat(val);
+  };
 
+  const currentStock = parseFloat(prodData.stock) || 0;
+  const requestedQty = parseQty(posQty.value);
+
+  // Validation checks
+  if (isNaN(requestedQty) || requestedQty <= 0) return alert("Invalid quantity");
   if (currentStock <= 0) return alert(`Sorry, ${prodData.name} is out of stock!`);
   if (requestedQty > currentStock) return alert(`Insufficient stock! Only ${currentStock} available.`);
   
   cart.push({ 
     id: prodData.id || (selectedProduct ? selectedProduct.id : posProductEl.value), 
     name: prodData.name, 
-    price: prodData.price, 
+    price: parseFloat(prodData.price), 
     qty: requestedQty 
   });
   
   new Audio("https://actions.google.com/sounds/v1/ui/beep_short.ogg").play();
   renderCart();
+  
+  // Reset UI
   selectedProduct = null;
   productSearch.value = "";
   posQty.value = "1";
@@ -635,12 +667,13 @@ paymentCompleteBtn.onclick = async () => {
                 const pData = snap.data();
                 
                 if (!pData) throw new Error(`Product ${c.name} not found.`);
-                if ((pData.stock || 0) < c.qty) throw new Error(`${c.name} has run out of stock.`);
                 
-                // Ensure values are numbers to prevent calculation errors
+                // Use parseFloat for stock validation to support fractions
+                const currentStock = parseFloat(pData.stock) || 0;
+                if (currentStock < c.qty) throw new Error(`${c.name} has insufficient stock.`);
+                
                 const sellPrice = parseFloat(c.price) || 0;
-                const costPrice = parseFloat(pData.buyPrice) || 0;
-                const qty = parseInt(c.qty) || 0;
+                const qty = parseFloat(c.qty) || 0;
                 
                 totalAmount += (sellPrice * qty);
                 
@@ -648,8 +681,8 @@ paymentCompleteBtn.onclick = async () => {
                 processedItems.push({ 
                     name: c.name, 
                     price: sellPrice, 
-                    qty: qty,
-                    cost: parseFloat(pData.buyPrice) || 0 // This will now always be a number
+                    qty: qty, // This is now a float (e.g., 0.5)
+                    cost: parseFloat(pData.buyPrice) || 0 
                 });
             }
 
@@ -668,7 +701,8 @@ paymentCompleteBtn.onclick = async () => {
                 const prodRef = db.collection("products").doc(c.id);
                 await db.runTransaction(async (t) => {
                     const snap = await t.get(prodRef);
-                    const currentStock = parseInt(snap.data().stock) || 0;
+                    const currentStock = parseFloat(snap.data().stock) || 0;
+                    // Subtract fractional quantity accurately
                     t.update(prodRef, { stock: Math.max(currentStock - c.qty, 0) });
                 });
             }
@@ -787,26 +821,21 @@ window.exportAttendance = async () => {
 };
 /* Sales Table & Reporting */
 const salesTable = document.getElementById("salesTable");
-let allSales = []; 
 
 // 1. Main Sales Listener
 db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
-    allSales = [];
+    let allSales = [];
     let todayTotal = 0;
     let monthlyTotal = 0;
-    
-    // Profit Variables
     let dailyProfit = 0;
     let totalProfit = 0;
     
-    const itemCounts = {}; // Track item quantities for the dashboard
-    
+    const itemCounts = {}; 
     const now = new Date();
     const today = now.toDateString();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-
-    // Create a local lookup map of names to Buy Prices
+    
     const costMap = {};
     window.productsCache.forEach(doc => {
         const p = doc.data();
@@ -818,92 +847,94 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
     snap.docs.forEach(doc => {
         const s = doc.data();
         allSales.push({ id: doc.id, ...s });
-        
         const saleDate = s.date.toDate();
         let saleCost = 0;
-        
-        // 2. Count Item Frequencies AND Calculate Cost
+
         s.items.forEach(item => {
-            itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
-            
-            // Look up the buyPrice from the cache
-            const name = item.name.trim().toLowerCase();
-            const buyPrice = costMap[name] || 0;
-            saleCost += (buyPrice * item.qty);
+            const normalizedItemName = item.name.trim().toLowerCase();
+            const qty = parseFloat(item.qty) || 0; 
+            const costPerItem = (item.cost !== undefined) ? parseFloat(item.cost) : (costMap[normalizedItemName] || 0);
+            saleCost += (costPerItem * qty);
+            itemCounts[item.name] = (itemCounts[item.name] || 0) + qty;
         });
 
         const profit = parseFloat(s.total) - saleCost;
         totalProfit += profit;
+        if (saleDate.toDateString() === today) { todayTotal += parseFloat(s.total); dailyProfit += profit; }
+        if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) { monthlyTotal += parseFloat(s.total); }
         
-        // 1. Calculate Totals
-        if (saleDate.toDateString() === today) {
-            todayTotal += parseFloat(s.total);
-            dailyProfit += profit;
-        }
-        if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
-            monthlyTotal += parseFloat(s.total);
-        }
-        
-        // 3. Render Table
+        // Render Table (with fraction display)
         if (salesTable) {
-            let actions = `
-                <button class="btn btn-sm btn-success" onclick="downloadSale('${doc.id}')">📄</button>
-                ${currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteSale('${doc.id}')">🗑️</button>` : ''}
-            `;
             salesTable.innerHTML += `<tr>
                 <td>${saleDate.toLocaleDateString()}</td>
                 <td>${s.customer}</td>
-                <td>${s.items.map(i => i.name + " x" + i.qty).join(", ")}</td>
+                <td>${s.items.map(i => `${i.name} x${toFraction(i.qty)}`).join(", ")}</td>
                 <td>KSh ${parseFloat(s.total).toLocaleString()}</td>
-                <td>${actions}</td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="downloadSale('${doc.id}')">📄</button>
+                    ${window.currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteSale('${doc.id}')">🗑️</button>` : ''}
+                </td>
             </tr>`;
         }
     });
+// Make sure this is in your main.js file
+window.deleteSale = async (id) => {
+    if (confirm("Are you sure you want to delete this transaction?")) {
+        try {
+            await db.collection("sales").doc(id).delete();
+            alert("Transaction deleted successfully.");
+        } catch (error) {
+            console.error("Error deleting document: ", error);
+            alert("Failed to delete transaction.");
+        }
+    }
+};
+    // Update Cards & Progress
+    document.getElementById("todaysSales").textContent = "KSh " + todayTotal.toLocaleString();
+    document.getElementById("monthlySales").textContent = "KSh " + monthlyTotal.toLocaleString();
+    document.getElementById("dailyProfit").textContent = "KSh " + dailyProfit.toLocaleString();
+    document.getElementById("totalProfit").textContent = "KSh " + totalProfit.toLocaleString();
 
-    // 4. Update Sales Cards
-    if (typeof todaysSalesEl !== 'undefined') todaysSalesEl.textContent = "KSh " + todayTotal.toLocaleString();
-    if (typeof monthlySalesEl !== 'undefined') monthlySalesEl.textContent = "KSh " + monthlyTotal.toLocaleString();
-
-    // Update Profit Cards (New)
-    const dailyProfitEl = document.getElementById("dailyProfit");
-    const totalProfitEl = document.getElementById("totalProfit");
-    if (dailyProfitEl) dailyProfitEl.textContent = "KSh " + dailyProfit.toLocaleString();
-    if (totalProfitEl) totalProfitEl.textContent = "KSh " + totalProfit.toLocaleString();
-
-    // 5. Update Top/Bottom Selling Items (Most to Least)
     const topItemsList = document.getElementById("topItemsList");
     if (topItemsList) {
-        const sortedItems = Object.entries(itemCounts)
-            .sort((a, b) => b[1] - a[1]); 
-
-        topItemsList.innerHTML = sortedItems.length > 0 
-            ? sortedItems.map(item => `
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="text-truncate" style="max-width: 150px;">${item[0]}</span>
-                    <span class="fw-bold text-primary">${item[1]} sold</span>
-                </div>`).join("")
-            : "<small>No sales data</small>";
+        const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]); 
+        topItemsList.innerHTML = sortedItems.map(item => `<div class="d-flex justify-content-between mb-2"><span>${item[0]}</span><span class="fw-bold text-primary">${toFraction(item[1])} sold</span></div>`).join("");
     }
 
+    renderGroupedSales(allSales); // Call logic to render grouped list
+    window.allSales = allSales;   // Make globally available for PDF functions
 
-    // --- DYNAMIC PROGRESS BAR UPDATE ---
-    const progressBar = document.getElementById("salesProgressBar");
-    const targetLabel = document.getElementById("targetLabel");
+
+// --- HELPER FUNCTIONS (Outside the Listener) ---
+
+
+
+// [Include your existing renderGroupedSales, downloadDailyReport, 
+// deleteSale, deleteDay, downloadSale, and downloadAllPDF functions here. 
+// Since they are now outside the onSnapshot, they will work perfectly.]
+   // --- DYNAMIC PROGRESS BAR UPDATE ---
+const progressBar = document.getElementById("salesProgressBar");
+const targetLabel = document.getElementById("targetLabel");
+
+if (progressBar && targetLabel) {
+    // Now dynamically pulls from the global variable
+    const target = (typeof currentExpectedSales !== 'undefined') ? currentExpectedSales : 0;
     
-    if (progressBar && targetLabel) {
-        // Now dynamically pulls from the global variable updated by your products listener
-        const target = (typeof currentExpectedSales !== 'undefined') ? currentExpectedSales : 0;
-        
-        // Prevent division by zero if target is 0
-        const percentage = target > 0 ? Math.min((todayTotal / target) * 100, 100) : 0;
-        
-        progressBar.style.width = percentage + "%";
-        progressBar.textContent = Math.round(percentage) + "%";
-        targetLabel.textContent = `KSh ${todayTotal.toLocaleString()} / KSh ${target.toLocaleString()}`;
-        progressBar.className = percentage >= 100 ? "progress-bar bg-warning" : "progress-bar bg-success";
-    }
+    // Switch from todayTotal to monthlyTotal
+    const progressValue = monthlyTotal; 
+    
+    // Prevent division by zero if target is 0
+    const percentage = target > 0 ? Math.min((progressValue / target) * 100, 100) : 0;
+    
+    progressBar.style.width = percentage + "%";
+    progressBar.textContent = Math.round(percentage) + "%";
+    targetLabel.textContent = `KSh ${progressValue.toLocaleString()} / KSh ${target.toLocaleString()}`;
+    
+    // Update color logic if needed; here it marks completion at 100%
+    progressBar.className = percentage >= 100 ? "progress-bar bg-warning" : "progress-bar bg-success";
+}
 
-    renderGroupedSales(allSales);
+renderGroupedSales(allSales);
 });
 // 2. Grouped View Renderer with Professional Download Button
 function renderGroupedSales(sales) {
@@ -927,13 +958,19 @@ function renderGroupedSales(sales) {
             dayTotal += s.total;
             s.items.forEach(item => {
                 if (!productSummary[item.name]) productSummary[item.name] = { qty: 0, total: 0 };
-                productSummary[item.name].qty += item.qty;
+                // Ensure qty is parsed as a float for accurate arithmetic
+                productSummary[item.name].qty += parseFloat(item.qty) || 0;
                 productSummary[item.name].total += (item.price * item.qty);
             });
         });
 
+       // Use the global toFraction helper to display quantities as fractions
         let tableRows = Object.keys(productSummary).map(name => `
-            <tr><td>${name}</td><td>${productSummary[name].qty}</td><td>KSh ${productSummary[name].total.toLocaleString()}</td></tr>
+            <tr>
+                <td>${name}</td>
+                <td>${toFraction(productSummary[name].qty)}</td>
+                <td>KSh ${productSummary[name].total.toLocaleString()}</td>
+            </tr>
         `).join('');
 
         container.innerHTML += `
@@ -941,8 +978,8 @@ function renderGroupedSales(sales) {
                 <div class="d-flex justify-content-between align-items-center">
                     <h6>Date: ${date} | Total: KSh ${dayTotal.toLocaleString()}</h6>
                     <div>
-                        <button class="btn btn-sm btn-info" onclick="downloadDailyReport('${date}')">📄 PDF Report</button>
-                        ${currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteDay('${date}')">Delete</button>` : ''}
+                        <button class="btn btn-sm btn-info" onclick="window.downloadDailyReport('${date}')">📄 PDF Report</button>
+                        ${currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="window.deleteDay('${date}')">Delete</button>` : ''}
                     </div>
                 </div>
                 <table class="table table-sm">
@@ -952,6 +989,40 @@ function renderGroupedSales(sales) {
             </div>`;
     });
 }
+/* --- GLOBAL DELETE HANDLER FOR DAILY REPORTS --- */
+window.deleteDay = async (dateStr) => {
+    // 1. Ask for confirmation
+    if (!confirm(`Are you sure you want to delete ALL sales records for ${dateStr}?`)) {
+        return;
+    }
+
+    try {
+        // 2. Create a batch to perform multiple deletions efficiently
+        const batch = db.batch();
+        
+        // 3. Filter sales that match the selected date
+        const salesToDelete = allSales.filter(s => s.date.toDate().toLocaleDateString() === dateStr);
+        
+        if (salesToDelete.length === 0) {
+            alert("No sales found for this date.");
+            return;
+        }
+
+        // 4. Add each deletion to the batch
+        salesToDelete.forEach(s => {
+            const docRef = db.collection("sales").doc(s.id);
+            batch.delete(docRef);
+        });
+
+        // 5. Commit the batch
+        await batch.commit();
+        alert(`Successfully deleted ${salesToDelete.length} records for ${dateStr}.`);
+        
+    } catch (error) {
+        console.error("Error deleting daily sales: ", error);
+        alert("Failed to delete records. Please check your permissions.");
+    }
+};
 
 window.downloadDailyReport = (dateStr) => {
     const dailySales = allSales.filter(s => s.date.toDate().toLocaleDateString() === dateStr);
@@ -967,7 +1038,8 @@ window.downloadDailyReport = (dateStr) => {
             if (!productSummary[item.name]) {
                 productSummary[item.name] = { qty: 0, total: 0 };
             }
-            productSummary[item.name].qty += item.qty;
+            // Use parseFloat to ensure numerical addition
+            productSummary[item.name].qty += parseFloat(item.qty) || 0;
             productSummary[item.name].total += (item.price * item.qty);
         });
     });
@@ -997,7 +1069,7 @@ window.downloadDailyReport = (dateStr) => {
         head: [['Product Name', 'Total Quantity Sold', 'Total Sales (KSh)']],
         body: Object.keys(productSummary).map(name => [
             name, 
-            productSummary[name].qty, 
+            toFraction(productSummary[name].qty), // Converts 0.5 to '1/2'
             productSummary[name].total.toLocaleString()
         ]),
         theme: 'striped',
@@ -1010,16 +1082,6 @@ window.downloadDailyReport = (dateStr) => {
 
     doc.save(`Daily_Report_${dateStr.replace(/\//g, '-')}.pdf`);
 };
-// 4. Existing Admin & Export Handlers
-window.deleteSale = async (id) => { if (confirm("Delete transaction?")) await db.collection("sales").doc(id).delete(); };
-window.deleteDay = async (dateStr) => {
-    if (!confirm(`Delete ALL sales for ${dateStr}?`)) return;
-    const batch = db.batch();
-    const salesToDelete = allSales.filter(s => s.date.toDate().toLocaleDateString() === dateStr);
-    salesToDelete.forEach(s => batch.delete(db.collection("sales").doc(s.id)));
-    await batch.commit();
-};
-
 window.downloadSale = async (id) => {
     const s = allSales.find(sale => sale.id === id);
     if (!s) return;
@@ -1045,13 +1107,13 @@ window.downloadSale = async (id) => {
     doc.text(`Date: ${dateStr}`, 14, 48);
     doc.text(`Transaction: ${s.transaction}`, 14, 54);
 
-    // 3. Items Table
+    // 3. Items Table - Updated to use toFraction(i.qty)
     doc.autoTable({
         startY: 65,
         head: [['Item', 'Qty', 'Price', 'Subtotal']],
         body: s.items.map(i => [
             i.name, 
-            i.qty, 
+            toFraction(i.qty), // Converts decimal 0.5 to fractional '1/2'
             `KSh ${Number(i.price).toLocaleString()}`, 
             `KSh ${(i.price * i.qty).toLocaleString()}`
         ]),
@@ -1069,10 +1131,10 @@ window.downloadSale = async (id) => {
     currentY += 15;
     doc.setDrawColor(41, 128, 185);
     doc.setFillColor(245, 245, 245);
-    doc.roundedRect(14, currentY, 182, 35, 3, 3, 'FD'); // Background box
+    doc.roundedRect(14, currentY, 182, 35, 3, 3, 'FD'); 
     
     doc.setFontSize(12);
-    doc.setTextColor(0, 150, 0); // M-Pesa Green
+    doc.setTextColor(0, 150, 0); 
     doc.text("PAY VIA M-PESA", 105, currentY + 8, null, null, "center");
     
     doc.setFontSize(10);
@@ -1083,24 +1145,23 @@ window.downloadSale = async (id) => {
     doc.setFontSize(10);
     doc.text(`Account Name: MADOLLA`, 105, currentY + 30, null, null, "center");
 
-   // Professional Thank You Footer
-doc.setFontSize(16);
-doc.setTextColor(41, 128, 185);
-doc.text("THANK YOU FOR YOUR PURCHASE!", 105, 245, null, null, "center");
+    // Professional Thank You Footer
+    doc.setFontSize(16);
+    doc.setTextColor(41, 128, 185);
+    doc.text("THANK YOU FOR YOUR PURCHASE!", 105, 245, null, null, "center");
 
-doc.setFontSize(10);
-doc.setTextColor(100);
-doc.text("We appreciate.", 105, 252, null, null, "center");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text("We appreciate.", 105, 252, null, null, "center");
 
-// Developer Branding
-doc.setFontSize(8);
-doc.setTextColor(150);
-doc.text("System Developed by Stones Web & System Solutions", 105, 260, null, null, "center");
-doc.text("Tel: 0790427109 , Email: livingstoneoduor21@gmail.com", 105, 265, null, null, "center");
+    // Developer Branding
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("System Developed by Stones Web & System Solutions", 105, 260, null, "center");
+    doc.text("Tel: 0790427109 , Email: livingstoneoduor21@gmail.com", 105, 265, null, "center");
 
     doc.save(`Receipt_${s.customer.replace(/\s+/g, '_')}_${id.substring(0,5)}.pdf`);
 };
-
 document.getElementById("downloadAllPDF").onclick = () => {
     if (allSales.length === 0) return alert("No sales data available.");
 
@@ -1307,4 +1368,3 @@ window.downloadRequisitionPDF = () => {
     });
     doc.save(`Requisition_${new Date().toLocaleDateString()}.pdf`);
 };
-
