@@ -28,6 +28,35 @@ function toFraction(val) {
     const divisor = gcd(numerator, denominator);
     return `${numerator / divisor}/${denominator / divisor}`;
 }
+/* --- GLOBAL HELPERS --- */
+window.toFraction = function(val) {
+    const decimal = parseFloat(val);
+    if (isNaN(decimal)) return "0";
+    if (decimal % 1 === 0) return decimal.toString();
+    
+    // Round to handle floating point noise
+    const rounded = Math.round(decimal * 1000) / 1000;
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    
+    const denominator = 1000;
+    const numerator = Math.round(rounded * denominator);
+    const divisor = gcd(numerator, denominator);
+    
+    return `${numerator / divisor}/${denominator / divisor}`;
+};
+
+window.toMixedFraction = function(val) {
+    const num = parseFloat(val);
+    if (isNaN(num)) return "0";
+    const whole = Math.floor(num);
+    const fraction = num - whole;
+    
+    if (fraction === 0) return whole.toString();
+    
+    // Use the existing toFraction helper for the decimal part
+    const fracStr = window.toFraction(fraction);
+    return whole > 0 ? `${whole} ${fracStr}` : fracStr;
+};
 
 // --- GLOBAL VARIABLES ---
 window.productsCache = [];
