@@ -1178,15 +1178,20 @@ document.getElementById("downloadAllPDF").onclick = () => {
     // 4. Detailed History Table
     doc.autoTable({
         startY: 50,
-        head: [['Date', 'Customer', 'Items', 'Total (KSh)']],
+        head: [['Date', 'Customer', 'Items (Qty x Price = Subtotal)', 'Total (KSh)']],
         body: allSales.map(s => [
             s.date.toDate().toLocaleDateString(),
             s.customer,
-            s.items.map(i => `${i.name} x${i.qty}`).join(", "),
+            // Logic to show: Name (Fractional Qty x Price = Subtotal)
+            s.items.map(i => {
+                const sub = i.qty * i.price;
+                return `${i.name} (${toMixedFraction(i.qty)} x KSh ${i.price.toLocaleString()} = KSh ${sub.toLocaleString()})`;
+            }).join("\n"),
             s.total.toLocaleString()
         ]),
         theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] }
+        headStyles: { fillColor: [41, 128, 185] },
+        styles: { cellPadding: 2, fontSize: 9 }
     });
 
     // 5. Footer
