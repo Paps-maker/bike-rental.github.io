@@ -711,8 +711,8 @@ paymentCompleteBtn.onclick = async () => {
     })();
 };
 /* --- SECURED ATTENDANCE LOGIC --- */
-const OFFICE_LAT = -1.27805; // REPLACE with your office Latitude
-const OFFICE_LON = 36.78965; // REPLACE with your office Longitude
+const OFFICE_LAT = -1.533167; // REPLACE with your office Latitude
+const OFFICE_LON = 37.131361; // REPLACE with your office Longitude
 const MAX_DISTANCE = 0.005;    // Max distance in degrees (approx 50m)
 
 // 1. Global Live Listener
