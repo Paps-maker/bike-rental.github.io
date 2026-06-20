@@ -107,20 +107,63 @@
 <body>
 
 <!-- Login Section -->
-<div id="loginSection" class="py-5 container">
- <div style="display: flex; align-items: center; gap: 20px;">
-  <img src="img/logo.jpeg" alt="Logo" style="height: 100px; width: auto;">
-  <h3 class="mb-4">MADOLLAR LIQUOR PUB</h3>
-</div>
+<div id="loginSection" class="container py-5">
 
-  <div class="mb-3">
-    <input id="loginEmail" type="email" placeholder="Email" class="form-control">
+  <!-- HEADER -->
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <img src="img/logo.jpeg" alt="Logo" style="height: 100px; width: auto;">
+    <h3 class="mb-0">MADOLLAR LIQUOR PUB</h3>
   </div>
-  <div class="mb-3">
-    <input id="loginPass" type="password" placeholder="Password" class="form-control">
+
+  <!-- LOGIN WRAPPER (kept but stabilized) -->
+  <div class="login-wrapper mx-auto" style="max-width: 400px;">
+
+    <!-- MODE SWITCH -->
+    <div class="d-flex justify-content-between mb-3">
+
+  <button type="button"
+          id="switchToAdminBtn"
+          class="btn btn-sm w-50 me-1 fw-bold"
+          style="background-color:#212529; color:#ffffff; border:1px solid #212529;"
+          onclick="window.setPortalMode('admin')">
+    🔑 Admin
+  </button>
+
+  <button type="button"
+          id="switchToStaffBtn"
+          class="btn btn-sm w-50 ms-1 fw-bold"
+          style="background-color:#ffffff; color:#000000; border:1px solid #000000;"
+          onclick="window.setPortalMode('staff')">
+    👤 Staff
+  </button>
+
+</div>
+    <!-- EMAIL -->
+    <div class="mb-3">
+      <input id="loginEmail"
+             type="email"
+             placeholder="Email"
+             class="form-control">
+    </div>
+
+    <!-- PASSWORD -->
+    <div class="mb-3">
+      <input id="loginPass"
+             type="password"
+             placeholder="Password"
+             class="form-control">
+    </div>
+
+    <!-- LOGIN BUTTON -->
+    <button id="loginBtn" class="w-100 btn btn-custom">
+      Login
+    </button>
+
+    <!-- MESSAGE -->
+    <div id="loginMsg" class="mt-2 small text-danger"></div>
+
   </div>
-  <button id="loginBtn" class="w-100 btn btn-custom">Login</button>
-  <div id="loginMsg" class="mt-2 small-muted"></div>
+
 </div>
 
 <!-- Dashboard -->
@@ -185,7 +228,7 @@
   </div>
 </div>
 
-   <ul class="nav nav-tabs" id="mainTabs">
+  <ul class="nav nav-tabs" id="mainTabs">
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#productsTab">Products</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customersTab">Customers</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#posTab">POS</button></li>
@@ -193,6 +236,9 @@
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#attendanceTab">Staff Clock in & out</button></li>
   <li class="nav-item admin-only d-none">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#requisitionTab">Requisition</button>
+  </li>
+  <li class="nav-item admin-only d-none">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#staffManagementTab">Staff Management</button>
   </li>
 </ul>
     <div class="col-sm-4">
@@ -286,7 +332,7 @@
       <div id="productResults" class="dropdown-menu w-100 shadow" style="display:none; position:absolute; z-index:1000;"></div>
     </div>
 
-   <div class="col-md-2">
+    <div class="col-md-2">
   <label class="small-muted">Qty</label>
   <input id="posQty" type="text" value="1" class="form-control" placeholder="1 or 1/2">
 </div>
@@ -417,7 +463,6 @@
     </div>
 </div>
 
-
   <div class="tab-pane fade" id="salesTab">
     <h5>Sales Reporting</h5>
 
@@ -483,6 +528,54 @@
     </div>
     <div class="toast-body" id="toastBody"></div>
   </div>
+</div>
+<div class="tab-pane fade" id="staffManagementTab" role="tabpanel">
+    
+    <div class="card my-4">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">👥 Staff Profile Management System</h5>
+        </div>
+        
+        <div class="card-body">
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <input type="text" id="staffName" class="form-control" placeholder="Full Employee Name">
+                </div>
+                <div class="col-md-3">
+                    <input type="email" id="staffEmail" class="form-control" placeholder="Email (Login ID)">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" id="staffPassword" class="form-control" placeholder="Operational Password">
+                </div>
+                <div class="col-md-2">
+                    <select id="staffRole" class="form-select">
+                        <option value="staff" selected>Staff Member</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button id="addStaffBtn" class="btn btn-primary w-100" onclick="window.saveStaffMember()">Save</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Employee Profile</th>
+                            <th>Email Username</th>
+                            <th>Assigned Tier</th>
+                            <th>Status</th>
+                            <th>Operational Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
 <div class="tab-pane fade" id="attendanceTab">
     <div class="p-3">
