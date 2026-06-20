@@ -14,30 +14,26 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
-// Attach core services to window for global access
+// ===============================
+// CORE SERVICES
+// ===============================
 window.auth = firebase.auth();
 window.db = firebase.firestore();
 
-function toFraction(val) {
-    const decimal = parseFloat(val);
-    if (isNaN(decimal)) return "0";
-    if (decimal % 1 === 0) return decimal.toString();
-    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
-    const len = decimal.toString().split('.')[1]?.length || 0;
-    const denominator = Math.pow(10, len);
-    const numerator = decimal * denominator;
-    const divisor = gcd(numerator, denominator);
-    return `${numerator / divisor}/${denominator / divisor}`;
-}
-
-// --- GLOBAL VARIABLES ---
+// ===============================
+// SAFE GLOBAL STATE
+// ===============================
 window.productsCache = [];
 window.requisitionItems = [];
 window.currentExpectedSales = 0;
-window.currentRole = "staff"; // Attached to window for easier access
-window.activePortalMode = "admin"; // Tracks the toggle buttons state ("admin" or "staff")
 
-/* --- AUTH ELEMENTS --- */
+window.currentRole = "staff";
+window.activePortalMode = "admin";
+window.customSessionActive = false;
+
+// ===============================
+// SAFE ELEMENT REFERENCES
+// ===============================
 const loginSection = document.getElementById("loginSection");
 const dashboard = document.getElementById("dashboard");
 const loginBtn = document.getElementById("loginBtn");
@@ -47,15 +43,36 @@ const loginMsg = document.getElementById("loginMsg");
 const logoutBtn = document.getElementById("logoutBtn");
 const roleBadge = document.getElementById("roleBadge");
 
-/**
- * Handles the toggling states between Admin and Staff layout portals
- */
+// ===============================
+// SAFETY CHECK FUNCTION
+// ===============================
+function showDashboard() {
+    if (!loginSection || !dashboard) return;
+
+    loginSection.classList.add("d-none");
+    dashboard.classList.remove("d-none");
+
+    if (typeof initDashboard === "function") {
+        initDashboard();
+    }
+}
+
+function showLogin() {
+    if (!loginSection || !dashboard) return;
+
+    dashboard.classList.add("d-none");
+    loginSection.classList.remove("d-none");
+}
+
+// ===============================
+// PORTAL MODE TOGGLE
+// ===============================
 window.setPortalMode = (mode) => {
     window.activePortalMode = mode;
-    
+
     const adminBtn = document.getElementById("switchToAdminBtn");
     const staffBtn = document.getElementById("switchToStaffBtn");
-    
+
     if (loginMsg) loginMsg.textContent = "";
 
     if (mode === "admin") {
@@ -69,132 +86,151 @@ window.setPortalMode = (mode) => {
     }
 };
 
-/**
- * Updates UI visibility based on user role.
- */
+// ===============================
+// ROLE UI HANDLER
+// ===============================
 function updateUIByRole(role) {
     window.currentRole = role || "staff";
-    if (roleBadge) roleBadge.textContent = window.currentRole.toUpperCase();
-    
+
+    if (roleBadge) {
+        roleBadge.textContent = window.currentRole.toUpperCase();
+    }
+
     document.querySelectorAll(".admin-only").forEach(el => {
         el.classList.toggle("d-none", window.currentRole !== "admin");
     });
 }
 
-/* --- AUTH LOGIC --- */
+// ===============================
+// LOGIN HANDLER
+// ===============================
 loginBtn.onclick = async () => {
-  if (loginMsg) loginMsg.textContent = "";
-  
-  const emailVal = loginEmail.value.trim().toLowerCase();
-  const passVal = loginPass.value;
+    if (loginMsg) loginMsg.textContent = "";
 
-  if (!emailVal || !passVal) {
-      if (loginMsg) loginMsg.textContent = "Please fill in all fields.";
-      return;
-  }
+    const emailVal = loginEmail.value.trim().toLowerCase();
+    const passVal = loginPass.value;
 
-  try {
-    // --- MODE 1: CUSTOM FIRESTORE STAFF PORTAL SIGN IN ---
-    if (window.activePortalMode === "staff") {
-      // Look up staff user via email document reference id
-      const userDoc = await window.db.collection("users").doc(emailVal).get();
-      
-      if (!userDoc.exists) {
-        if (loginMsg) loginMsg.textContent = "No registered staff profile found with that email.";
+    if (!emailVal || !passVal) {
+        loginMsg.textContent = "Please fill in all fields.";
         return;
-      }
-
-      const userData = userDoc.data();
-
-      // Check for Admin access blocks
-      if (userData.status === "blocked") {
-        if (loginMsg) loginMsg.textContent = "Access Revoked: Your account access has been blocked by administration.";
-        return;
-      }
-
-      // Check plain text password key string
-      if (userData.password !== passVal) {
-        if (loginMsg) loginMsg.textContent = "Incorrect password. Please try again.";
-        return;
-      }
-
-      // Valid credentials! Manually configure UI and enter dashboard view
-      updateUIByRole(userData.role || "staff");
-      
-      // Clear login inputs fields
-      loginEmail.value = "";
-      loginPass.value = "";
-
-      loginSection.classList.add("d-none");
-      dashboard.classList.remove("d-none");
-      if (typeof initDashboard === 'function') initDashboard();
-
-    // --- MODE 2: ORIGINAL NATIVE FIREBASE AUTH LOGIN ---
-    } else {
-      const userCredential = await window.auth.signInWithEmailAndPassword(emailVal, passVal);
-      const token = await userCredential.user.getIdTokenResult(true);
-      updateUIByRole(token.claims.role);
-      
-      loginSection.classList.add("d-none");
-      dashboard.classList.remove("d-none");
-      if (typeof initDashboard === 'function') initDashboard();
     }
-  } catch(e) { 
-    if (loginMsg) loginMsg.textContent = e.message; 
-  }
-};
 
-logoutBtn.onclick = () => {
-  window.auth.signOut().then(() => {
-    // Force refresh to wipe custom cached memory state variables safely
-    window.location.reload();
-  });
-};
-
-/* Auth State Observer - UPDATED WITH SECURITY BLOCK CHECK */
-window.auth.onAuthStateChanged(async (user) => {
-  if (user) {
     try {
-      // If no email exists (or if it's a custom staff login), do not let the native observer process
-      if (!user.email) return;
 
-      // 1. Look up the staff member's profile document using their email address
-      const userDoc = await window.db.collection("users").doc(user.email.toLowerCase()).get();
-      
-      if (userDoc.exists) {
-        const userData = userDoc.data();
-        
-        // 2. INTERCEPT MECHANISM: If marked blocked by admin, log them out immediately
-        if (userData.status === "blocked") {
-          Swal.fire("Access Revoked", "Your account access has been blocked by administration.", "error");
-          window.auth.signOut();
-          return; // Stop execution here
+        // =========================
+        // STAFF FIRESTORE LOGIN
+        // =========================
+        if (window.activePortalMode === "staff") {
+
+            const userDoc = await window.db.collection("users").doc(emailVal).get();
+
+            if (!userDoc.exists) {
+                loginMsg.textContent = "No registered staff profile found.";
+                return;
+            }
+
+            const userData = userDoc.data();
+
+            if (userData.status === "blocked") {
+                loginMsg.textContent = "Account blocked by admin.";
+                return;
+            }
+
+            if (userData.password !== passVal) {
+                loginMsg.textContent = "Incorrect password.";
+                return;
+            }
+
+            // ✅ FIRESTORE LOGIN SUCCESS
+                       // ✅ FIRESTORE LOGIN SUCCESS
+            window.customSessionActive = true;
+
+            // 🔥 ADD THIS (IMPORTANT FIX)
+            window.loggedStaffEmail = emailVal;
+            window.currentUserEmail = emailVal;
+
+            window.currentRole = userData.role || "staff";
+            updateUIByRole(userData.role || "staff");
+
+            loginEmail.value = "";
+            loginPass.value = "";
+
+            showDashboard();
+            return;
         }
-        
-        // 3. Set the UI permissions dynamically based on the Firestore document role
-        updateUIByRole(userData.role || "staff");
-      } else {
-        // Fallback: If no custom database document exists yet, fallback to token claims
-        const token = await user.getIdTokenResult(true);
+
+        // =========================
+        // FIREBASE AUTH LOGIN
+        // =========================
+        const userCredential =
+            await window.auth.signInWithEmailAndPassword(emailVal, passVal);
+
+        const token = await userCredential.user.getIdTokenResult(true);
+
+        window.customSessionActive = false;
+
         updateUIByRole(token.claims.role || "staff");
-      }
-      
-      // 4. Reveal the dashboard if they cleared the security block check
-      loginSection.classList.add("d-none");
-      dashboard.classList.remove("d-none");
-      if (typeof initDashboard === 'function') initDashboard();
-      
+
+        showDashboard();
+
+    } catch (e) {
+        loginMsg.textContent = e.message;
+    }
+};
+
+// ===============================
+// LOGOUT
+// ===============================
+logoutBtn.onclick = () => {
+    window.customSessionActive = false;
+    window.auth.signOut().then(() => {
+        showLogin();
+        location.reload();
+    });
+};
+
+// ===============================
+// AUTH STATE LISTENER (SAFE)
+// ===============================
+window.auth.onAuthStateChanged(async (user) => {
+
+    // ✅ IMPORTANT: do not override Firestore login session
+    if (window.customSessionActive) return;
+
+    if (!user) {
+        showLogin();
+        return;
+    }
+
+    try {
+
+        const userDoc = await window.db.collection("users")
+            .doc(user.email.toLowerCase()).get();
+
+        if (userDoc.exists) {
+
+            const userData = userDoc.data();
+
+            if (userData.status === "blocked") {
+                Swal.fire("Access Revoked", "Account blocked.", "error");
+                window.auth.signOut();
+                return;
+            }
+
+            updateUIByRole(userData.role || "staff");
+
+        } else {
+
+            const token = await user.getIdTokenResult(true);
+            updateUIByRole(token.claims.role || "staff");
+        }
+
+        showDashboard();
+
     } catch (err) {
-      console.error("Auth security routing error:", err);
-      window.auth.signOut();
+        console.error("Auth error:", err);
+        window.auth.signOut();
     }
-  } else {
-    // Safety check: Only revert to login view if the active window role isn't a validated Firestore staff
-    if (window.currentRole !== "staff") {
-      dashboard.classList.add("d-none");
-      loginSection.classList.remove("d-none");
-    }
-  }
 });
 /* Initialize Dashboard */
 function initDashboard() {
@@ -816,102 +852,196 @@ paymentCompleteBtn.onclick = async () => {
         }
     })();
 };
-/* --- SECURED ATTENDANCE LOGIC --- */
-const OFFICE_LAT = -1.27805; // REPLACE with your office Latitude
-const OFFICE_LON = 36.78965; // REPLACE with your office Longitude
-const MAX_DISTANCE = 0.005;    // Max distance in degrees (approx 50m)
+// ===============================
+// OFFICE CONFIG
+// ===============================
+const OFFICE_LAT = -1.27805;
+const OFFICE_LON = 36.78965;
+const MAX_DISTANCE = 0.005;
 
-// 1. Global Live Listener
-db.collection("attendance").orderBy("clockIn", "desc").onSnapshot(snap => {
+// ===============================
+// GET CURRENT USER EMAIL (UNIFIED)
+// ===============================
+function getCurrentUserEmail() {
+    return window.auth.currentUser?.email || window.loggedStaffEmail;
+}
+
+// ===============================
+// LIVE ATTENDANCE LISTENER
+// ===============================
+db.collection("attendance")
+.orderBy("clockIn", "desc")
+.onSnapshot(snap => {
+
     const attendanceTable = document.getElementById("attendanceTable");
     if (!attendanceTable) return;
-    
-    attendanceTable.innerHTML = ""; 
+
+    attendanceTable.innerHTML = "";
+
     snap.forEach(doc => {
         const a = doc.data();
-        if (!a.clockIn) return; 
+        if (!a.clockIn) return;
 
-        const isStaff = currentRole !== 'admin';
-        if (isStaff && a.staffEmail !== auth.currentUser?.email) return;
+        const email = getCurrentUserEmail();
 
-        const isAdmin = currentRole === 'admin';
-        attendanceTable.innerHTML += `<tr>
-            <td>${a.date}</td>
-            ${isAdmin ? `<td>${a.staffEmail}</td>` : ''}
-            <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
-            <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : 'Ongoing'}</td>
-            ${isAdmin ? `<td><button class="btn btn-sm btn-danger" onclick="window.deleteAttendanceRecord('${doc.id}')">Delete</button></td>` : ''}
-        </tr>`;
+        const isAdmin = currentRole === "admin";
+
+        const isStaff = currentRole !== "admin";
+
+        // ✅ FIX: works for BOTH login systems
+        if (isStaff && a.staffEmail !== email) return;
+
+        attendanceTable.innerHTML += `
+            <tr>
+                <td>${a.date}</td>
+
+                ${isAdmin ? `<td>${a.staffEmail}</td>` : ""}
+
+                <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
+
+                <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : "Ongoing"}</td>
+
+                ${isAdmin ? `
+                    <td>
+                        <button class="btn btn-sm btn-danger"
+                            onclick="window.deleteAttendanceRecord('${doc.id}')">
+                            Delete
+                        </button>
+                    </td>
+                ` : ""}
+            </tr>
+        `;
     });
 });
 
-// 2. Secured Clock In
+// ===============================
+// CLOCK IN (FIXED)
+// ===============================
 window.clockIn = async () => {
-    if (!auth.currentUser) return;
 
-    // Check Geolocation
+    const email = getCurrentUserEmail();
+    if (!email) return Swal.fire("Error", "No user detected", "error");
+
     navigator.geolocation.getCurrentPosition(async (position) => {
+
         const { latitude, longitude } = position.coords;
-        const distance = Math.sqrt(Math.pow(latitude - OFFICE_LAT, 2) + Math.pow(longitude - OFFICE_LON, 2));
+
+        const distance = Math.sqrt(
+            Math.pow(latitude - OFFICE_LAT, 2) +
+            Math.pow(longitude - OFFICE_LON, 2)
+        );
 
         if (distance > MAX_DISTANCE) {
-            return Swal.fire("Access Denied", "You are too far from the working location please arrive at your work location for you to clock in.", "error");
+            return Swal.fire(
+                "Access Denied",
+                "You are too far from workplace",
+                "error"
+            );
         }
 
         const today = new Date().toLocaleDateString();
-        const check = await db.collection("attendance")
-            .where("staffEmail", "==", auth.currentUser.email)
-            .where("date", "==", today).get();
 
-        if (!check.empty) return Swal.fire("Already Checked In", "You have already clocked in today.", "warning");
+        const check = await db.collection("attendance")
+            .where("staffEmail", "==", email)
+            .where("date", "==", today)
+            .get();
+
+        if (!check.empty) {
+            return Swal.fire("Already Checked In", "", "warning");
+        }
 
         await db.collection("attendance").add({
-            staffEmail: auth.currentUser.email,
+            staffEmail: email,
             date: today,
             clockIn: firebase.firestore.FieldValue.serverTimestamp(),
             clockOut: null,
-            location: { lat: latitude, lon: longitude } // Storing for audit
+            location: { lat: latitude, lon: longitude }
         });
-        Swal.fire("Clocked In", "Verified location recorded.", "success");
 
-    }, (err) => {
-        Swal.fire("Location Required", "Please enable location services to clock in.", "warning");
+        Swal.fire("Clocked In", "Success", "success");
+
+    }, () => {
+        Swal.fire("Location Required", "Enable GPS", "warning");
     }, { enableHighAccuracy: true });
 };
 
-// 3. Clock Out (No location requirement, or repeat logic above if needed)
+// ===============================
+// CLOCK OUT (FIXED)
+// ===============================
 window.clockOut = async () => {
-    if (!auth.currentUser) return;
+
+    const email = getCurrentUserEmail();
+    if (!email) return;
+
     const today = new Date().toLocaleDateString();
+
     const query = await db.collection("attendance")
-        .where("staffEmail", "==", auth.currentUser.email)
+        .where("staffEmail", "==", email)
         .where("date", "==", today)
-        .where("clockOut", "==", null).get();
+        .where("clockOut", "==", null)
+        .get();
 
-    if (query.empty) return Swal.fire("Error", "No active shift found.", "error");
+    if (query.empty) {
+        return Swal.fire("Error", "No active shift", "error");
+    }
 
-    await query.docs[0].ref.update({ clockOut: firebase.firestore.FieldValue.serverTimestamp() });
-    Swal.fire("Clocked Out", "Shift ended successfully", "info");
+    await query.docs[0].ref.update({
+        clockOut: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    Swal.fire("Clocked Out", "Success", "info");
 };
 
-// 4. Delete & Export (Keep your existing functions)
+// ===============================
+// DELETE
+// ===============================
 window.deleteAttendanceRecord = async (id) => {
-    const result = await Swal.fire({ title: 'Delete?', icon: 'warning', showCancelButton: true });
-    if (result.isConfirmed) await db.collection("attendance").doc(id).delete();
+    const result = await Swal.fire({
+        title: "Delete?",
+        icon: "warning",
+        showCancelButton: true
+    });
+
+    if (result.isConfirmed) {
+        await db.collection("attendance").doc(id).delete();
+    }
 };
 
+// ===============================
+// EXPORT
+// ===============================
 window.exportAttendance = async () => {
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
+
+    const email = getCurrentUserEmail();
+
     let query = db.collection("attendance").orderBy("clockIn", "desc");
-    if (currentRole !== 'admin') query = query.where("staffEmail", "==", auth.currentUser.email);
+
+    if (currentRole !== "admin") {
+        query = query.where("staffEmail", "==", email);
+    }
+
     const snap = await query.get();
-    let tableData = snap.docs.map(d => {
+
+    const tableData = snap.docs.map(d => {
         const a = d.data();
-        return [a.date, a.staffEmail, a.clockIn?.toDate().toLocaleTimeString(), a.clockOut?.toDate().toLocaleTimeString() || 'Ongoing'];
+
+        return [
+            a.date,
+            a.staffEmail,
+            a.clockIn?.toDate().toLocaleTimeString(),
+            a.clockOut?.toDate().toLocaleTimeString() || "Ongoing"
+        ];
     });
+
     doc.text("Staff Attendance Report", 14, 10);
-    doc.autoTable({ head: [['Date', 'Staff', 'Clock In', 'Clock Out']], body: tableData });
+    doc.autoTable({
+        head: [["Date", "Staff", "Clock In", "Clock Out"]],
+        body: tableData
+    });
+
     doc.save("Attendance_Report.pdf");
 };
 /* Sales Table & Reporting */
