@@ -17,6 +17,7 @@ firebase.initializeApp(firebaseConfig);
 // Attach core services to window for global access
 window.auth = firebase.auth();
 window.db = firebase.firestore();
+
 function toFraction(val) {
     const decimal = parseFloat(val);
     if (isNaN(decimal)) return "0";
@@ -34,6 +35,7 @@ window.productsCache = [];
 window.requisitionItems = [];
 window.currentExpectedSales = 0;
 window.currentRole = "staff"; // Attached to window for easier access
+window.activePortalMode = "admin"; // Tracks the toggle buttons state ("admin" or "staff")
 
 /* --- AUTH ELEMENTS --- */
 const loginSection = document.getElementById("loginSection");
@@ -44,6 +46,28 @@ const loginPass = document.getElementById("loginPass");
 const loginMsg = document.getElementById("loginMsg");
 const logoutBtn = document.getElementById("logoutBtn");
 const roleBadge = document.getElementById("roleBadge");
+
+/**
+ * Handles the toggling states between Admin and Staff layout portals
+ */
+window.setPortalMode = (mode) => {
+    window.activePortalMode = mode;
+    
+    const adminBtn = document.getElementById("switchToAdminBtn");
+    const staffBtn = document.getElementById("switchToStaffBtn");
+    
+    if (loginMsg) loginMsg.textContent = "";
+
+    if (mode === "admin") {
+        if (adminBtn) adminBtn.className = "btn btn-sm btn-dark w-50 me-1";
+        if (staffBtn) staffBtn.className = "btn btn-sm btn-outline-dark w-50 ms-1";
+        if (loginBtn) loginBtn.textContent = "Login as Admin";
+    } else {
+        if (adminBtn) adminBtn.className = "btn btn-sm btn-outline-dark w-50 me-1";
+        if (staffBtn) staffBtn.className = "btn btn-sm btn-dark w-50 ms-1";
+        if (loginBtn) loginBtn.textContent = "Login as Staff";
+    }
+};
 
 /**
  * Updates UI visibility based on user role.
@@ -59,35 +83,117 @@ function updateUIByRole(role) {
 
 /* --- AUTH LOGIC --- */
 loginBtn.onclick = async () => {
+  if (loginMsg) loginMsg.textContent = "";
+  
+  const emailVal = loginEmail.value.trim().toLowerCase();
+  const passVal = loginPass.value;
+
+  if (!emailVal || !passVal) {
+      if (loginMsg) loginMsg.textContent = "Please fill in all fields.";
+      return;
+  }
+
   try {
-    const userCredential = await window.auth.signInWithEmailAndPassword(loginEmail.value, loginPass.value);
-    const token = await userCredential.user.getIdTokenResult(true);
-    updateUIByRole(token.claims.role);
-    
-    loginSection.classList.add("d-none");
-    dashboard.classList.remove("d-none");
-    if (typeof initDashboard === 'function') initDashboard();
+    // --- MODE 1: CUSTOM FIRESTORE STAFF PORTAL SIGN IN ---
+    if (window.activePortalMode === "staff") {
+      // Look up staff user via email document reference id
+      const userDoc = await window.db.collection("users").doc(emailVal).get();
+      
+      if (!userDoc.exists) {
+        if (loginMsg) loginMsg.textContent = "No registered staff profile found with that email.";
+        return;
+      }
+
+      const userData = userDoc.data();
+
+      // Check for Admin access blocks
+      if (userData.status === "blocked") {
+        if (loginMsg) loginMsg.textContent = "Access Revoked: Your account access has been blocked by administration.";
+        return;
+      }
+
+      // Check plain text password key string
+      if (userData.password !== passVal) {
+        if (loginMsg) loginMsg.textContent = "Incorrect password. Please try again.";
+        return;
+      }
+
+      // Valid credentials! Manually configure UI and enter dashboard view
+      updateUIByRole(userData.role || "staff");
+      
+      // Clear login inputs fields
+      loginEmail.value = "";
+      loginPass.value = "";
+
+      loginSection.classList.add("d-none");
+      dashboard.classList.remove("d-none");
+      if (typeof initDashboard === 'function') initDashboard();
+
+    // --- MODE 2: ORIGINAL NATIVE FIREBASE AUTH LOGIN ---
+    } else {
+      const userCredential = await window.auth.signInWithEmailAndPassword(emailVal, passVal);
+      const token = await userCredential.user.getIdTokenResult(true);
+      updateUIByRole(token.claims.role);
+      
+      loginSection.classList.add("d-none");
+      dashboard.classList.remove("d-none");
+      if (typeof initDashboard === 'function') initDashboard();
+    }
   } catch(e) { 
     if (loginMsg) loginMsg.textContent = e.message; 
   }
 };
 
 logoutBtn.onclick = () => {
-  window.auth.signOut();
+  window.auth.signOut().then(() => {
+    // Force refresh to wipe custom cached memory state variables safely
+    window.location.reload();
+  });
 };
 
-/* Auth State Observer */
+/* Auth State Observer - UPDATED WITH SECURITY BLOCK CHECK */
 window.auth.onAuthStateChanged(async (user) => {
   if (user) {
-    const token = await user.getIdTokenResult(true);
-    updateUIByRole(token.claims.role);
-    
-    loginSection.classList.add("d-none");
-    dashboard.classList.remove("d-none");
-    if (typeof initDashboard === 'function') initDashboard();
+    try {
+      // If no email exists (or if it's a custom staff login), do not let the native observer process
+      if (!user.email) return;
+
+      // 1. Look up the staff member's profile document using their email address
+      const userDoc = await window.db.collection("users").doc(user.email.toLowerCase()).get();
+      
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        
+        // 2. INTERCEPT MECHANISM: If marked blocked by admin, log them out immediately
+        if (userData.status === "blocked") {
+          Swal.fire("Access Revoked", "Your account access has been blocked by administration.", "error");
+          window.auth.signOut();
+          return; // Stop execution here
+        }
+        
+        // 3. Set the UI permissions dynamically based on the Firestore document role
+        updateUIByRole(userData.role || "staff");
+      } else {
+        // Fallback: If no custom database document exists yet, fallback to token claims
+        const token = await user.getIdTokenResult(true);
+        updateUIByRole(token.claims.role || "staff");
+      }
+      
+      // 4. Reveal the dashboard if they cleared the security block check
+      loginSection.classList.add("d-none");
+      dashboard.classList.remove("d-none");
+      if (typeof initDashboard === 'function') initDashboard();
+      
+    } catch (err) {
+      console.error("Auth security routing error:", err);
+      window.auth.signOut();
+    }
   } else {
-    dashboard.classList.add("d-none");
-    loginSection.classList.remove("d-none");
+    // Safety check: Only revert to login view if the active window role isn't a validated Firestore staff
+    if (window.currentRole !== "staff") {
+      dashboard.classList.add("d-none");
+      loginSection.classList.remove("d-none");
+    }
   }
 });
 /* Initialize Dashboard */
@@ -711,8 +817,8 @@ paymentCompleteBtn.onclick = async () => {
     })();
 };
 /* --- SECURED ATTENDANCE LOGIC --- */
-const OFFICE_LAT = -1.533167; // REPLACE with your office Latitude
-const OFFICE_LON = 37.131361; // REPLACE with your office Longitude
+const OFFICE_LAT = -1.27805; // REPLACE with your office Latitude
+const OFFICE_LON = 36.78965; // REPLACE with your office Longitude
 const MAX_DISTANCE = 0.005;    // Max distance in degrees (approx 50m)
 
 // 1. Global Live Listener
@@ -1361,4 +1467,182 @@ window.downloadRequisitionPDF = () => {
         columnStyles: { 0: { cellWidth: 10 } }
     });
     doc.save(`Requisition_${new Date().toLocaleDateString()}.pdf`);
+};
+/* ==========================================================================
+   👥 REFACTORED ADMIN STAFF MANAGEMENT MODULE (DEBUG & PROD READY)
+   ========================================================================== */
+
+// Initialize edit tracking variable globally if not yet declared
+if (typeof window.editStaffId === 'undefined') {
+    window.editStaffId = null;
+}
+
+// 1. Create a global function so the HTML button can always reach it
+window.saveStaffMember = async () => {
+    console.log("Save button clicked! Processing input fields...");
+    
+    const staffEmailInput = document.getElementById("staffEmail");
+    const staffPasswordInput = document.getElementById("staffPassword");
+    const staffNameInput = document.getElementById("staffName");
+    const staffRoleInput = document.getElementById("staffRole");
+    const addStaffBtn = document.getElementById("addStaffBtn");
+
+    if (!staffEmailInput || !staffPasswordInput || !staffNameInput) {
+        console.error("Staff Management DOM inputs are missing!");
+        return Swal.fire("System Error", "Could not locate form input elements on the page.", "error");
+    }
+
+    const email = staffEmailInput.value.trim();
+    const password = staffPasswordInput.value;
+    const name = staffNameInput.value.trim();
+    const role = staffRoleInput ? staffRoleInput.value : "staff";
+
+    if (!email || !password || !name) {
+        return Swal.fire("Missing Details", "Please fill in all staff fields completely.", "warning");
+    }
+
+    try {
+        if (window.editStaffId) {
+            // Update operation
+            console.log(`Attempting to update user profile doc ID: ${window.editStaffId}`);
+            await window.db.collection("users").doc(window.editStaffId).update({
+                name: name,
+                email: email,
+                password: password,
+                role: role
+            });
+            Swal.fire("Staff Updated", `Successfully modified profile details for ${name}`, "success");
+            window.editStaffId = null;
+            if (addStaffBtn) addStaffBtn.textContent = "Save";
+        } else {
+            // New entry creation using lowercase email as document ID path
+            console.log(`Attempting to create new document for email: ${email.toLowerCase()}`);
+            await window.db.collection("users").doc(email.toLowerCase()).set({
+                name: name,
+                email: email.toLowerCase(),
+                password: password,
+                role: role,
+                status: "active",
+                createdAt: new Date()
+            });
+            Swal.fire("Staff Registered", `Successfully logged user profile for ${name}`, "success");
+        }
+
+        // Reset inputs cleanly
+        staffEmailInput.value = "";
+        staffPasswordInput.value = "";
+        staffNameInput.value = "";
+        staffEmailInput.disabled = false;
+        
+    } catch (error) {
+        console.error("Save Operation Failure Log:", error);
+        Swal.fire("Database Error", error.message, "error");
+    }
+};
+
+// 2. Real-time layout rendering listener with error trapping
+window.db.collection("users").onSnapshot(snap => {
+    console.log(`Firestore Snapshot triggered. Records found: ${snap.size}`);
+    
+    const staffTableBody = document.getElementById("staffTableBody");
+    if (!staffTableBody) {
+        console.warn("Table element '#staffTableBody' not found yet. Skipping render pass.");
+        return;
+    }
+    
+    staffTableBody.innerHTML = "";
+
+    if (snap.empty) {
+        staffTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No registered employees found.</td></tr>`;
+        return;
+    }
+
+    snap.forEach(doc => {
+        const staff = doc.data();
+        const isBlocked = staff.status === "blocked";
+        
+        // Safety checks for rendering fields cleanly
+        const staffName = staff.name || "N/A";
+        const staffEmail = staff.email || doc.id;
+        const staffRole = staff.role || "staff";
+        const staffStatus = staff.status || "active";
+        
+        const rowHTML = `
+            <tr>
+                <td><strong>${staffName}</strong></td>
+                <td>${staffEmail}</td>
+                <td><span class="badge ${staffRole === 'admin' ? 'bg-danger' : 'bg-primary'}">${staffRole.toUpperCase()}</span></td>
+                <td>
+                    <span class="badge ${isBlocked ? 'bg-dark' : 'bg-success'}">
+                        ${isBlocked ? 'BLOCKED' : 'ACTIVE'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-warning me-1" onclick="window.prepareStaffEdit('${doc.id}')">Edit</button>
+                    <button class="btn btn-sm ${isBlocked ? 'btn-outline-success' : 'btn-outline-dark'} me-1" onclick="window.toggleStaffAccess('${doc.id}', '${staffStatus}')">
+                        ${isBlocked ? 'Unblock' : 'Block'}
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="window.deleteStaffUser('${doc.id}')">Delete</button>
+                </td>
+            </tr>
+        `;
+        staffTableBody.innerHTML += rowHTML;
+    });
+}, error => {
+    console.error("CRITICAL FIRESTORE ERROR:", error);
+    const staffTableBody = document.getElementById("staffTableBody");
+    if (staffTableBody) {
+        staffTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3"><strong>Read Access Denied:</strong> ${error.message}</td></tr>`;
+    }
+});
+
+// Helper Modification Setup Utilities
+window.prepareStaffEdit = async (docId) => {
+    try {
+        const doc = await window.db.collection("users").doc(docId).get();
+        if (!doc.exists) return;
+        const staff = doc.data();
+
+        window.editStaffId = docId;
+        document.getElementById("staffName").value = staff.name || "";
+        document.getElementById("staffEmail").value = staff.email || "";
+        document.getElementById("staffEmail").disabled = true; 
+        document.getElementById("staffPassword").value = staff.password || "";
+        document.getElementById("staffRole").value = staff.role || "staff";
+
+        const addStaffBtn = document.getElementById("addStaffBtn");
+        if (addStaffBtn) addStaffBtn.textContent = "Update Details";
+    } catch (err) {
+        console.error("Error setting up edit:", err);
+    }
+};
+
+window.toggleStaffAccess = async (docId, currentStatus) => {
+    try {
+        const newStatus = currentStatus === "blocked" ? "active" : "blocked";
+        await window.db.collection("users").doc(docId).update({ status: newStatus });
+        Swal.fire("Status Updated", `Employee profile set to ${newStatus}`, "success");
+    } catch (err) {
+        console.error("Error toggling access status:", err);
+        Swal.fire("Action Error", err.message, "error");
+    }
+};
+
+window.deleteStaffUser = async (docId) => {
+    try {
+        const res = await Swal.fire({ 
+            title: "Remove staff profile?", 
+            text: "This operation cannot be undone.",
+            icon: "warning", 
+            showCancelButton: true,
+            confirmButtonColor: "#d33"
+        });
+        if (res.isConfirmed) {
+            await window.db.collection("users").doc(docId).delete();
+            Swal.fire("Deleted", "Profile removed from database", "success");
+        }
+    } catch (err) {
+        console.error("Error processing delete:", err);
+        Swal.fire("Action Error", err.message, "error");
+    }
 };
