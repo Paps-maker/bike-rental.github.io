@@ -68,6 +68,7 @@ function showLogin() {
 // PORTAL MODE TOGGLE
 // ===============================
 window.setPortalMode = (mode) => {
+
     window.activePortalMode = mode;
 
     const adminBtn = document.getElementById("switchToAdminBtn");
@@ -75,14 +76,52 @@ window.setPortalMode = (mode) => {
 
     if (loginMsg) loginMsg.textContent = "";
 
-    if (mode === "admin") {
-        if (adminBtn) adminBtn.className = "btn btn-sm btn-dark w-50 me-1";
-        if (staffBtn) staffBtn.className = "btn btn-sm btn-outline-dark w-50 ms-1";
-        if (loginBtn) loginBtn.textContent = "Login as Admin";
-    } else {
-        if (adminBtn) adminBtn.className = "btn btn-sm btn-outline-dark w-50 me-1";
-        if (staffBtn) staffBtn.className = "btn btn-sm btn-dark w-50 ms-1";
-        if (loginBtn) loginBtn.textContent = "Login as Staff";
+    // =========================
+    // RESET BOTH BUTTONS FIRST
+    // =========================
+    const resetBtn = (btn) => {
+        btn.style.transform = "scale(1)";
+        btn.classList.remove("shadow");
+    };
+
+    if (adminBtn && staffBtn) {
+
+        resetBtn(adminBtn);
+        resetBtn(staffBtn);
+
+        // =========================
+        // ADMIN ACTIVE
+        // =========================
+        if (mode === "admin") {
+
+            adminBtn.style.backgroundColor = "#212529";
+            adminBtn.style.color = "#ffffff"; // ✅ ALWAYS VISIBLE
+            adminBtn.style.border = "2px solid #ffc107";
+            adminBtn.classList.add("shadow");
+
+            staffBtn.style.backgroundColor = "#ffffff";
+            staffBtn.style.color = "#000000"; // ✅ ALWAYS VISIBLE
+            staffBtn.style.border = "1px solid #000";
+
+            loginBtn.textContent = "Login as Admin";
+        }
+
+        // =========================
+        // STAFF ACTIVE
+        // =========================
+        else {
+
+            staffBtn.style.backgroundColor = "#212529";
+            staffBtn.style.color = "#ffffff"; // ✅ ALWAYS VISIBLE
+            staffBtn.style.border = "2px solid #0d6efd";
+            staffBtn.classList.add("shadow");
+
+            adminBtn.style.backgroundColor = "#ffffff";
+            adminBtn.style.color = "#000000"; // ✅ ALWAYS VISIBLE
+            adminBtn.style.border = "1px solid #000";
+
+            loginBtn.textContent = "Login as Staff";
+        }
     }
 };
 
