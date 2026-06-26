@@ -958,10 +958,9 @@ paymentCompleteBtn.onclick = async () => {
 // ===============================
 // OFFICE CONFIG
 // ===============================
-const OFFICE_LAT = -1.27805;
-const OFFICE_LON = 36.78965;
-const MAX_DISTANCE = 0.005;
-
+const OFFICE_LAT = -1.533137;
+const OFFICE_LON = 37.131477;
+const MAX_DISTANCE = 0.009;
 // ===============================
 // GET CURRENT USER EMAIL (UNIFIED)
 // ===============================
