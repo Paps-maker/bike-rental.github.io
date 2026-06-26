@@ -156,9 +156,9 @@ loginBtn.onclick = async () => {
 
     try {
 
-        // =========================
-        // STAFF FIRESTORE LOGIN
-        // =========================
+        // ========================================================
+        // STAFF FIRESTORE LOGIN WITH INTEGRATED ATTENDANCE MODAL
+        // ========================================================
         if (window.activePortalMode === "staff") {
 
             const userDoc = await window.db.collection("users").doc(emailVal).get();
@@ -181,23 +181,87 @@ loginBtn.onclick = async () => {
             }
 
             // ✅ FIRESTORE LOGIN SUCCESS
-                       // ✅ FIRESTORE LOGIN SUCCESS
             window.customSessionActive = true;
-
-            // 🔥 ADD THIS (IMPORTANT FIX)
             window.loggedStaffEmail = emailVal;
             window.currentUserEmail = emailVal;
-
             window.currentRole = userData.role || "staff";
+            
             updateUIByRole(userData.role || "staff");
 
             loginEmail.value = "";
             loginPass.value = "";
 
-            showDashboard();
+            // 🛑 CHECK ATTENDANCE BEFORE SHOWING DASHBOARD
+            const today = new Date().toLocaleDateString();
+            const check = await window.db.collection("attendance")
+                .where("staffEmail", "==", emailVal)
+                .where("date", "==", today)
+                .get();
+
+            if (check.empty) {
+                // User HAS NOT checked in today. Force open an un-dismissible SweetAlert modal.
+                Swal.fire({
+                    title: "Attendance Check-In Required",
+                    text: "You must check in with your location to access your staff dashboard.",
+                    icon: "warning",
+                    confirmButtonText: "Clock In Now",
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showLoaderOnConfirm: true,
+                    preConfirm: async () => {
+                        // 1. Get location using an async wrapper to prevent stuck loaders
+                        const position = await new Promise((resolve) => {
+                            navigator.geolocation.getCurrentPosition(
+                                (pos) => resolve({ success: true, coords: pos.coords }),
+                                (err) => resolve({ success: false, error: err })
+                            , { enableHighAccuracy: true });
+                        });
+
+                        // 2. Handle GPS/Location permission error
+                        if (!position.success) {
+                            Swal.showValidationMessage("Location Required: Please enable GPS/location services.");
+                            return false; // Automatically stops the SweetAlert loading spinner
+                        }
+
+                        const { latitude, longitude } = position.coords;
+                        const distance = Math.sqrt(
+                            Math.pow(latitude - OFFICE_LAT, 2) +
+                            Math.pow(longitude - OFFICE_LON, 2)
+                        );
+
+                        // 3. Handle Distance range validation failure
+                        if (distance > MAX_DISTANCE) {
+                            Swal.showValidationMessage("Access Denied: You are too far from the workplace.");
+                            return false; // Automatically stops the SweetAlert loading spinner
+                        }
+
+                        // 4. Try pushing payload to database
+                        try {
+                            await window.db.collection("attendance").add({
+                                staffEmail: emailVal,
+                                date: today,
+                                clockIn: firebase.firestore.FieldValue.serverTimestamp(),
+                                clockOut: null,
+                                location: { lat: latitude, lon: longitude }
+                            });
+                            return true; // Resolves validation, closes modal cleanly
+                        } catch (err) {
+                            Swal.showValidationMessage(`Database error: ${err.message}`);
+                            return false; 
+                        }
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed && result.value) {
+                        Swal.fire("Clocked In", "Welcome to work! Dashboard unlocked.", "success");
+                        showDashboard(); // Dashboard entry granted!
+                    }
+                });
+            } else {
+                // Already checked in today, take them straight to dashboard
+                showDashboard();
+            }
             return;
         }
-
         // =========================
         // FIREBASE AUTH LOGIN
         // =========================
@@ -922,24 +986,18 @@ db.collection("attendance")
         if (!a.clockIn) return;
 
         const email = getCurrentUserEmail();
-
         const isAdmin = currentRole === "admin";
-
         const isStaff = currentRole !== "admin";
 
-        // ✅ FIX: works for BOTH login systems
+        // FIX: works for BOTH login systems and updates instantly from the login screen modal too!
         if (isStaff && a.staffEmail !== email) return;
 
         attendanceTable.innerHTML += `
             <tr>
                 <td>${a.date}</td>
-
                 ${isAdmin ? `<td>${a.staffEmail}</td>` : ""}
-
                 <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
-
                 <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : "Ongoing"}</td>
-
                 ${isAdmin ? `
                     <td>
                         <button class="btn btn-sm btn-danger"
@@ -954,7 +1012,7 @@ db.collection("attendance")
 });
 
 // ===============================
-// CLOCK IN (FIXED)
+// CLOCK IN (SYNCHRONIZED WITH LOGIN ACTION)
 // ===============================
 window.clockIn = async () => {
 
@@ -986,7 +1044,7 @@ window.clockIn = async () => {
             .get();
 
         if (!check.empty) {
-            return Swal.fire("Already Checked In", "", "warning");
+            return Swal.fire("Already Checked In", "You have already completed check-in for today.", "warning");
         }
 
         await db.collection("attendance").add({
@@ -997,10 +1055,16 @@ window.clockIn = async () => {
             location: { lat: latitude, lon: longitude }
         });
 
-        Swal.fire("Clocked In", "Success", "success");
+        await Swal.fire("Clocked In", "Success! Your dashboard access is fully active.", "success");
+
+        // Safety fallback check for UI functions if used manually on dashboard
+        if (typeof hideCheckInRequiredScreen === "function") {
+            hideCheckInRequiredScreen();
+        }
+        showDashboard();
 
     }, () => {
-        Swal.fire("Location Required", "Enable GPS", "warning");
+        Swal.fire("Location Required", "Please allow GPS and location access parameters to clock in.", "warning");
     }, { enableHighAccuracy: true });
 };
 
@@ -1021,14 +1085,14 @@ window.clockOut = async () => {
         .get();
 
     if (query.empty) {
-        return Swal.fire("Error", "No active shift", "error");
+        return Swal.fire("Error", "No active shift found or you have already clocked out today.", "error");
     }
 
     await query.docs[0].ref.update({
         clockOut: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    Swal.fire("Clocked Out", "Success", "info");
+    Swal.fire("Clocked Out", "Shift ended successfully.", "info");
 };
 
 // ===============================
@@ -1036,18 +1100,23 @@ window.clockOut = async () => {
 // ===============================
 window.deleteAttendanceRecord = async (id) => {
     const result = await Swal.fire({
-        title: "Delete?",
+        title: "Delete this record?",
+        text: "You won't be able to revert this actions!",
         icon: "warning",
-        showCancelButton: true
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!"
     });
 
     if (result.isConfirmed) {
         await db.collection("attendance").doc(id).delete();
+        Swal.fire("Deleted!", "The record has been cleared.", "success");
     }
 };
 
 // ===============================
-// EXPORT
+// EXPORT TO PDF
 // ===============================
 window.exportAttendance = async () => {
 
@@ -1081,7 +1150,7 @@ window.exportAttendance = async () => {
         body: tableData
     });
 
-    doc.save("Attendance_Report.pdf");
+    doc.save(`Attendance_Report_${new Date().toISOString().slice(0,10)}.pdf`);
 };
 /* Sales Table & Reporting */
 const salesTable = document.getElementById("salesTable");
@@ -1169,13 +1238,7 @@ window.deleteSale = async (id) => {
     window.allSales = allSales;   // Make globally available for PDF functions
 
 
-// --- HELPER FUNCTIONS (Outside the Listener) ---
 
-
-
-// [Include your existing renderGroupedSales, downloadDailyReport, 
-// deleteSale, deleteDay, downloadSale, and downloadAllPDF functions here. 
-// Since they are now outside the onSnapshot, they will work perfectly.]
    // --- DYNAMIC PROGRESS BAR UPDATE ---
 const progressBar = document.getElementById("salesProgressBar");
 const targetLabel = document.getElementById("targetLabel");
