@@ -143,9 +143,9 @@ function updateUIByRole(role) {
 // ===============================
 // OFFICE CONFIG
 // ===============================
-const OFFICE_LAT = -1.3218;
-const OFFICE_LON = 36.8245;
-const MAX_DISTANCE = 0.045;
+const OFFICE_LAT = -1.27805;
+const OFFICE_LON = 36.78965;
+const MAX_DISTANCE = 0.090;
 
 // Variable to maintain our live unsubscribe hook across session handoffs
 window.activeAttendanceListener = null;
