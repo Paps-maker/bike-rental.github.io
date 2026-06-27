@@ -141,6 +141,75 @@ function updateUIByRole(role) {
 }
 
 // ===============================
+// OFFICE CONFIG
+// ===============================
+const OFFICE_LAT = -1.27805;
+const OFFICE_LON = 36.78965;
+const MAX_DISTANCE = 0.045;
+
+// Variable to maintain our live unsubscribe hook across session handoffs
+window.activeAttendanceListener = null;
+
+// ===============================
+// GET CURRENT USER EMAIL (UNIFIED SAFETY FALLBACK)
+// ===============================
+function getCurrentUserEmail() {
+    return window.auth?.currentUser?.email || window.loggedStaffEmail || window.currentUserEmail || "";
+}
+
+// ===============================
+// LIVE ATTENDANCE REALTIME LISTENER INITIALIZER
+// ===============================
+function startAttendanceRealtimeListener() {
+    // Drop active socket channels first if re-authenticating to prevent leaky processing loops
+    if (typeof window.activeAttendanceListener === "function") {
+        window.activeAttendanceListener();
+    }
+
+    const attendanceTable = document.getElementById("attendanceTable");
+    if (!attendanceTable) return;
+
+    // Open clean real-time transactional stream from Firestore
+    window.activeAttendanceListener = window.db.collection("attendance")
+        .orderBy("clockIn", "desc")
+        .onSnapshot(snap => {
+            attendanceTable.innerHTML = "";
+
+            snap.forEach(doc => {
+                const a = doc.data();
+                if (!a.clockIn) return;
+
+                const email = getCurrentUserEmail();
+                const role = window.currentRole || "staff";
+                const isAdmin = role === "admin";
+                const isStaff = role !== "admin";
+
+                // If user is regular staff, filter to only show their records. If Admin, bypass filtering.
+                if (isStaff && a.staffEmail !== email) return;
+
+                attendanceTable.innerHTML += `
+                    <tr>
+                        <td>${a.date}</td>
+                        ${isAdmin ? `<td>${a.staffEmail}</td>` : ""}
+                        <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
+                        <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : "Ongoing"}</td>
+                        ${isAdmin ? `
+                            <td>
+                                <button class="btn btn-sm btn-danger"
+                                    onclick="window.deleteAttendanceRecord('${doc.id}')">
+                                    Delete
+                                </button>
+                            </td>
+                        ` : ""}
+                    </tr>
+                `;
+            });
+        }, error => {
+            console.error("Realtime pipeline error:", error);
+        });
+}
+
+// ===============================
 // LOGIN HANDLER
 // ===============================
 loginBtn.onclick = async () => {
@@ -155,7 +224,6 @@ loginBtn.onclick = async () => {
     }
 
     try {
-
         // ========================================================
         // STAFF FIRESTORE LOGIN WITH INTEGRATED ATTENDANCE MODAL
         // ========================================================
@@ -180,16 +248,16 @@ loginBtn.onclick = async () => {
                 return;
             }
 
-            // ✅ FIRESTORE LOGIN SUCCESS
+            // ✅ FIRESTORE LOGIN SUCCESS - Explicitly assign variables globally
             window.customSessionActive = true;
             window.loggedStaffEmail = emailVal;
             window.currentUserEmail = emailVal;
             window.currentRole = userData.role || "staff";
             
-            updateUIByRole(userData.role || "staff");
+            updateUIByRole(window.currentRole);
 
-            loginEmail.value = "";
-            loginPass.value = "";
+            // 🚀 BOOT REALTIME ENGINE FOR FIRESTORE USERS
+            startAttendanceRealtimeListener();
 
             // 🛑 CHECK ATTENDANCE BEFORE SHOWING DASHBOARD
             const today = new Date().toLocaleDateString();
@@ -213,14 +281,15 @@ loginBtn.onclick = async () => {
                         const position = await new Promise((resolve) => {
                             navigator.geolocation.getCurrentPosition(
                                 (pos) => resolve({ success: true, coords: pos.coords }),
-                                (err) => resolve({ success: false, error: err })
-                            , { enableHighAccuracy: true });
+                                (err) => resolve({ success: false, error: err }),
+                                { enableHighAccuracy: true }
+                            );
                         });
 
                         // 2. Handle GPS/Location permission error
                         if (!position.success) {
                             Swal.showValidationMessage("Location Required: Please enable GPS/location services.");
-                            return false; // Automatically stops the SweetAlert loading spinner
+                            return false; 
                         }
 
                         const { latitude, longitude } = position.coords;
@@ -232,7 +301,7 @@ loginBtn.onclick = async () => {
                         // 3. Handle Distance range validation failure
                         if (distance > MAX_DISTANCE) {
                             Swal.showValidationMessage("Access Denied: You are too far from the workplace.");
-                            return false; // Automatically stops the SweetAlert loading spinner
+                            return false; 
                         }
 
                         // 4. Try pushing payload to database
@@ -244,7 +313,7 @@ loginBtn.onclick = async () => {
                                 clockOut: null,
                                 location: { lat: latitude, lon: longitude }
                             });
-                            return true; // Resolves validation, closes modal cleanly
+                            return true; 
                         } catch (err) {
                             Swal.showValidationMessage(`Database error: ${err.message}`);
                             return false; 
@@ -253,32 +322,183 @@ loginBtn.onclick = async () => {
                 }).then((result) => {
                     if (result.isConfirmed && result.value) {
                         Swal.fire("Clocked In", "Welcome to work! Dashboard unlocked.", "success");
-                        showDashboard(); // Dashboard entry granted!
+                        
+                        // Clear inputs safely AFTER successful navigation flow completes
+                        loginEmail.value = "";
+                        loginPass.value = "";
+                        showDashboard(); 
                     }
                 });
             } else {
-                // Already checked in today, take them straight to dashboard
+                // Already checked in today, clear inputs and take them straight to dashboard
+                loginEmail.value = "";
+                loginPass.value = "";
                 showDashboard();
             }
-            return;
+            return; // Exit completely out of the runtime, bypassing Firebase Auth block below
         }
-        // =========================
-        // FIREBASE AUTH LOGIN
-        // =========================
+
+        // ========================================================
+        // FIREBASE AUTH LOGIN (ADMIN SIDE / ALTERNATE PORTALS)
+        // ========================================================
         const userCredential =
             await window.auth.signInWithEmailAndPassword(emailVal, passVal);
 
         const token = await userCredential.user.getIdTokenResult(true);
 
         window.customSessionActive = false;
+        window.currentRole = token.claims.role || "staff";
 
-        updateUIByRole(token.claims.role || "staff");
+        updateUIByRole(window.currentRole);
 
+        // 🚀 BOOT REALTIME ENGINE FOR ADMINS ON LOGIN EXECUTIONS
+        startAttendanceRealtimeListener();
+
+        loginEmail.value = "";
+        loginPass.value = "";
         showDashboard();
 
     } catch (e) {
-        loginMsg.textContent = e.message;
+        if (loginMsg) loginMsg.textContent = e.message;
     }
+};
+
+// ===============================
+// CLOCK IN (SYNCHRONIZED WITH MANUAL ACTION)
+// ===============================
+window.clockIn = async () => {
+    const email = getCurrentUserEmail();
+    if (!email) return Swal.fire("Error", "No user detected", "error");
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        const distance = Math.sqrt(
+            Math.pow(latitude - OFFICE_LAT, 2) +
+            Math.pow(longitude - OFFICE_LON, 2)
+        );
+
+        if (distance > MAX_DISTANCE) {
+            return Swal.fire(
+                "Access Denied",
+                "You are too far from workplace",
+                "error"
+            );
+        }
+
+        const today = new Date().toLocaleDateString();
+
+        const check = await window.db.collection("attendance")
+            .where("staffEmail", "==", email)
+            .where("date", "==", today)
+            .get();
+
+        if (!check.empty) {
+            return Swal.fire("Already Checked In", "You have already completed check-in for today.", "warning");
+        }
+
+        await window.db.collection("attendance").add({
+            staffEmail: email,
+            date: today,
+            clockIn: firebase.firestore.FieldValue.serverTimestamp(),
+            clockOut: null,
+            location: { lat: latitude, lon: longitude }
+        });
+
+        await Swal.fire("Clocked In", "Success! Your dashboard access is fully active.", "success");
+
+        if (typeof hideCheckInRequiredScreen === "function") {
+            hideCheckInRequiredScreen();
+        }
+        showDashboard();
+
+    }, () => {
+        Swal.fire("Location Required", "Please allow GPS and location access parameters to clock in.", "warning");
+    }, { enableHighAccuracy: true });
+};
+
+// ===============================
+// CLOCK OUT (FIXED)
+// ===============================
+window.clockOut = async () => {
+    const email = getCurrentUserEmail();
+    if (!email) return;
+
+    const today = new Date().toLocaleDateString();
+
+    const query = await window.db.collection("attendance")
+        .where("staffEmail", "==", email)
+        .where("date", "==", today)
+        .where("clockOut", "==", null)
+        .get();
+
+    if (query.empty) {
+        return Swal.fire("Error", "No active shift found or you have already clocked out today.", "error");
+    }
+
+    await query.docs[0].ref.update({
+        clockOut: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    Swal.fire("Clocked Out", "Shift ended successfully.", "info");
+};
+
+// ===============================
+// DELETE
+// ===============================
+window.deleteAttendanceRecord = async (id) => {
+    const result = await Swal.fire({
+        title: "Delete this record?",
+        text: "You won't be able to revert this actions!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!"
+    });
+
+    if (result.isConfirmed) {
+        await window.db.collection("attendance").doc(id).delete();
+        Swal.fire("Deleted!", "The record has been cleared.", "success");
+    }
+};
+
+// ===============================
+// EXPORT TO PDF
+// ===============================
+window.exportAttendance = async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const email = getCurrentUserEmail();
+    const role = window.currentRole || "staff";
+
+    let query = window.db.collection("attendance").orderBy("clockIn", "desc");
+
+    if (role !== "admin") {
+        query = query.where("staffEmail", "==", email);
+    }
+
+    const snap = await query.get();
+
+    const tableData = snap.docs.map(d => {
+        const a = d.data();
+
+        return [
+            a.date,
+            a.staffEmail,
+            a.clockIn?.toDate().toLocaleTimeString(),
+            a.clockOut?.toDate().toLocaleTimeString() || "Ongoing"
+        ];
+    });
+
+    doc.text("Staff Attendance Report", 14, 10);
+    doc.autoTable({
+        head: [["Date", "Staff", "Clock In", "Clock Out"]],
+        body: tableData
+    });
+
+    doc.save(`Attendance_Report_${new Date().toISOString().slice(0,10)}.pdf`);
 };
 
 // ===============================
@@ -306,12 +526,10 @@ window.auth.onAuthStateChanged(async (user) => {
     }
 
     try {
-
         const userDoc = await window.db.collection("users")
             .doc(user.email.toLowerCase()).get();
 
         if (userDoc.exists) {
-
             const userData = userDoc.data();
 
             if (userData.status === "blocked") {
@@ -320,14 +538,16 @@ window.auth.onAuthStateChanged(async (user) => {
                 return;
             }
 
-            updateUIByRole(userData.role || "staff");
-
+            window.currentRole = userData.role || "staff";
+            updateUIByRole(window.currentRole);
         } else {
-
             const token = await user.getIdTokenResult(true);
-            updateUIByRole(token.claims.role || "staff");
+            window.currentRole = token.claims.role || "staff";
+            updateUIByRole(window.currentRole);
         }
 
+        // 🚀 BOOT REALTIME ENGINE FOR ACTIVE STATE RESTORATIONS (E.G. REFRESHES)
+        startAttendanceRealtimeListener();
         showDashboard();
 
     } catch (err) {
@@ -955,202 +1175,7 @@ paymentCompleteBtn.onclick = async () => {
         }
     })();
 };
-// ===============================
-// OFFICE CONFIG
-// ===============================
-const OFFICE_LAT = -1.533137;
-const OFFICE_LON = 37.131477;
-const MAX_DISTANCE = 0.045;
-// ===============================
-// GET CURRENT USER EMAIL (UNIFIED)
-// ===============================
-function getCurrentUserEmail() {
-    return window.auth.currentUser?.email || window.loggedStaffEmail;
-}
 
-// ===============================
-// LIVE ATTENDANCE LISTENER
-// ===============================
-db.collection("attendance")
-.orderBy("clockIn", "desc")
-.onSnapshot(snap => {
-
-    const attendanceTable = document.getElementById("attendanceTable");
-    if (!attendanceTable) return;
-
-    attendanceTable.innerHTML = "";
-
-    snap.forEach(doc => {
-        const a = doc.data();
-        if (!a.clockIn) return;
-
-        const email = getCurrentUserEmail();
-        const isAdmin = currentRole === "admin";
-        const isStaff = currentRole !== "admin";
-
-        // FIX: works for BOTH login systems and updates instantly from the login screen modal too!
-        if (isStaff && a.staffEmail !== email) return;
-
-        attendanceTable.innerHTML += `
-            <tr>
-                <td>${a.date}</td>
-                ${isAdmin ? `<td>${a.staffEmail}</td>` : ""}
-                <td>${a.clockIn.toDate().toLocaleTimeString()}</td>
-                <td>${a.clockOut ? a.clockOut.toDate().toLocaleTimeString() : "Ongoing"}</td>
-                ${isAdmin ? `
-                    <td>
-                        <button class="btn btn-sm btn-danger"
-                            onclick="window.deleteAttendanceRecord('${doc.id}')">
-                            Delete
-                        </button>
-                    </td>
-                ` : ""}
-            </tr>
-        `;
-    });
-});
-
-// ===============================
-// CLOCK IN (SYNCHRONIZED WITH LOGIN ACTION)
-// ===============================
-window.clockIn = async () => {
-
-    const email = getCurrentUserEmail();
-    if (!email) return Swal.fire("Error", "No user detected", "error");
-
-    navigator.geolocation.getCurrentPosition(async (position) => {
-
-        const { latitude, longitude } = position.coords;
-
-        const distance = Math.sqrt(
-            Math.pow(latitude - OFFICE_LAT, 2) +
-            Math.pow(longitude - OFFICE_LON, 2)
-        );
-
-        if (distance > MAX_DISTANCE) {
-            return Swal.fire(
-                "Access Denied",
-                "You are too far from workplace",
-                "error"
-            );
-        }
-
-        const today = new Date().toLocaleDateString();
-
-        const check = await db.collection("attendance")
-            .where("staffEmail", "==", email)
-            .where("date", "==", today)
-            .get();
-
-        if (!check.empty) {
-            return Swal.fire("Already Checked In", "You have already completed check-in for today.", "warning");
-        }
-
-        await db.collection("attendance").add({
-            staffEmail: email,
-            date: today,
-            clockIn: firebase.firestore.FieldValue.serverTimestamp(),
-            clockOut: null,
-            location: { lat: latitude, lon: longitude }
-        });
-
-        await Swal.fire("Clocked In", "Success! Your dashboard access is fully active.", "success");
-
-        // Safety fallback check for UI functions if used manually on dashboard
-        if (typeof hideCheckInRequiredScreen === "function") {
-            hideCheckInRequiredScreen();
-        }
-        showDashboard();
-
-    }, () => {
-        Swal.fire("Location Required", "Please allow GPS and location access parameters to clock in.", "warning");
-    }, { enableHighAccuracy: true });
-};
-
-// ===============================
-// CLOCK OUT (FIXED)
-// ===============================
-window.clockOut = async () => {
-
-    const email = getCurrentUserEmail();
-    if (!email) return;
-
-    const today = new Date().toLocaleDateString();
-
-    const query = await db.collection("attendance")
-        .where("staffEmail", "==", email)
-        .where("date", "==", today)
-        .where("clockOut", "==", null)
-        .get();
-
-    if (query.empty) {
-        return Swal.fire("Error", "No active shift found or you have already clocked out today.", "error");
-    }
-
-    await query.docs[0].ref.update({
-        clockOut: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    Swal.fire("Clocked Out", "Shift ended successfully.", "info");
-};
-
-// ===============================
-// DELETE
-// ===============================
-window.deleteAttendanceRecord = async (id) => {
-    const result = await Swal.fire({
-        title: "Delete this record?",
-        text: "You won't be able to revert this actions!",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: "Yes, delete it!"
-    });
-
-    if (result.isConfirmed) {
-        await db.collection("attendance").doc(id).delete();
-        Swal.fire("Deleted!", "The record has been cleared.", "success");
-    }
-};
-
-// ===============================
-// EXPORT TO PDF
-// ===============================
-window.exportAttendance = async () => {
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    const email = getCurrentUserEmail();
-
-    let query = db.collection("attendance").orderBy("clockIn", "desc");
-
-    if (currentRole !== "admin") {
-        query = query.where("staffEmail", "==", email);
-    }
-
-    const snap = await query.get();
-
-    const tableData = snap.docs.map(d => {
-        const a = d.data();
-
-        return [
-            a.date,
-            a.staffEmail,
-            a.clockIn?.toDate().toLocaleTimeString(),
-            a.clockOut?.toDate().toLocaleTimeString() || "Ongoing"
-        ];
-    });
-
-    doc.text("Staff Attendance Report", 14, 10);
-    doc.autoTable({
-        head: [["Date", "Staff", "Clock In", "Clock Out"]],
-        body: tableData
-    });
-
-    doc.save(`Attendance_Report_${new Date().toISOString().slice(0,10)}.pdf`);
-};
 /* Sales Table & Reporting */
 const salesTable = document.getElementById("salesTable");
 
