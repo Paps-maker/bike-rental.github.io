@@ -466,35 +466,34 @@
   <div class="tab-pane fade" id="salesTab">
     <h5>Sales Reporting</h5>
 
-   <div class="row admin-only mb-4">
-    <!-- Daily Profit Card -->
-    <div class="col-md-6 mb-3 mb-md-0">
-        <div class="card bg-success text-white shadow-sm h-100">
-            <div class="card-body d-flex flex-column justify-content-center">
-                <h6 class="text-uppercase tracking-wider opacity-75 mb-1">Daily Profit</h6>
-                <h3 id="dailyProfit" class="fw-bold mb-0">KSh 0</h3>
-            </div>
-        </div>
-    </div>
-
-    <!-- Total Net Profit Card with Last Month Breakdown -->
-    <div class="col-md-6">
-        <div class="card bg-primary text-white shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-uppercase tracking-wider opacity-75 mb-1">Total Net Profit</h6>
-                <h3 id="totalProfit" class="fw-bold mb-3">KSh 0</h3>
-                
-                <!-- Divider -->
-                <hr class="border-white opacity-25 my-2">
-                
-                <!-- Last Month Breakdown Section -->
-                <div id="profitCardBreakdown" class="small">
-                    <!-- JavaScript will dynamically inject the last month's calculation here -->
+    <div class="row admin-only mb-4">
+        <!-- Daily Profit Card -->
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card bg-success text-white shadow-sm h-100">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <h6 class="text-uppercase tracking-wider opacity-75 mb-1">Daily Profit</h6>
+                    <h3 id="dailyProfit" class="fw-bold mb-0">KSh 0</h3>
                 </div>
             </div>
         </div>
-    </div>
-</div>
+
+        <!-- Total Net Profit Card with Last Month Breakdown -->
+        <div class="col-md-6">
+            <div class="card bg-primary text-white shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase tracking-wider opacity-75 mb-1">Total Net Profit</h6>
+                    <h3 id="totalProfit" class="fw-bold mb-3">KSh 0</h3>
+                    
+                    <!-- Divider Line -->
+                    <hr class="border-white opacity-25 my-2">
+                    
+                    <!-- Last Month Breakdown Dynamic Container -->
+                    <div id="profitCardBreakdown" class="small">
+                        <!-- JavaScript will dynamically insert last month's profit right here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div class="card p-3 mb-4">
