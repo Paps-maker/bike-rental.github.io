@@ -1187,11 +1187,21 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
     let dailyProfit = 0;
     let totalProfit = 0;
     
+    // Set up tracking variables for last month calculations
+    window.lastMonthProfit = 0;
+    window.lastMonthKey = "";
+    
     const itemCounts = {}; 
     const now = new Date();
     const today = now.toDateString();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    
+    // Calculate targets for exactly one calendar month ago
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const targetLastMonth = lastMonthDate.getMonth();
+    const targetLastYear = lastMonthDate.getFullYear();
+    window.lastMonthKey = lastMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     
     const costMap = {};
     window.productsCache.forEach(doc => {
@@ -1217,9 +1227,23 @@ db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
 
         const profit = parseFloat(s.total) - saleCost;
         totalProfit += profit;
+
+        // Check if the sale occurred in the previous month calendar bracket
+        if (saleDate.getMonth() === targetLastMonth && saleDate.getFullYear() === targetLastYear) {
+            window.lastMonthProfit += profit;
+        }
+
         if (saleDate.toDateString() === today) { todayTotal += parseFloat(s.total); dailyProfit += profit; }
         if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) { monthlyTotal += parseFloat(s.total); }
-        
+        const profitCardBreakdown = document.getElementById("profitCardBreakdown");
+if (profitCardBreakdown) {
+    profitCardBreakdown.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center py-1">
+            <span class="opacity-75">Profit (${window.lastMonthKey}):</span>
+            <span class="fw-bold">KSh ${window.lastMonthProfit.toFixed(2)}</span>
+        </div>
+    `;
+}
         // Render Table (with fraction display)
         if (salesTable) {
             salesTable.innerHTML += `<tr>
