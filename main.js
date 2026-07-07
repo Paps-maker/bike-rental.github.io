@@ -1246,17 +1246,17 @@ if (profitCardBreakdown) {
 }
         // Render Table (with fraction display)
         if (salesTable) {
-            salesTable.innerHTML += `<tr>
-                <td>${saleDate.toLocaleDateString()}</td>
-                <td>${s.customer}</td>
-                <td>${s.items.map(i => `${i.name} x${toFraction(i.qty)}`).join(", ")}</td>
-                <td>KSh ${parseFloat(s.total).toLocaleString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-success" onclick="downloadSale('${doc.id}')">📄</button>
-                    ${window.currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteSale('${doc.id}')">🗑️</button>` : ''}
-                </td>
-            </tr>`;
-        }
+    salesTable.innerHTML += `<tr>
+        <td>${saleDate.toLocaleDateString('en-GB')}</td>
+        <td>${s.customer}</td>
+        <td>${s.items.map(i => `${i.name} x${toFraction(i.qty)}`).join(", ")}</td>
+        <td>KSh ${parseFloat(s.total).toLocaleString()}</td>
+        <td>
+            <button class="btn btn-sm btn-success" onclick="downloadSale('${doc.id}')">📄</button>
+            ${window.currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteSale('${doc.id}')">🗑️</button>` : ''}
+        </td>
+    </tr>`;
+}
     });
 // Make sure this is in your main.js file
 window.deleteSale = async (id) => {
