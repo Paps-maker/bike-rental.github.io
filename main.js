@@ -1312,19 +1312,26 @@ if (progressBar && targetLabel) {
 renderGroupedSales(allSales);
 });
 // 2. Grouped View Renderer with Professional Download Button
+// 2. Grouped View Renderer with Professional Download Button
 function renderGroupedSales(sales) {
     const container = document.getElementById("dailySalesContainer");
     if (!container) return;
     container.innerHTML = "";
 
     const grouped = sales.reduce((acc, sale) => {
-        const dateKey = sale.date.toDate().toLocaleDateString();
+        // Enforce day/month/year format for the grouping keys
+        const dateKey = sale.date.toDate().toLocaleDateString('en-GB');
         if (!acc[dateKey]) acc[dateKey] = [];
         acc[dateKey].push(sale);
         return acc;
     }, {});
 
-    Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a)).forEach(date => {
+    // Sort by parsing 'DD/MM/YYYY' keys back into comparable timestamps
+    Object.keys(grouped).sort((a, b) => {
+        const [dayA, monthA, yearA] = a.split('/');
+        const [dayB, monthB, yearB] = b.split('/');
+        return new Date(`${yearB}-${monthB}-${dayB}`) - new Date(`${yearA}-${monthA}-${dayA}`);
+    }).forEach(date => {
         const dailySales = grouped[date];
         let dayTotal = 0;
         let productSummary = {};
@@ -1339,7 +1346,7 @@ function renderGroupedSales(sales) {
             });
         });
 
-       // Use the global toFraction helper to display quantities as fractions
+        // Use the global toFraction helper to display quantities as fractions
         let tableRows = Object.keys(productSummary).map(name => `
             <tr>
                 <td>${name}</td>
@@ -1357,7 +1364,7 @@ function renderGroupedSales(sales) {
                         ${currentRole === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="window.deleteDay('${date}')">Delete</button>` : ''}
                     </div>
                 </div>
-                <table class="table table-sm">
+                <table class="table table-sm mt-2">
                     <thead><tr><th>Product</th><th>Qty</th><th>Subtotal</th></tr></thead>
                     <tbody>${tableRows}</tbody>
                 </table>
