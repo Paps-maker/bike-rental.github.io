@@ -557,147 +557,499 @@ window.auth.onAuthStateChanged(async (user) => {
 });
 /* Initialize Dashboard */
 function initDashboard() {
- /* --- Products Management & Quick Restock --- */
-
-const prodName = document.getElementById("prodName");
-const todaysSalesEl = document.getElementById("todaysSales");
+    /* --- Products Management & Quick Restock --- */
+    const prodName = document.getElementById("prodName");
+    const todaysSalesEl = document.getElementById("todaysSales");
     const monthlySalesEl = document.getElementById("monthlySales");
-const prodBuyPrice = document.getElementById("prodBuyPrice");
-const prodPrice = document.getElementById("prodPrice");
-const prodStock = document.getElementById("prodStock");
-const prodMin = document.getElementById("prodMin");
-const addProductBtn = document.getElementById("addProductBtn");
-const productsTable = document.getElementById("productsTable");
-let editProductId = null;
-
-/* --- GLOBAL HELPERS --- */
-window.toFraction = function(val) {
-    const decimal = parseFloat(val);
-    if (isNaN(decimal)) return "0";
-    if (decimal % 1 === 0) return decimal.toString();
-    
-    // Round to handle floating point noise
-    const rounded = Math.round(decimal * 1000) / 1000;
-    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
-    
-    const denominator = 1000;
-    const numerator = Math.round(rounded * denominator);
-    const divisor = gcd(numerator, denominator);
-    
-    return `${numerator / divisor}/${denominator / divisor}`;
-};
-
-window.toMixedFraction = function(val) {
-    const num = parseFloat(val);
-    if (isNaN(num)) return "0";
-    const whole = Math.floor(num);
-    const fraction = num - whole;
-    
-    if (fraction === 0) return whole.toString();
-    
-    // Use the existing toFraction helper for the decimal part
-    const fracStr = window.toFraction(fraction);
-    return whole > 0 ? `${whole} ${fracStr}` : fracStr;
-};
-
-/* --- PRODUCT MANAGEMENT (Updated for Fractions) --- */
-
-// 1. Add Product
-addProductBtn.onclick = async () => {
-    if (currentRole !== "admin") return Swal.fire("Access Denied", "Admins only", "error");
-    if (!prodName.value || !prodPrice.value || !prodStock.value) return;
-
-    await db.collection("products").add({
-        name: prodName.value,
-        buyPrice: parseFloat(prodBuyPrice.value) || 0,
-        price: parseFloat(prodPrice.value) || 0,
-        stock: parseFloat(prodStock.value) || 0, // Using parseFloat
-        min: parseFloat(prodMin.value) || 0      // Using parseFloat
-    });
-    Swal.fire("Success!", "Product added", "success");
-    prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
-};
-
-// 2. Quick Restock
-window.quickRestock = async (productId, productName) => {
-    const inputEl = document.getElementById(`restockInput-${productId}`);
-    const amountToAdd = parseFloat(inputEl.value); 
-
-    if (!amountToAdd || amountToAdd <= 0) return Swal.fire("Invalid", "Enter valid quantity", "warning");
-
-    await db.collection("products").doc(productId).update({
-        stock: firebase.firestore.FieldValue.increment(amountToAdd)
-    });
-    
-    inputEl.value = ""; 
-    Swal.fire("Restocked!", `Added to ${productName}`, "success");
-};
-
-// 3. Save Edit
-document.getElementById("saveEditBtn").onclick = async () => {
-    if (!editProductId) return;
-    await db.collection("products").doc(editProductId).update({
-        name: document.getElementById("editProdName").value,
-        buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
-        price: parseFloat(document.getElementById("editProdPrice").value),
-        stock: parseFloat(document.getElementById("editProdStock").value), 
-        min: parseFloat(document.getElementById("editProdMin").value) || 0
-    });
-    Swal.fire("Updated!", "Product details saved.", "success");
-};
-// First render function: Includes Inventory Adjustment and Reason Input
-function renderProducts(docs) {
-    const productsHead = document.getElementById("productsHead");
+    const prodBuyPrice = document.getElementById("prodBuyPrice");
+    const prodPrice = document.getElementById("prodPrice");
+    const prodStock = document.getElementById("prodStock");
+    const prodMin = document.getElementById("prodMin");
+    const addProductBtn = document.getElementById("addProductBtn");
     const productsTable = document.getElementById("productsTable");
-    const lowStockBadge = document.getElementById("lowStockBadge");
-    const lowStockWrapper = document.getElementById("lowStockWrapper");
-    
-    productsTable.innerHTML = "";
-    let lowStockItems = [];
+    let editProductId = null;
 
-    // 1. Build Header
-    let headerHTML = `<tr><th>Name</th>`;
-    if (currentRole === "admin") headerHTML += `<th>Buy</th>`;
-    headerHTML += `<th>Sell</th><th>Stock</th><th>Min</th>`;
-    if (currentRole === "admin") headerHTML += `<th>Inventory Adjustment</th><th>Actions</th>`;
-    headerHTML += `</tr>`;
-    productsHead.innerHTML = headerHTML;
+    // Safe role-checking extraction helper
+    const isAdmin = () => typeof currentRole !== 'undefined' && currentRole === 'admin';
 
-    // 2. Sort and Build Body
-    const sortedDocs = [...docs].sort((a, b) => a.data().name.localeCompare(b.data().name));
-
-    sortedDocs.forEach(doc => {
-        const p = doc.data();
-        if (p.stock <= p.min) lowStockItems.push(p);
+    /* --- GLOBAL HELPERS --- */
+    window.toFraction = function(val) {
+        const decimal = parseFloat(val);
+        if (isNaN(decimal)) return "0";
+        if (decimal % 1 === 0) return decimal.toString();
         
-        let row = `<tr><td>${p.name}</td>`;
-        if (currentRole === "admin") row += `<td>KSh ${p.buyPrice || 0}</td>`;
-        row += `<td>KSh ${p.price}</td><td>${p.stock}</td><td>${p.min}</td>`;
+        // Round to handle floating point noise
+        const rounded = Math.round(decimal * 1000) / 1000;
+        const gcd = (a, b) => (b ? gcd(b, a % b) : a);
         
-        if (currentRole === "admin") {
-            row += `
-            <td>
-                <div class="input-group input-group-sm" style="width: 250px;">
-                    <input type="number" id="restockInput-${doc.id}" class="form-control" placeholder="Qty" style="max-width: 60px;">
-                    <input type="text" id="reasonInput-${doc.id}" class="form-control" placeholder="Reason (e.g. Sale/Stock In)" style="max-width: 100px;">
-                    <button class="btn btn-sm btn-success" onclick="window.adjustStock('${doc.id}', '${p.name}', 'add')">+</button>
-                    <button class="btn btn-sm btn-danger" onclick="window.adjustStock('${doc.id}', '${p.name}', 'reduce')">-</button>
-                </div>
-            </td>
-            <td>
-                <button class="btn btn-sm btn-warning editBtn" data-id="${doc.id}">Edit</button>
-                <button class="btn btn-sm btn-danger delBtn" data-id="${doc.id}">Delete</button>
-            </td>`;
+        const denominator = 1000;
+        const numerator = Math.round(rounded * denominator);
+        const divisor = gcd(numerator, denominator);
+        
+        return `${numerator / divisor}/${denominator / divisor}`;
+    };
+
+    window.toMixedFraction = function(val) {
+        const num = parseFloat(val);
+        if (isNaN(num)) return "0";
+        const whole = Math.floor(num);
+        const fraction = num - whole;
+        
+        if (fraction === 0) return whole.toString();
+        
+        const fracStr = window.toFraction(fraction);
+        return whole > 0 ? `${whole} ${fracStr}` : fracStr;
+    };
+
+    /* --- LOG DELETE HANDLER --- */
+    window.deleteLogEntry = async (collectionName, logId) => {
+        if (!isAdmin()) {
+            return Swal.fire("Access Denied", "Admins only", "error");
         }
-        row += `</tr>`;
-        productsTable.innerHTML += row;
-    });
 
-    if (lowStockBadge && lowStockWrapper) {
-        lowStockBadge.textContent = lowStockItems.length;
-        lowStockWrapper.style.display = lowStockItems.length > 0 ? "" : "none";
+        const result = await Swal.fire({
+            title: "Are you sure?",
+            text: "This log entry will be permanently removed from history.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes, delete entry"
+        });
+
+        if (result.isConfirmed) {
+            try {
+                await db.collection(collectionName).doc(logId).delete();
+                Swal.fire("Deleted!", "Log entry removed successfully.", "success");
+            } catch (error) {
+                Swal.fire("Error", "Could not remove log: " + error.message, "error");
+            }
+        }
+    };
+
+    /* --- PRODUCT MANAGEMENT --- */
+
+    // 1. Add Product
+    if (addProductBtn) {
+        addProductBtn.onclick = async () => {
+            if (!isAdmin()) {
+                return Swal.fire("Access Denied", "Admins only", "error");
+            }
+            if (!prodName.value || !prodPrice.value || !prodStock.value) {
+                return Swal.fire("Missing Info", "Please fill out the required fields.", "warning");
+            }
+
+            const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+            const parsedStock = parseFloat(prodStock.value) || 0;
+            const pName = prodName.value;
+
+            // Save main product record
+            const docRef = await db.collection("products").add({
+                name: pName,
+                buyPrice: parseFloat(prodBuyPrice.value) || 0,
+                price: parseFloat(prodPrice.value) || 0,
+                stock: parsedStock, 
+                min: parseFloat(prodMin.value) || 0      
+            });
+
+            // Log to new products history collection
+            await db.collection("new_products_logs").add({
+                productId: docRef.id,
+                name: pName,
+                initialStock: parsedStock,
+                createdAt: timestamp
+            });
+
+            Swal.fire("Success!", "Product added", "success");
+            prodName.value = prodPrice.value = prodBuyPrice.value = prodStock.value = prodMin.value = "";
+        };
     }
-}
+
+    // 2. Quick Restock
+    window.quickRestock = async (productId, productName) => {
+        const inputEl = document.getElementById(`restockInput-${productId}`);
+        if (!inputEl) return;
+        const amountToAdd = parseFloat(inputEl.value); 
+
+        if (!amountToAdd || amountToAdd <= 0) {
+            return Swal.fire("Invalid", "Enter a valid quantity", "warning");
+        }
+
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+        // Update active database stock counter
+        await db.collection("products").doc(productId).update({
+            stock: firebase.firestore.FieldValue.increment(amountToAdd)
+        });
+        
+        // Log transaction history details
+        await db.collection("restock_logs").add({
+            productId: productId,
+            name: productName,
+            quantityAdded: amountToAdd,
+            restockedAt: timestamp
+        });
+        
+        inputEl.value = ""; 
+        Swal.fire("Restocked!", `Added ${amountToAdd} to ${productName}`, "success");
+    };
+
+    // 3. Dynamic Inventory Adjustments (+ / - buttons with reasons)
+    window.adjustStock = async (productId, productName, operationalMode) => {
+        if (!isAdmin()) return Swal.fire("Access Denied", "Admins only", "error");
+
+        const qtyEl = document.getElementById(`restockInput-${productId}`);
+        const reasonEl = document.getElementById(`reasonInput-${productId}`);
+        if (!qtyEl || !reasonEl) return;
+
+        const quantity = parseFloat(qtyEl.value);
+        const reason = reasonEl.value.trim();
+
+        if (isNaN(quantity) || quantity <= 0) {
+            return Swal.fire("Invalid Quantity", "Please enter a positive value.", "warning");
+        }
+        if (!reason) {
+            return Swal.fire("Reason Required", "Please specify a reason for adjustment.", "warning");
+        }
+
+        const targetValue = operationalMode === "add" ? quantity : -quantity;
+        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+        // Update main data counter
+        await db.collection("products").doc(productId).update({
+            stock: firebase.firestore.FieldValue.increment(targetValue)
+        });
+
+        // Add contextual details tracking entry logs
+        if (operationalMode === "add") {
+            await db.collection("restock_logs").add({
+                productId: productId,
+                name: productName,
+                quantityAdded: quantity,
+                restockedAt: timestamp
+            });
+        } else {
+            await db.collection("restock_logs").add({
+                productId: productId,
+                name: productName,
+                quantityAdded: -quantity,
+                restockedAt: timestamp
+            });
+        }
+
+        qtyEl.value = "";
+        reasonEl.value = "";
+        Swal.fire("Success", `Stock adjustment updated successfully.`, "success");
+    };
+
+    // 4. Save Edit Window Configuration
+    const saveEditBtn = document.getElementById("saveEditBtn");
+    if (saveEditBtn) {
+        saveEditBtn.onclick = async () => {
+            if (!editProductId) return;
+            await db.collection("products").doc(editProductId).update({
+                name: document.getElementById("editProdName").value,
+                buyPrice: parseFloat(document.getElementById("editProdBuyingPrice").value) || 0,
+                price: parseFloat(document.getElementById("editProdPrice").value),
+                stock: parseFloat(document.getElementById("editProdStock").value), 
+                min: parseFloat(document.getElementById("editProdMin").value) || 0
+            });
+            Swal.fire("Updated!", "Product details saved.", "success");
+        };
+    }
+
+    /* --- REAL-TIME LOGS TABLE LISTENERS --- */
+    function initLogsListeners() {
+        const restockTableBody = document.getElementById("restockLogsTableBody");
+        const newProductsTableBody = document.getElementById("newProductsTableBody");
+        const downloadRestocksBtn = document.getElementById("downloadRestocksPdfBtn");
+        const downloadNewProdsBtn = document.getElementById("downloadNewProdsPdfBtn");
+
+        if (!restockTableBody || !newProductsTableBody) return;
+
+        const formatTimestamp = (timestamp) => {
+            if (!timestamp) return '<span class="text-muted italic">Past Entry</span>';
+            try {
+                const date = timestamp.toDate();
+                return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return '<span class="text-muted italic">Past Entry</span>';
+            }
+        };
+
+        const hideBtnClass = isAdmin() ? '' : 'd-none';
+
+        // Helper function to build rows, group them by identical item names, and add styled boundaries
+        const renderGroupedLogs = (snapshot, containerEl, isNewProducts = false) => {
+            containerEl.innerHTML = "";
+            if (snapshot.empty) {
+                containerEl.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No entries found.</td></tr>`;
+                return;
+            }
+
+            // Grouping structure: { "Product Name": [doc1, doc2, ...] }
+            const groups = {};
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const itemName = data.name || 'Unknown Item';
+                if (!groups[itemName]) {
+                    groups[itemName] = [];
+                }
+                groups[itemName].push({ id: doc.id, data: data });
+            });
+
+            const totalGroups = Object.keys(groups).length;
+            let currentGroupIndex = 0;
+
+            // Loop through each product group
+            for (const itemName in groups) {
+                currentGroupIndex++;
+                const entries = groups[itemName];
+
+                entries.forEach((entry, index) => {
+                    const row = document.createElement("tr");
+                    const data = entry.data;
+                    const id = entry.id;
+
+                    // Apply a thick bottom boundary line on the LAST item of the group (except the final group)
+                    if (index === entries.length - 1 && currentGroupIndex < totalGroups) {
+                        row.style.borderBottom = "3px solid #b2bec3";
+                    }
+
+                    if (!isNewProducts) {
+                        // Restock Logic UI Rendering
+                        const qtyVal = parseFloat(data.quantityAdded) || 0;
+                        const signClass = qtyVal >= 0 ? "text-success" : "text-danger";
+                        const prefixSign = qtyVal >= 0 ? "+" : "";
+
+                        row.innerHTML = `
+                            <td>${itemName}</td>
+                            <td><span class="${signClass} font-weight-bold">${prefixSign}${window.toMixedFraction(qtyVal)}</span></td>
+                            <td>${formatTimestamp(data.restockedAt)}</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteLogEntry('restock_logs', '${id}')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </td>
+                        `;
+                    } else {
+                        // New Products Logic UI Rendering
+                        row.innerHTML = `
+                            <td>${itemName}</td>
+                            <td>${window.toMixedFraction(data.initialStock)}</td>
+                            <td>${formatTimestamp(data.createdAt)}</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteLogEntry('new_products_logs', '${id}')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </td>
+                        `;
+                    }
+                    containerEl.appendChild(row);
+                });
+            }
+        };
+
+        // Stream Restock Entries
+        db.collection("restock_logs")
+            .orderBy("restockedAt", "desc")
+            .onSnapshot(snapshot => {
+                renderGroupedLogs(snapshot, restockTableBody, false);
+            }, error => {
+                console.warn("Falling back to unordered snapshot context evaluation...", error);
+                db.collection("restock_logs").get().then(snap => {
+                    renderGroupedLogs(snap, restockTableBody, false);
+                });
+            });
+
+        // Stream New Product Additions
+        db.collection("new_products_logs")
+            .orderBy("createdAt", "desc")
+            .onSnapshot(snapshot => {
+                renderGroupedLogs(snapshot, newProductsTableBody, true);
+            }, error => {
+                console.warn("Falling back to unordered snapshot context evaluation...", error);
+                db.collection("new_products_logs").get().then(snap => {
+                    renderGroupedLogs(snap, newProductsTableBody, true);
+                });
+            });
+
+        // Download Action Triggers
+        if (downloadRestocksBtn) {
+            downloadRestocksBtn.onclick = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(18);
+                doc.text("Restocked Products History Report", 14, 20);
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 27);
+                doc.autoTable({
+                    html: '#restockLogsTable',
+                    startY: 35,
+                    columns: [
+                        { header: 'Product Name', dataKey: 'name' },
+                        { header: 'Quantity Added', dataKey: 'qty' },
+                        { header: 'Date & Time', dataKey: 'date' }
+                    ],
+                    columnsOverride: { 3: { display: false } },
+                    styles: { fontSize: 10, cellPadding: 3 },
+                    headStyles: { fillColor: [40, 167, 69] }
+                });
+                doc.save(`Restock_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+            };
+        }
+
+        if (downloadNewProdsBtn) {
+            downloadNewProdsBtn.onclick = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(18);
+                doc.text("Newly Registered Products Report", 14, 20);
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 27);
+                doc.autoTable({
+                    html: '#newProductsLogsTable',
+                    startY: 35,
+                    columns: [
+                        { header: 'Product Name', dataKey: 'name' },
+                        { header: 'Initial Stock Level', dataKey: 'stock' },
+                        { header: 'Date & Time Added', dataKey: 'date' }
+                    ],
+                    columnsOverride: { 3: { display: false } },
+                    styles: { fontSize: 10, cellPadding: 3 },
+                    headStyles: { fillColor: [0, 123, 255] }
+                });
+                doc.save(`New_Products_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+            };
+        }
+    }
+
+    // Run active tracking stream processes
+    initLogsListeners();
+
+    /* --- Primary Products Data Compilation View --- */
+    window.renderProducts = function(docs) {
+        const productsHead = document.getElementById("productsHead");
+        const productsTable = document.getElementById("productsTable");
+        const lowStockBadge = document.getElementById("lowStockBadge");
+        const lowStockWrapper = document.getElementById("lowStockWrapper");
+        
+        if (!productsTable) return; 
+
+        productsTable.innerHTML = "";
+        let lowStockItems = [];
+
+        // 1. Build Header Configuration Dynamically
+        let headerHTML = `<tr><th>Name</th>`;
+        if (isAdmin()) headerHTML += `<th>Buy</th>`;
+        headerHTML += `<th>Sell</th><th>Stock</th><th>Min</th>`;
+        if (isAdmin()) headerHTML += `<th>Inventory Adjustment</th><th>Actions</th>`;
+        headerHTML += `</tr>`;
+        
+        if (productsHead) productsHead.innerHTML = headerHTML;
+
+        // 2. Sort and Build Row Templates
+        const sortedDocs = [...docs].sort((a, b) => a.data().name.localeCompare(b.data().name));
+
+        sortedDocs.forEach(doc => {
+            const p = doc.data();
+            const id = doc.id;
+            
+            if (p.stock <= p.min) lowStockItems.push(p.name);
+            
+            let rowHTML = `<tr class="${p.stock <= p.min ? 'table-danger' : ''}"><td>${p.name}</td>`;
+            if (isAdmin()) {
+                rowHTML += `<td>KSh ${parseFloat(p.buyPrice || 0).toFixed(2)}</td>`;
+            }
+            rowHTML += `<td>KSh ${parseFloat(p.price || 0).toFixed(2)}</td>
+                       <td><strong>${window.toMixedFraction(p.stock)}</strong></td>
+                       <td>${window.toMixedFraction(p.min)}</td>`;
+            
+            if (isAdmin()) {
+                rowHTML += `
+                <td>
+                    <div class="input-group input-group-sm" style="width: 250px;">
+                        <input type="number" id="restockInput-${id}" class="form-control" placeholder="Qty" style="max-width: 60px;">
+                        <input type="text" id="reasonInput-${id}" class="form-control" placeholder="Reason" style="max-width: 100px;">
+                        <button class="btn btn-sm btn-success" onclick="window.adjustStock('${id}', '${p.name.replace(/'/g, "\\'")}', 'add')">+</button>
+                        <button class="btn btn-sm btn-danger" onclick="window.adjustStock('${id}', '${p.name.replace(/'/g, "\\'")}', 'reduce')">-</button>
+                    </div>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-warning editBtn" data-id="${id}">Edit</button>
+                    <button class="btn btn-sm btn-danger delBtn" data-id="${id}">Delete</button>
+                </td>`;
+            }
+            rowHTML += `</tr>`;
+            productsTable.innerHTML += rowHTML;
+        });
+
+        // 3. Update Low Stock Alert Metrics
+        if (lowStockBadge && lowStockWrapper) {
+            if (lowStockItems.length > 0) {
+                lowStockBadge.textContent = lowStockItems.length;
+                lowStockWrapper.style.display = "";
+                lowStockWrapper.title = "Low Stock Items:\n" + lowStockItems.join("\n");
+            } else {
+                lowStockWrapper.style.display = "none";
+            }
+        }
+
+        // 4. Bind listeners to active data target parameters
+        document.querySelectorAll(".editBtn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const targetId = e.target.getAttribute("data-id");
+                const targetDoc = docs.find(d => d.id === targetId);
+                if (!targetDoc) return;
+                
+                const dataset = targetDoc.data();
+                editProductId = targetId;
+                
+                const editProdName = document.getElementById("editProdName");
+                const editProdBuyingPrice = document.getElementById("editProdBuyingPrice");
+                const editProdPrice = document.getElementById("editProdPrice");
+                const editProdStock = document.getElementById("editProdStock");
+                const editProdMin = document.getElementById("editProdMin");
+
+                if (editProdName) editProdName.value = dataset.name || "";
+                if (editProdBuyingPrice) editProdBuyingPrice.value = dataset.buyPrice || 0;
+                if (editProdPrice) editProdPrice.value = dataset.price || 0;
+                if (editProdStock) editProdStock.value = dataset.stock || 0;
+                if (editProdMin) editProdMin.value = dataset.min || 0;
+            });
+        });
+
+        // 5. Bind listeners to active delete button targets
+        document.querySelectorAll(".delBtn").forEach(btn => {
+            btn.addEventListener("click", async (e) => {
+                const targetId = e.target.getAttribute("data-id");
+                if (!targetId) return;
+
+                const result = await Swal.fire({
+                    title: "Are you sure?",
+                    text: "This product will be permanently deleted from active inventory!",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonColor: "#d33",
+                    cancelButtonColor: "#3085d6",
+                    confirmButtonText: "Yes, delete it!"
+                });
+
+                if (result.isConfirmed) {
+                    try {
+                        await db.collection("products").doc(targetId).delete();
+                        Swal.fire("Deleted!", "The product has been removed.", "success");
+                    } catch (error) {
+                        Swal.fire("Error", "Could not remove product: " + error.message, "error");
+                    }
+                }
+            });
+        });
+    };
 
 // 5. Initialize
 db.collection("products").onSnapshot(snap => {
