@@ -297,55 +297,46 @@
     </div>
   </div>
 </div>
-<!-- Tab Content Wrapper Pane -->
 <div class="tab-pane fade" id="inflowLogsTab" role="tabpanel">
     <div id="productLogsPage" class="dashboard-page p-3">
-        <h2>Product Inflow Logs</h2>
-        <hr>
-
-        <!-- Section 1: Restocks -->
+        <!--stock logs-->
+        <!-- Header & Top Global Actions -->
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h3>Restocked Products History</h3>
-            <button class="btn btn-sm btn-success" id="downloadRestocksPdfBtn">
-                <i class="fas fa-file-pdf"></i> Download Restocks PDF
-            </button>
+            <h2>Product Inflow Logs</h2>
+            <div>
+                <button class="btn btn-sm btn-success me-2" id="downloadRestocksPdfBtn">
+                    <i class="fas fa-file-pdf me-1"></i> Download Restocks PDF
+                </button>
+                <button class="btn btn-sm btn-primary" id="downloadNewProdsPdfBtn">
+                    <i class="fas fa-file-pdf me-1"></i> Download New Products PDF
+                </button>
+            </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle" id="restockLogsTable">
-                <thead>
-                    <tr>
-                        <th>Product Name</th>
-                        <th>Quantity Added</th>
-                        <th>Date & Time</th>
-                        <th class="text-end">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="restockLogsTableBody"></tbody>
-            </table>
+        <hr class="mb-4">
+
+        <!-- SECTION A: RESTOCKED PRODUCTS (Grouped dynamically by Date) -->
+        <div class="mb-5">
+            <h3 class="mb-3 text-primary"><i class="fas fa-boxes me-2"></i>Restocked Products History</h3>
+            <div id="restockDateTablesContainer">
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin me-2"></i> Loading restock logs...
+                </div>
+            </div>
         </div>
 
-        <!-- Section 2: New Products -->
-        <div class="d-flex justify-content-between align-items-center mt-5 mb-2">
-            <h3>Newly Registered Products</h3>
-            <button class="btn btn-sm btn-primary" id="downloadNewProdsPdfBtn">
-                <i class="fas fa-file-pdf"></i> Download New Products PDF
-            </button>
+        <!-- SECTION B: NEWLY REGISTERED PRODUCTS (Grouped dynamically by Date) -->
+        <div class="mb-4">
+            <h3 class="mb-3 text-info"><i class="fas fa-folder-plus me-2"></i>Newly Registered Products History</h3>
+            <div id="newProductsDateTablesContainer">
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin me-2"></i> Loading new product logs...
+                </div>
+            </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle" id="newProductsLogsTable">
-                <thead>
-                    <tr>
-                        <th>Product Name</th>
-                        <th>Initial Stock Level</th>
-                        <th>Date & Time Added</th>
-                        <th class="text-end">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="newProductsTableBody"></tbody>
-            </table>
-        </div>
+
     </div>
 </div>
+
       <!-- Customers -->
       <div class="tab-pane fade" id="customersTab">
         <h5>Customers</h5>
