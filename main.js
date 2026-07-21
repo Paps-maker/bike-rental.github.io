@@ -758,74 +758,182 @@ function initDashboard() {
         };
     }
 
-    /* --- REAL-TIME LOGS TABLE LISTENERS --- */
-    function initLogsListeners() {
-        const restockTableBody = document.getElementById("restockLogsTableBody");
-        const newProductsTableBody = document.getElementById("newProductsTableBody");
-        const downloadRestocksBtn = document.getElementById("downloadRestocksPdfBtn");
-        const downloadNewProdsBtn = document.getElementById("downloadNewProdsPdfBtn");
+   /* --- REAL-TIME LOGS TABLE LISTENERS --- */
+function initLogsListeners() {
+    const restockContainer = document.getElementById("restockDateTablesContainer");
+    const newProductsContainer = document.getElementById("newProductsDateTablesContainer");
+    const downloadRestocksBtn = document.getElementById("downloadRestocksPdfBtn");
+    const downloadNewProdsBtn = document.getElementById("downloadNewProdsPdfBtn");
 
-        if (!restockTableBody || !newProductsTableBody) return;
+    if (!restockContainer || !newProductsContainer) return;
 
-        const formatTimestamp = (timestamp) => {
-            if (!timestamp) return '<span class="text-muted italic">Past Entry</span>';
-            try {
-                const date = timestamp.toDate();
-                return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            } catch (e) {
-                return '<span class="text-muted italic">Past Entry</span>';
-            }
-        };
+    // Helper: Safely convert Firebase Timestamp to JS Date object
+    const getJsDate = (timestamp) => {
+        if (!timestamp) return null;
+        try {
+            return timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        } catch (e) {
+            return null;
+        }
+    };
 
-        const hideBtnClass = isAdmin() ? '' : 'd-none';
+    // Helper: Format Time string for individual table rows
+    const formatTimeOnly = (dateObj) => {
+        if (!dateObj) return '<span class="text-muted italic">Past Entry</span>';
+        return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
 
-        // Helper function to build rows, group them by identical item names, and add styled boundaries
-        const renderGroupedLogs = (snapshot, containerEl, isNewProducts = false) => {
-            containerEl.innerHTML = "";
-            if (snapshot.empty) {
-                containerEl.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No entries found.</td></tr>`;
-                return;
-            }
+    // Helper: Format Date header string (e.g. "July 21, 2026")
+    const formatDateHeader = (dateObj) => {
+        if (!dateObj) return "Past Entries / Undated";
+        return dateObj.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
 
-            // Grouping structure: { "Product Name": [doc1, doc2, ...] }
-            const groups = {};
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const itemName = data.name || 'Unknown Item';
-                if (!groups[itemName]) {
-                    groups[itemName] = [];
-                }
-                groups[itemName].push({ id: doc.id, data: data });
+    const hideBtnClass = (typeof isAdmin === 'function' && isAdmin()) ? '' : 'd-none';
+
+    // PDF Export Helper for a Single Date Table
+    window.downloadSingleTablePdf = (tableId, dateTitle, reportType) => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const tableEl = document.getElementById(tableId);
+
+        if (!tableEl) return;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text(`${reportType} - ${dateTitle}`, 14, 18);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 25);
+
+        doc.autoTable({
+            html: `#${tableId}`,
+            startY: 30,
+            columnsOverride: { 3: { display: false } }, // Exclude Action Column
+            styles: { fontSize: 10, cellPadding: 3 },
+            headStyles: { fillColor: reportType.includes("Restock") ? [40, 167, 69] : [0, 123, 255] }
+        });
+
+        const safeFilename = `${reportType.replace(/\s+/g, '_')}_${dateTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+        doc.save(safeFilename);
+    };
+
+    // Core function: Group logs by Date & Product Name, then render tables
+    const renderDateGroupedTables = (snapshot, parentContainer, isNewProducts = false) => {
+        parentContainer.innerHTML = "";
+
+        if (snapshot.empty) {
+            parentContainer.innerHTML = `<div class="text-muted text-center py-4 border rounded bg-light">No log entries found.</div>`;
+            return;
+        }
+
+        // Grouping: { "July 21, 2026": { "Item A": [doc1, doc2] } }
+        const dateGroups = {};
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // Fallback for createdAt / restockedAt timestamps
+            const rawTimestamp = isNewProducts 
+                ? (data.createdAt || data.timestamp || data.restockedAt) 
+                : (data.restockedAt || data.timestamp || data.createdAt);
+            
+            const dateObj = getJsDate(rawTimestamp);
+            const dateKey = formatDateHeader(dateObj);
+            const itemName = data.name || data.productName || 'Unknown Item';
+
+            if (!dateGroups[dateKey]) dateGroups[dateKey] = {};
+            if (!dateGroups[dateKey][itemName]) dateGroups[dateKey][itemName] = [];
+
+            dateGroups[dateKey][itemName].push({
+                id: doc.id,
+                data: data,
+                dateObj: dateObj
             });
+        });
 
-            const totalGroups = Object.keys(groups).length;
+        const todayStr = formatDateHeader(new Date());
+
+        // Iterate through each Date group
+        let tableCounter = 0;
+        for (const dateKey in dateGroups) {
+            tableCounter++;
+            const isToday = (dateKey === todayStr);
+            const itemGroups = dateGroups[dateKey];
+            const prefix = isNewProducts ? 'newprod' : 'restock';
+            const tableId = `${prefix}_table_${tableCounter}_${Date.now()}`;
+            const reportTitle = isNewProducts ? "New Products Log" : "Restock Log";
+
+            const dateCard = document.createElement("div");
+            dateCard.className = "mb-4 border rounded p-3 bg-white shadow-sm";
+
+            // Header with title, record count badge, AND individual table PDF download button
+            const headerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h5 class="${isToday ? 'text-primary fw-bold' : 'text-secondary'} mb-0">
+                        <i class="fas ${isToday ? 'fa-calendar-day' : 'fa-calendar-alt'} me-2"></i>
+                        ${isToday ? `Today (${dateKey})` : dateKey}
+                        <span class="badge ${isToday ? 'bg-primary' : 'bg-secondary'} ms-2">
+                            ${Object.values(itemGroups).reduce((sum, arr) => sum + arr.length, 0)} Record(s)
+                        </span>
+                    </h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="downloadSingleTablePdf('${tableId}', '${dateKey}', '${reportTitle}')">
+                        <i class="fas fa-file-pdf me-1"></i> PDF for this Date
+                    </button>
+                </div>
+            `;
+
+            const tableHTML = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle mb-0" id="${tableId}">
+                        <thead class="${isToday ? (isNewProducts ? 'table-info' : 'table-primary') : 'table-light'}">
+                            <tr>
+                                <th>Product Name</th>
+                                <th>${isNewProducts ? 'Initial Stock Level' : 'Quantity Added'}</th>
+                                <th>Time Logged</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="dateTableBody"></tbody>
+                    </table>
+                </div>
+            `;
+
+            dateCard.innerHTML = headerHTML + tableHTML;
+            const tbody = dateCard.querySelector(".dateTableBody");
+
+            // Populate rows
+            const totalItemGroups = Object.keys(itemGroups).length;
             let currentGroupIndex = 0;
 
-            // Loop through each product group
-            for (const itemName in groups) {
+            for (const itemName in itemGroups) {
                 currentGroupIndex++;
-                const entries = groups[itemName];
+                const entries = itemGroups[itemName];
 
                 entries.forEach((entry, index) => {
                     const row = document.createElement("tr");
                     const data = entry.data;
                     const id = entry.id;
 
-                    // Apply a thick bottom boundary line on the LAST item of the group (except the final group)
-                    if (index === entries.length - 1 && currentGroupIndex < totalGroups) {
+                    // Group boundary line
+                    if (index === entries.length - 1 && currentGroupIndex < totalItemGroups) {
                         row.style.borderBottom = "3px solid #b2bec3";
                     }
 
                     if (!isNewProducts) {
-                        // Restock Logic UI Rendering
+                        // Restock Details
                         const qtyVal = parseFloat(data.quantityAdded) || 0;
                         const signClass = qtyVal >= 0 ? "text-success" : "text-danger";
                         const prefixSign = qtyVal >= 0 ? "+" : "";
+                        const formattedQty = window.toMixedFraction ? window.toMixedFraction(qtyVal) : qtyVal;
 
                         row.innerHTML = `
                             <td>${itemName}</td>
-                            <td><span class="${signClass} font-weight-bold">${prefixSign}${window.toMixedFraction(qtyVal)}</span></td>
-                            <td>${formatTimestamp(data.restockedAt)}</td>
+                            <td><span class="${signClass} font-weight-bold">${prefixSign}${formattedQty}</span></td>
+                            <td>${formatTimeOnly(entry.dateObj)}</td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteLogEntry('restock_logs', '${id}')">
                                     <i class="fas fa-trash"></i> Delete
@@ -833,11 +941,14 @@ function initDashboard() {
                             </td>
                         `;
                     } else {
-                        // New Products Logic UI Rendering
+                        // New Product Details
+                        const initialStockVal = data.initialStock !== undefined ? data.initialStock : (data.quantity || 0);
+                        const formattedStock = window.toMixedFraction ? window.toMixedFraction(initialStockVal) : initialStockVal;
+
                         row.innerHTML = `
                             <td>${itemName}</td>
-                            <td>${window.toMixedFraction(data.initialStock)}</td>
-                            <td>${formatTimestamp(data.createdAt)}</td>
+                            <td><span class="fw-bold text-dark">${formattedStock}</span></td>
+                            <td>${formatTimeOnly(entry.dateObj)}</td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteLogEntry('new_products_logs', '${id}')">
                                     <i class="fas fa-trash"></i> Delete
@@ -845,91 +956,88 @@ function initDashboard() {
                             </td>
                         `;
                     }
-                    containerEl.appendChild(row);
+
+                    tbody.appendChild(row);
                 });
             }
+
+            parentContainer.appendChild(dateCard);
+        }
+    };
+
+    // Stream Restock Entries
+    db.collection("restock_logs")
+        .orderBy("restockedAt", "desc")
+        .onSnapshot(snapshot => {
+            renderDateGroupedTables(snapshot, restockContainer, false);
+        }, error => {
+            console.warn("Restock logs ordered listener error, retrying unordered fallback...", error);
+            db.collection("restock_logs").get().then(snap => {
+                renderDateGroupedTables(snap, restockContainer, false);
+            });
+        });
+
+    // Stream New Product Additions
+    db.collection("new_products_logs")
+        .orderBy("createdAt", "desc")
+        .onSnapshot(snapshot => {
+            renderDateGroupedTables(snapshot, newProductsContainer, true);
+        }, error => {
+            console.warn("New products logs ordered listener error, retrying unordered fallback...", error);
+            db.collection("new_products_logs").get().then(snap => {
+                renderDateGroupedTables(snap, newProductsContainer, true);
+            });
+        });
+
+    // Download ALL tables in a container into a single combined PDF
+    const exportContainerToPdf = (containerEl, title, filenamePrefix, headerBgColor) => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text(title, 14, 20);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 27);
+
+        let currentY = 35;
+        const tables = containerEl.querySelectorAll("table");
+
+        if (tables.length === 0) {
+            doc.text("No log records available to export.", 14, currentY);
+        } else {
+            tables.forEach((tableEl) => {
+                doc.autoTable({
+                    html: `#${tableEl.id}`,
+                    startY: currentY,
+                    columnsOverride: { 3: { display: false } }, // Exclude Action Column
+                    styles: { fontSize: 10, cellPadding: 3 },
+                    headStyles: { fillColor: headerBgColor }
+                });
+                currentY = doc.lastAutoTable.finalY + 10;
+            });
+        }
+
+        doc.save(`${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    };
+
+    // Global Container PDF Exports
+    if (downloadRestocksBtn) {
+        downloadRestocksBtn.onclick = () => {
+            exportContainerToPdf(restockContainer, "Restocked Products History Report", "Restock_Report", [40, 167, 69]);
         };
-
-        // Stream Restock Entries
-        db.collection("restock_logs")
-            .orderBy("restockedAt", "desc")
-            .onSnapshot(snapshot => {
-                renderGroupedLogs(snapshot, restockTableBody, false);
-            }, error => {
-                console.warn("Falling back to unordered snapshot context evaluation...", error);
-                db.collection("restock_logs").get().then(snap => {
-                    renderGroupedLogs(snap, restockTableBody, false);
-                });
-            });
-
-        // Stream New Product Additions
-        db.collection("new_products_logs")
-            .orderBy("createdAt", "desc")
-            .onSnapshot(snapshot => {
-                renderGroupedLogs(snapshot, newProductsTableBody, true);
-            }, error => {
-                console.warn("Falling back to unordered snapshot context evaluation...", error);
-                db.collection("new_products_logs").get().then(snap => {
-                    renderGroupedLogs(snap, newProductsTableBody, true);
-                });
-            });
-
-        // Download Action Triggers
-        if (downloadRestocksBtn) {
-            downloadRestocksBtn.onclick = () => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(18);
-                doc.text("Restocked Products History Report", 14, 20);
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(10);
-                doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 27);
-                doc.autoTable({
-                    html: '#restockLogsTable',
-                    startY: 35,
-                    columns: [
-                        { header: 'Product Name', dataKey: 'name' },
-                        { header: 'Quantity Added', dataKey: 'qty' },
-                        { header: 'Date & Time', dataKey: 'date' }
-                    ],
-                    columnsOverride: { 3: { display: false } },
-                    styles: { fontSize: 10, cellPadding: 3 },
-                    headStyles: { fillColor: [40, 167, 69] }
-                });
-                doc.save(`Restock_Report_${new Date().toISOString().slice(0,10)}.pdf`);
-            };
-        }
-
-        if (downloadNewProdsBtn) {
-            downloadNewProdsBtn.onclick = () => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(18);
-                doc.text("Newly Registered Products Report", 14, 20);
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(10);
-                doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 27);
-                doc.autoTable({
-                    html: '#newProductsLogsTable',
-                    startY: 35,
-                    columns: [
-                        { header: 'Product Name', dataKey: 'name' },
-                        { header: 'Initial Stock Level', dataKey: 'stock' },
-                        { header: 'Date & Time Added', dataKey: 'date' }
-                    ],
-                    columnsOverride: { 3: { display: false } },
-                    styles: { fontSize: 10, cellPadding: 3 },
-                    headStyles: { fillColor: [0, 123, 255] }
-                });
-                doc.save(`New_Products_Report_${new Date().toISOString().slice(0,10)}.pdf`);
-            };
-        }
     }
 
-    // Run active tracking stream processes
-    initLogsListeners();
+    if (downloadNewProdsBtn) {
+        downloadNewProdsBtn.onclick = () => {
+            exportContainerToPdf(newProductsContainer, "Newly Registered Products Report", "New_Products_Report", [0, 123, 255]);
+        };
+    }
+}
+
+// Run active tracking stream processes
+initLogsListeners();
 
     /* --- Primary Products Data Compilation View --- */
     window.renderProducts = function(docs) {
