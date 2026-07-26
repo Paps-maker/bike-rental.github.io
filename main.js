@@ -758,7 +758,7 @@ function initDashboard() {
         };
     }
 
-   /* --- REAL-TIME LOGS TABLE LISTENERS --- */
+ /* --- REAL-TIME LOGS TABLE LISTENERS --- */
 function initLogsListeners() {
     const restockContainer = document.getElementById("restockDateTablesContainer");
     const newProductsContainer = document.getElementById("newProductsDateTablesContainer");
@@ -783,7 +783,7 @@ function initLogsListeners() {
         return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    // Helper: Format Date header string (e.g. "July 21, 2026")
+    // Helper: Format Date header string (e.g. "July 26, 2026")
     const formatDateHeader = (dateObj) => {
         if (!dateObj) return "Past Entries / Undated";
         return dateObj.toLocaleDateString('en-US', {
@@ -794,6 +794,25 @@ function initLogsListeners() {
     };
 
     const hideBtnClass = (typeof isAdmin === 'function' && isAdmin()) ? '' : 'd-none';
+
+    // Global cache map to store currently available stock levels: { "COUNTY 250ML": 15, "productId123": 20 }
+    const currentStockMap = {};
+
+    // 1. Live listener to keep product stocks up-to-date in real time
+    db.collection("products").onSnapshot(snapshot => {
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const currentStock = parseFloat(data.stock || 0);
+            
+            // Map by Document ID
+            currentStockMap[doc.id] = currentStock;
+            
+            // Map by Product Name
+            if (data.name) {
+                currentStockMap[data.name.trim()] = currentStock;
+            }
+        });
+    }, err => console.warn("Error listening to products stock:", err));
 
     // PDF Export Helper for a Single Date Table
     window.downloadSingleTablePdf = (tableId, dateTitle, reportType) => {
@@ -813,7 +832,7 @@ function initLogsListeners() {
         doc.autoTable({
             html: `#${tableId}`,
             startY: 30,
-            columnsOverride: { 3: { display: false } }, // Exclude Action Column
+            columnsOverride: { 5: { display: false } }, // Exclude Action Column
             styles: { fontSize: 10, cellPadding: 3 },
             headStyles: { fillColor: reportType.includes("Restock") ? [40, 167, 69] : [0, 123, 255] }
         });
@@ -831,12 +850,11 @@ function initLogsListeners() {
             return;
         }
 
-        // Grouping: { "July 21, 2026": { "Item A": [doc1, doc2] } }
+        // Grouping: { "July 26, 2026": { "Item A": [doc1, doc2] } }
         const dateGroups = {};
 
         snapshot.forEach(doc => {
             const data = doc.data();
-            // Fallback for createdAt / restockedAt timestamps
             const rawTimestamp = isNewProducts 
                 ? (data.createdAt || data.timestamp || data.restockedAt) 
                 : (data.restockedAt || data.timestamp || data.createdAt);
@@ -870,7 +888,6 @@ function initLogsListeners() {
             const dateCard = document.createElement("div");
             dateCard.className = "mb-4 border rounded p-3 bg-white shadow-sm";
 
-            // Header with title, record count badge, AND individual table PDF download button
             const headerHTML = `
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <h5 class="${isToday ? 'text-primary fw-bold' : 'text-secondary'} mb-0">
@@ -892,7 +909,9 @@ function initLogsListeners() {
                         <thead class="${isToday ? (isNewProducts ? 'table-info' : 'table-primary') : 'table-light'}">
                             <tr>
                                 <th>Product Name</th>
-                                <th>${isNewProducts ? 'Initial Stock Level' : 'Quantity Added'}</th>
+                                <th>Currently Available Stock</th>
+                                <th>${isNewProducts ? 'Initial Added' : 'Quantity Added'}</th>
+                                <th>Total Available</th>
                                 <th>Time Logged</th>
                                 <th class="text-end">Action</th>
                             </tr>
@@ -918,21 +937,39 @@ function initLogsListeners() {
                     const data = entry.data;
                     const id = entry.id;
 
-                    // Group boundary line
                     if (index === entries.length - 1 && currentGroupIndex < totalItemGroups) {
                         row.style.borderBottom = "3px solid #b2bec3";
+                    }
+
+                    // Look up current live stock from Map (by ID or Product Name)
+                    const pId = data.productId || id;
+                    let currentStockVal = 0;
+
+                    if (currentStockMap[pId] !== undefined) {
+                        currentStockVal = currentStockMap[pId];
+                    } else if (currentStockMap[itemName.trim()] !== undefined) {
+                        currentStockVal = currentStockMap[itemName.trim()];
+                    } else if (data.previousStock !== undefined) {
+                        currentStockVal = parseFloat(data.previousStock) || 0;
                     }
 
                     if (!isNewProducts) {
                         // Restock Details
                         const qtyVal = parseFloat(data.quantityAdded) || 0;
+                        const totalStockVal = currentStockVal + qtyVal;
+
                         const signClass = qtyVal >= 0 ? "text-success" : "text-danger";
                         const prefixSign = qtyVal >= 0 ? "+" : "";
+
+                        const formattedCurrent = window.toMixedFraction ? window.toMixedFraction(currentStockVal) : currentStockVal;
                         const formattedQty = window.toMixedFraction ? window.toMixedFraction(qtyVal) : qtyVal;
+                        const formattedTotal = window.toMixedFraction ? window.toMixedFraction(totalStockVal) : totalStockVal;
 
                         row.innerHTML = `
                             <td>${itemName}</td>
-                            <td><span class="${signClass} font-weight-bold">${prefixSign}${formattedQty}</span></td>
+                            <td><span class="text-dark fw-bold">${formattedCurrent}</span></td>
+                            <td><span class="${signClass} fw-bold">${prefixSign}${formattedQty}</span></td>
+                            <td><span class="text-primary fw-bold">${formattedTotal}</span></td>
                             <td>${formatTimeOnly(entry.dateObj)}</td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteLogEntry('restock_logs', '${id}')">
@@ -942,12 +979,18 @@ function initLogsListeners() {
                         `;
                     } else {
                         // New Product Details
-                        const initialStockVal = data.initialStock !== undefined ? data.initialStock : (data.quantity || 0);
-                        const formattedStock = window.toMixedFraction ? window.toMixedFraction(initialStockVal) : initialStockVal;
+                        const initialStockVal = parseFloat(data.initialStock !== undefined ? data.initialStock : (data.quantity || 0)) || 0;
+                        const totalStockVal = currentStockVal + initialStockVal;
+
+                        const formattedCurrent = window.toMixedFraction ? window.toMixedFraction(currentStockVal) : currentStockVal;
+                        const formattedAdded = window.toMixedFraction ? window.toMixedFraction(initialStockVal) : initialStockVal;
+                        const formattedTotal = window.toMixedFraction ? window.toMixedFraction(totalStockVal) : totalStockVal;
 
                         row.innerHTML = `
                             <td>${itemName}</td>
-                            <td><span class="fw-bold text-dark">${formattedStock}</span></td>
+                            <td><span class="text-dark fw-bold">${formattedCurrent}</span></td>
+                            <td><span class="text-success fw-bold">+${formattedAdded}</span></td>
+                            <td><span class="text-primary fw-bold">${formattedTotal}</span></td>
                             <td>${formatTimeOnly(entry.dateObj)}</td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteLogEntry('new_products_logs', '${id}')">
@@ -989,7 +1032,7 @@ function initLogsListeners() {
             });
         });
 
-    // Download ALL tables in a container into a single combined PDF
+    // Global Container PDF Exports
     const exportContainerToPdf = (containerEl, title, filenamePrefix, headerBgColor) => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -1011,7 +1054,7 @@ function initLogsListeners() {
                 doc.autoTable({
                     html: `#${tableEl.id}`,
                     startY: currentY,
-                    columnsOverride: { 3: { display: false } }, // Exclude Action Column
+                    columnsOverride: { 5: { display: false } },
                     styles: { fontSize: 10, cellPadding: 3 },
                     headStyles: { fillColor: headerBgColor }
                 });
@@ -1022,7 +1065,6 @@ function initLogsListeners() {
         doc.save(`${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`);
     };
 
-    // Global Container PDF Exports
     if (downloadRestocksBtn) {
         downloadRestocksBtn.onclick = () => {
             exportContainerToPdf(restockContainer, "Restocked Products History Report", "Restock_Report", [40, 167, 69]);
