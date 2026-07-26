@@ -758,6 +758,37 @@ function initDashboard() {
         };
     }
 
+/* --- GLOBAL HELPER: DELETE ENTIRE DATE GROUP OF LOGS --- */
+window.deleteDateGroupLogs = async function(collectionName, idsJsonString, dateTitle) {
+    let logIds = [];
+    try {
+        logIds = JSON.parse(decodeURIComponent(idsJsonString));
+    } catch (e) {
+        console.error("Failed to parse log IDs array", e);
+        return;
+    }
+
+    if (!logIds || logIds.length === 0) return;
+
+    const confirmMsg = `Are you sure you want to delete all ${logIds.length} record(s) for "${dateTitle}"? This action cannot be undone.`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        // Use Firestore WriteBatch for efficient bulk deletion (up to 500 operations per batch)
+        const batch = db.batch();
+        logIds.forEach(id => {
+            const docRef = db.collection(collectionName).doc(id);
+            batch.delete(docRef);
+        });
+
+        await batch.commit();
+        console.log(`Successfully deleted ${logIds.length} entries from ${collectionName}.`);
+    } catch (err) {
+        console.error(`Error deleting date group entries from ${collectionName}:`, err);
+        alert(`Failed to delete records: ${err.message}`);
+    }
+};
+
 /* --- REAL-TIME LOGS TABLE LISTENERS --- */
 function initLogsListeners() {
     const restockContainer = document.getElementById("restockDateTablesContainer");
@@ -884,6 +915,16 @@ function initLogsListeners() {
             const prefix = isNewProducts ? 'newprod' : 'restock';
             const tableId = `${prefix}_table_${tableCounter}_${Date.now()}`;
             const reportTitle = isNewProducts ? "New Products Log" : "Restock Log";
+            const targetCollection = isNewProducts ? "new_products_logs" : "restock_logs";
+
+            // Gather all document IDs for this date group
+            const allDateGroupIds = [];
+            Object.values(itemGroups).forEach(groupEntries => {
+                groupEntries.forEach(entry => allDateGroupIds.push(entry.id));
+            });
+
+            // Safely encode JSON string of IDs for HTML attribute inline handler
+            const encodedIdsJson = encodeURIComponent(JSON.stringify(allDateGroupIds));
 
             const dateCard = document.createElement("div");
             dateCard.className = "mb-4 border rounded p-3 bg-white shadow-sm";
@@ -894,12 +935,17 @@ function initLogsListeners() {
                         <i class="fas ${isToday ? 'fa-calendar-day' : 'fa-calendar-alt'} me-2"></i>
                         ${isToday ? `Today (${dateKey})` : dateKey}
                         <span class="badge ${isToday ? 'bg-primary' : 'bg-secondary'} ms-2">
-                            ${Object.values(itemGroups).reduce((sum, arr) => sum + arr.length, 0)} Record(s)
+                            ${allDateGroupIds.length} Record(s)
                         </span>
                     </h5>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="downloadSingleTablePdf('${tableId}', '${dateKey}', '${reportTitle}')">
-                        <i class="fas fa-file-pdf me-1"></i> PDF for this Date
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="downloadSingleTablePdf('${tableId}', '${dateKey}', '${reportTitle}')">
+                            <i class="fas fa-file-pdf me-1"></i> PDF for this Date
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger ${hideBtnClass}" onclick="deleteDateGroupLogs('${targetCollection}', '${encodedIdsJson}', '${dateKey}')">
+                            <i class="fas fa-trash me-1"></i> Delete Date Group
+                        </button>
+                    </div>
                 </div>
             `;
 
