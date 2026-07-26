@@ -758,7 +758,7 @@ function initDashboard() {
         };
     }
 
- /* --- REAL-TIME LOGS TABLE LISTENERS --- */
+/* --- REAL-TIME LOGS TABLE LISTENERS --- */
 function initLogsListeners() {
     const restockContainer = document.getElementById("restockDateTablesContainer");
     const newProductsContainer = document.getElementById("newProductsDateTablesContainer");
@@ -795,7 +795,7 @@ function initLogsListeners() {
 
     const hideBtnClass = (typeof isAdmin === 'function' && isAdmin()) ? '' : 'd-none';
 
-    // Global cache map to store currently available stock levels: { "COUNTY 250ML": 15, "productId123": 20 }
+    // Global cache map to store live database stock levels
     const currentStockMap = {};
 
     // 1. Live listener to keep product stocks up-to-date in real time
@@ -909,9 +909,9 @@ function initLogsListeners() {
                         <thead class="${isToday ? (isNewProducts ? 'table-info' : 'table-primary') : 'table-light'}">
                             <tr>
                                 <th>Product Name</th>
-                                <th>Currently Available Stock</th>
+                                <th>Stock Before Addition</th>
                                 <th>${isNewProducts ? 'Initial Added' : 'Quantity Added'}</th>
-                                <th>Total Available</th>
+                                <th>Total Stock After</th>
                                 <th>Time Logged</th>
                                 <th class="text-end">Action</th>
                             </tr>
@@ -941,33 +941,40 @@ function initLogsListeners() {
                         row.style.borderBottom = "3px solid #b2bec3";
                     }
 
-                    // Look up current live stock from Map (by ID or Product Name)
+                    // Look up current live database stock
                     const pId = data.productId || id;
-                    let currentStockVal = 0;
+                    let dbStockVal = 0;
 
                     if (currentStockMap[pId] !== undefined) {
-                        currentStockVal = currentStockMap[pId];
+                        dbStockVal = currentStockMap[pId];
                     } else if (currentStockMap[itemName.trim()] !== undefined) {
-                        currentStockVal = currentStockMap[itemName.trim()];
-                    } else if (data.previousStock !== undefined) {
-                        currentStockVal = parseFloat(data.previousStock) || 0;
+                        dbStockVal = currentStockMap[itemName.trim()];
                     }
 
                     if (!isNewProducts) {
-                        // Restock Details
+                        // Restock Logic
                         const qtyVal = parseFloat(data.quantityAdded) || 0;
-                        const totalStockVal = currentStockVal + qtyVal;
+
+                        // Total Stock AFTER addition is what's stored in live DB
+                        let totalStockVal = (data.afterStock !== undefined) 
+                            ? parseFloat(data.afterStock) 
+                            : dbStockVal;
+
+                        // Stock BEFORE addition = Total Stock - Quantity Added
+                        let stockBeforeVal = (data.previousStock !== undefined) 
+                            ? parseFloat(data.previousStock) 
+                            : (totalStockVal - qtyVal);
 
                         const signClass = qtyVal >= 0 ? "text-success" : "text-danger";
                         const prefixSign = qtyVal >= 0 ? "+" : "";
 
-                        const formattedCurrent = window.toMixedFraction ? window.toMixedFraction(currentStockVal) : currentStockVal;
+                        const formattedBefore = window.toMixedFraction ? window.toMixedFraction(stockBeforeVal) : stockBeforeVal;
                         const formattedQty = window.toMixedFraction ? window.toMixedFraction(qtyVal) : qtyVal;
                         const formattedTotal = window.toMixedFraction ? window.toMixedFraction(totalStockVal) : totalStockVal;
 
                         row.innerHTML = `
                             <td>${itemName}</td>
-                            <td><span class="text-dark fw-bold">${formattedCurrent}</span></td>
+                            <td><span class="text-dark fw-bold">${formattedBefore}</span></td>
                             <td><span class="${signClass} fw-bold">${prefixSign}${formattedQty}</span></td>
                             <td><span class="text-primary fw-bold">${formattedTotal}</span></td>
                             <td>${formatTimeOnly(entry.dateObj)}</td>
@@ -978,17 +985,20 @@ function initLogsListeners() {
                             </td>
                         `;
                     } else {
-                        // New Product Details
+                        // New Product Logic
                         const initialStockVal = parseFloat(data.initialStock !== undefined ? data.initialStock : (data.quantity || 0)) || 0;
-                        const totalStockVal = currentStockVal + initialStockVal;
+                        
+                        // Newly registered items start with 0 stock before creation
+                        const stockBeforeVal = 0;
+                        const totalStockVal = dbStockVal > 0 ? dbStockVal : initialStockVal;
 
-                        const formattedCurrent = window.toMixedFraction ? window.toMixedFraction(currentStockVal) : currentStockVal;
+                        const formattedBefore = window.toMixedFraction ? window.toMixedFraction(stockBeforeVal) : stockBeforeVal;
                         const formattedAdded = window.toMixedFraction ? window.toMixedFraction(initialStockVal) : initialStockVal;
                         const formattedTotal = window.toMixedFraction ? window.toMixedFraction(totalStockVal) : totalStockVal;
 
                         row.innerHTML = `
                             <td>${itemName}</td>
-                            <td><span class="text-dark fw-bold">${formattedCurrent}</span></td>
+                            <td><span class="text-dark fw-bold">${formattedBefore}</span></td>
                             <td><span class="text-success fw-bold">+${formattedAdded}</span></td>
                             <td><span class="text-primary fw-bold">${formattedTotal}</span></td>
                             <td>${formatTimeOnly(entry.dateObj)}</td>
@@ -1080,7 +1090,6 @@ function initLogsListeners() {
 
 // Run active tracking stream processes
 initLogsListeners();
-
     /* --- Primary Products Data Compilation View --- */
     window.renderProducts = function(docs) {
         const productsHead = document.getElementById("productsHead");
