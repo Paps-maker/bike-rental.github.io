@@ -2490,3 +2490,23 @@ window.deleteStaffUser = async (docId) => {
         Swal.fire("Action Error", err.message, "error");
     }
 };
+document.addEventListener("DOMContentLoaded", function () {
+  const backToTopBtn = document.getElementById("backToTopBtn");
+
+  // Show/Hide button based on window scroll position
+  window.addEventListener("scroll", function () {
+    if (window.scrollY > 250) {
+      backToTopBtn.classList.add("show");
+    } else {
+      backToTopBtn.classList.remove("show");
+    }
+  });
+
+  // Smooth scroll back to top on click
+  backToTopBtn.addEventListener("click", function () {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  });
+});
