@@ -96,7 +96,44 @@
 
 /* Ensure the icon fits nicely */
 .gap-2 { gap: 0.5rem; }
+  /* Floating Back-to-Top Arrow Button */
+#backToTopBtn {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  z-index: 1050; /* Above table elements and overlays */
+  width: 48px;
+  height: 48px;
+  background-color: #d4a373; /* Custom Gold Accent */
+  color: #000000;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+
+#backToTopBtn:hover {
+  background-color: #c48c59;
+  color: #ffffff;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Show button class when scrolling down */
+#backToTopBtn.show {
+  opacity: 1;
+  visibility: visible;
+}
 </style>
+  <!-- Font Awesome CDN for Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -336,7 +373,10 @@
 
     </div>
 </div>
-
+<!-- Floating Back to Top Button -->
+<button id="backToTopBtn" aria-label="Scroll to top" title="Go to top">
+  <span style="font-size: 1.4rem; font-weight: bold; line-height: 1;">&#8593;</span>
+</button>
       <!-- Customers -->
       <div class="tab-pane fade" id="customersTab">
         <h5>Customers</h5>
