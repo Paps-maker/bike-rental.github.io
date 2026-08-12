@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MADOLLAR  Inventory System</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="icon" href="img/logo.jpeg" type="image/jpg">
+<style>
+  /* Base Theme */
+  body { background: #1c1c1c; color: #f8f9fa; font-family: sans-serif; }
+  .navbar { background: #2b1d0e; }
+  .navbar-brand { font-weight: bold; color: #f8f9fa !important; }
+  .card { background: #2a2a2a; border: none; color: #fff; border-radius: 8px; }
+  
+  /* Tabs */
+  .nav-tabs .nav-link { color: #f8f9fa; border: none; }
+  .nav-tabs .nav-link.active { background: #d4a373; color: #000; font-weight: bold; }
+  
+  /* Buttons */
+  .btn-custom { background: #d4a373; border: none; color: #000; }
+  .btn-custom:hover { background: #c48c59; color: #fff; }
+  
+  /* Table & UI Elements */
+  .table { color: #fff; }
+  .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .low-stock { background:#ff6b6b; color:#000; padding:2px 6px; border-radius:6px; font-weight:600; font-size:12px; }
+  .small-muted { font-size: 0.85rem; color: #bdbdbd; margin-right: 8px; }
+
+  /* Mobile Optimization */
+  @media (max-width: 768px) {
+    .btn, .form-control, .form-select { min-height: 44px; } /* Finger-friendly size */
+    .modal-dialog { margin: 10px; max-width: none; }
+    h5 { font-size: 1.1rem; }
+    .col-md-4, .col-md-5, .col-md-2 { margin-bottom: 10px; }
+  }
+
+  /* Search & Results Dropdown */
+  #productResults { 
+    max-height: 300px; 
+    overflow-y: auto; 
+    width: 100% !important; 
+  }
+
+  /* Modal Styling */
+  .modal-content { background-color: #212529 !important; color: #f8f9fa !important; border: 1px solid #444; }
+  .modal-header, .modal-footer { border-color: #444; }
+  .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+
+  /* Low Stock Wrapper */
+  #lowStockWrapper {
+    padding: 5px 10px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    background-color: #2b2b2b;
+    border: 1px solid #444;
+  }
+  #lowStockWrapper:hover { background-color: #3d3d3d; }
+  .card {
+    border-radius: 12px;
+    transition: transform 0.2s;
+}
+
+.card .text-muted {
+    color: #bdc3c7 !important; /* Light grey for labels */
+}
+
+.card h5 {
+    color: #ffffff !important; /* Bright white for sales figures */
+}
+
+/* Ensure the primary color is bright enough to show on dark backgrounds */
+.text-primary {
+    color: #5dade2 !important; /* A brighter blue that pops on dark backgrounds */
+
+}
+/* Stylish, compact selection button */
+.btn-outline-light {
+    border: 1px solid #495057 !important;
+    color: #ced4da !important;
+    background: transparent !important;
+    padding: 6px 12px !important;
+    font-size: 0.85rem !important;
+    border-radius: 6px !important;
+    transition: all 0.3s ease !important;
+}
+
+.btn-outline-light:hover {
+    background: #d4a373 !important;
+    color: #000 !important;
+    border-color: #d4a373 !important;
+}
+
+/* Ensure the icon fits nicely */
+.gap-2 { gap: 0.5rem; }
+  /* Floating Back-to-Top Arrow Button */
+#backToTopBtn {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  z-index: 1050; /* Above table elements and overlays */
+  width: 48px;
+  height: 48px;
+  background-color: #d4a373; /* Custom Gold Accent */
+  color: #000000;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+
+#backToTopBtn:hover {
+  background-color: #c48c59;
+  color: #ffffff;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Show button class when scrolling down */
+#backToTopBtn.show {
+  opacity: 1;
+  visibility: visible;
+}
+</style>
+  <!-- Font Awesome CDN for Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Login Section -->
+<div id="loginSection" class="container py-5">
+
+  <!-- HEADER -->
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <img src="img/logo.jpeg" alt="Logo" style="height: 100px; width: auto;">
+    <h3 class="mb-0">MADOLLAR LIQUOR PUB</h3>
+  </div>
+
+  <!-- LOGIN WRAPPER (kept but stabilized) -->
+  <div class="login-wrapper mx-auto" style="max-width: 400px;">
+
+    <!-- MODE SWITCH -->
+    <div class="d-flex justify-content-between mb-3">
+
+  <button type="button"
+          id="switchToAdminBtn"
+          class="btn btn-sm w-50 me-1 fw-bold"
+          style="background-color:#212529; color:#ffffff; border:1px solid #212529;"
+          onclick="window.setPortalMode('admin')">
+    🔑 Admin
+  </button>
+
+  <button type="button"
+          id="switchToStaffBtn"
+          class="btn btn-sm w-50 ms-1 fw-bold"
+          style="background-color:#ffffff; color:#000000; border:1px solid #000000;"
+          onclick="window.setPortalMode('staff')">
+    👤 Staff
+  </button>
+
+</div>
+    <!-- EMAIL -->
+    <div class="mb-3">
+      <input id="loginEmail"
+             type="email"
+             placeholder="Email"
+             class="form-control">
+    </div>
+
+    <!-- PASSWORD -->
+    <div class="mb-3">
+      <input id="loginPass"
+             type="password"
+             placeholder="Password"
+             class="form-control">
+    </div>
+
+    <!-- LOGIN BUTTON -->
+    <button id="loginBtn" class="w-100 btn btn-custom">
+      Login
+    </button>
+
+    <!-- MESSAGE -->
+    <div id="loginMsg" class="mt-2 small text-danger"></div>
+
+  </div>
+
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="d-none">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+      <div style="display: flex; align-items: center; gap: 20px;">
+  <img src="img/logo.jpeg" alt="Logo" style="height: 100px; width: auto;">
+  <h3 class="mb-4">MADOLLAR LIQUOR PUB </h3>
+</div>
+      <div class="d-flex align-items-center gap-3 ms-auto">
+        <button class="btn btn-outline-primary btn-sm position-relative me-2" onclick="window.openNotificationsModal()" title="View Notifications">
+          <i class="fas fa-bell me-1"></i> Notifications
+          <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+        </button>
+        <div id="lowStockWrapper" style="cursor: pointer; display: inline-flex; align-items: center;">
+          <div class="small-muted">Low stock:</div>
+        </div>
+        <span id="lowStockBadge" class="bg-danger px-2 py-1 rounded text-white">0</span>
+        <span id="roleBadge" class="bg-warning ms-3 text-dark badge">ADMIN</span>
+        <button id="logoutBtn" class="ms-3 btn btn-sm btn-light">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="py-4 container">
+    <!-- Dashboard Cards -->
+   <div class="mb-4 row g-3">
+  <div class="col-sm-4">
+    <div class="p-3 card shadow-sm border-0">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+          <div class="small text-muted"><i class="fas fa-calendar-day me-1 text-success"></i>Today's Sales</div>
+          <h5 id="todaysSales" class="fw-bold mb-0 text-success">KSh 0</h5>
+        </div>
+        <div class="text-end">
+          <div class="small text-muted"><i class="fas fa-history me-1 text-info"></i>Previous Day Sales</div>
+          <h5 id="yesterdaysSales" class="fw-bold mb-0 text-info">KSh 0</h5>
+        </div>
+      </div>
+      <div class="admin-only d-none pt-2 border-top border-secondary">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="small text-muted">Monthly Sales:</span>
+          <strong id="monthlySales" class="text-primary fs-6">KSh 0</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Customers</div><h4 id="customerCount">0</h4></div></div>
+  <div class="col-sm-4"><div class="p-3 card"><div class="small-muted">Products</div><h4 id="productCount">0</h4></div></div>
+
+  <div class="col-sm-6 admin-only d-none">
+    <div class="p-3 card shadow-sm border-0">
+      <div class="small-muted fw-bold">Total Stock Value</div>
+      <div class="d-flex justify-content-between mt-2">
+        <div><strong>Cost:</strong> <span id="totalBuyValue" class="text-secondary fw-bold">KSh 0</span></div>
+        <div><strong>Expected:</strong> <span id="totalSellValue" class="text-success fw-bold">KSh 0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 admin-only d-none">
+    <div class="p-3 card shadow-sm border-0">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="small-muted fw-bold"><i class="fas fa-bullseye text-primary me-1"></i> Monthly Target</div>
+        <button class="btn btn-sm btn-outline-primary py-0 px-2 admin-only" style="font-size: 11px;" onclick="window.openTargetModal()">⚙️ Set Target</button>
+      </div>
+      <div class="progress mt-2" style="height: 20px;">
+        <div id="salesProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%;">0%</div>
+      </div>
+      <div class="mt-2 text-center small text-muted" id="targetLabel">KSh 0 / KSh 0</div>
+    </div>
+  </div>
+</div>
+
+  <ul class="nav nav-tabs" id="mainTabs">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#productsTab">Products</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customersTab">Customers</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#posTab">POS</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#salesTab">Sales</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#attendanceTab">Staff Clock in & out</button></li>
+  
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#inflowLogsTab">Restock Logs</button>
+  </li>
+  
+  <li class="nav-item admin-only d-none">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#requisitionTab">Requisition</button>
+  </li>
+  <li class="nav-item admin-only d-none">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#staffManagementTab">Staff Management</button>
+  </li>
+</ul>
+    <div class="col-sm-4">
+    
+</div>
+
+    <div class="pt-3 tab-content">
+      <div class="tab-pane fade show active" id="productsTab">
+  <h5>Products</h5>
+        
+<div class="mb-3 row g-2 admin-only d-none">
+  <div class="col-md-3">
+    <input id="prodName" type="text" placeholder="Product Name" class="form-control">
+  </div>
+  <div class="col-md-2">
+    <input id="prodBuyPrice" type="number" placeholder="Buy Price" class="form-control">
+  </div>
+  <div class="col-md-2">
+    <input id="prodPrice" type="number" placeholder="Sell Price" class="form-control">
+  </div>
+  <div class="col-md-1">
+    <input id="prodStock" type="number" placeholder="Stock" class="form-control">
+  </div>
+  <div class="col-md-2">
+    <input id="prodMin" type="number" placeholder="Min alert" class="form-control">
+  </div>
+  <div class="col-md-2">
+    <button id="addProductBtn" class="w-100 btn btn-custom">Add Product</button>
+  </div>
+</div>
+        <input type="text" id="searchInput" placeholder="Search products by name..." class="form-control mb-3">
+
+<table class="table table-striped">
+  <thead id="productsHead">
+    </thead>
+  <tbody id="productsTable"></tbody>
+</table>
+</div>
+<div class="modal fade" id="lowStockModal" tabindex="-1" aria-labelledby="lowStockModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="lowStockModalLabel">Low Stock Alerts</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tab-pane fade" id="inflowLogsTab" role="tabpanel">
+    <div id="productLogsPage" class="dashboard-page p-3">
+        <!--stock logs-->
+        <!-- Header & Top Global Actions -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2>Restock</h2>
+            <div>
+                <button class="btn btn-sm btn-success me-2" id="downloadRestocksPdfBtn">
+                    <i class="fas fa-file-pdf me-1"></i> Download Restocks PDF
+                </button>
+                <button class="btn btn-sm btn-primary" id="downloadNewProdsPdfBtn">
+                    <i class="fas fa-file-pdf me-1"></i> Download New Products PDF
+                </button>
+            </div>
+        </div>
+        <hr class="mb-4">
+
+        <!-- SECTION A: RESTOCKED PRODUCTS (Grouped dynamically by Date) -->
+        <div class="mb-5">
+            <h3 class="mb-3 text-primary"><i class="fas fa-boxes me-2"></i>Restocked Products History</h3>
+            <div id="restockDateTablesContainer">
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin me-2"></i> Loading restock logs...
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION B: NEWLY REGISTERED PRODUCTS (Grouped dynamically by Date) -->
+        <div class="mb-4">
+            <h3 class="mb-3 text-info"><i class="fas fa-folder-plus me-2"></i>Newly Registered Products History</h3>
+            <div id="newProductsDateTablesContainer">
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin me-2"></i> Loading new product logs...
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- Floating Back to Top Button -->
+<button id="backToTopBtn" aria-label="Scroll to top" title="Go to top">
+  <span style="font-size: 1.4rem; font-weight: bold; line-height: 1;">&#8593;</span>
+</button>
+      <!-- Customers -->
+      <div class="tab-pane fade" id="customersTab">
+        <h5>Customers</h5>
+        <div class="mb-3 row g-2">
+          <div class="col-md-4"><input id="custName" type="text" placeholder="Customer Name" class="form-control"></div>
+          <div class="col-md-4"><input id="custPhone" type="text" placeholder="Phone" class="form-control"></div>
+          <div class="col-md-4"><button id="addCustomerBtn" class="w-100 btn btn-custom">Add Customer</button></div>
+        </div>
+        <table class="table table-striped">
+          <thead><tr><th>Name</th><th>Phone</th><th>Actions</th></tr></thead>
+          <tbody id="customersTable"></tbody>
+        </table>
+      </div>
+
+    <div class="tab-pane fade" id="posTab">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5>Point of Sale</h5>
+    <div class="card bg-dark text-white px-3 py-2">
+      <span class="small-muted">Total</span>
+      <h5 class="mb-0" id="cartTotalDisplay">KSh 0</h5>
+    </div>
+  </div>
+
+  <div class="row g-2">
+    <div class="col-md-4">
+      <label class="small-muted">Customer</label>
+      <div class="d-flex gap-2">
+        <select id="posCustomer" class="form-select">
+          <option value="">Guest</option>
+        </select>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">+</button>
+      </div>
+    </div>
+   
+    <div class="col-md-4 position-relative">
+      <label class="small-muted">Product Search</label>
+      <input type="text" id="productSearch" class="form-control" placeholder="Search product...">
+      <div id="productResults" class="dropdown-menu w-100 shadow" style="display:none; position:absolute; z-index:1000;"></div>
+    </div>
+
+   <div class="col-md-2">
+  <label class="small-muted">Qty</label>
+  <input id="posQty" type="text" value="" class="form-control" placeholder="1 or 1/2">
+</div>
+    <div class="d-flex align-items-end col-md-2">
+      <button id="addToCartBtn" class="w-100 btn btn-primary">Add to Cart</button>
+    </div>
+  </div>
+
+  <ul id="cartList" class="list-group mt-3 mb-3"></ul>
+
+  <div class="d-flex gap-2 mb-3">
+    <button id="checkoutBtn" class="btn btn-success">Checkout</button>
+    <button id="clearCartBtn" class="btn btn-secondary">Clear Cart</button>
+  </div>
+
+  <div id="paymentSection" class="mt-3 p-3 d-none card">
+    <div class="row g-2">
+      <div class="col-md-4">
+        <label class="small-muted">Transaction Code</label>
+        <input id="transCode" type="text" class="form-control" placeholder="e.g. MPESA12345">
+      </div>
+      <div class="col-md-4">
+        <label class="small-muted">Payment Method</label>
+        <select id="paymentMethod" class="form-select">
+          <option value="mpesa">M-PESA</option>
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+        </select>
+      </div>
+      <div class="d-flex align-items-end gap-2 col-md-4">
+        <button id="paymentCompleteBtn" class="btn btn-warning">Payment Completed</button>
+        <button id="cancelPaymentBtn" class="btn btn-outline-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addCustomerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Quick Add Customer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="newCustName" class="form-control mb-2" placeholder="Customer Name">
+        <input type="text" id="newCustPhone" class="form-control" placeholder="Phone Number">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="saveCustomerBtn">Save Customer</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tab-pane fade" id="requisitionTab">
+    <div class="card p-3 mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>Create Stock Requisition List</h5>
+            <div>
+                <label class="small text-muted me-2">Default Price Type:</label>
+                <select id="priceTypeSelect" class="form-control d-inline-block" style="width: auto;">
+                    <option value="sellPrice">Sell Price</option>
+                    <option value="buyPrice">Buy Price</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mb-3">
+            <button class="btn btn-outline-light btn-sm d-flex align-items-center gap-2" onclick="openProductSelector()">
+                <i class="bi bi-plus-lg"></i> Add Items
+            </button>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Price Type</th>
+                        <th>Price</th>
+                        <th style="min-width: 140px;">Qty</th> <th>Subtotal</th> 
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="requisitionTableBody"></tbody>
+                <tfoot id="requisitionTableFooter">
+                    <tr class="table-dark">
+                        <th colspan="3" class="text-end">Grand Total:</th>
+                        <th id="grandTotalValue" colspan="3">KSh 0</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <button class="btn btn-success mt-3" onclick="downloadRequisitionPDF()">
+            Download Requisition PDF
+        </button>
+    </div>
+</div>
+
+<div class="modal fade" id="productSelectorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Products to Requisition</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="searchProd" class="form-control mb-3" placeholder="Search products...">
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAll"></th>
+                                <th>Name</th>
+                                <th>Current Stock</th> </tr>
+                        </thead>
+                        <tbody id="modalProductList"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-custom" onclick="addSelectedToRequisition()">Add Selected Items</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+  <div class="tab-pane fade" id="salesTab">
+    <h5>Sales Reporting</h5>
+
+    <div class="row admin-only mb-4">
+        <!-- Daily Profit Card -->
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card bg-success text-white shadow-sm h-100">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <h6 class="text-uppercase tracking-wider opacity-75 mb-1">Daily Profit</h6>
+                    <h3 id="dailyProfit" class="fw-bold mb-0">KSh 0</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Net Profit Card with Last Month Breakdown -->
+        <div class="col-md-6">
+            <div class="card bg-primary text-white shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase tracking-wider opacity-75 mb-1">Total Net Profit</h6>
+                    <h3 id="totalProfit" class="fw-bold mb-3">KSh 0</h3>
+                    
+                    <!-- Divider Line -->
+                    <hr class="border-white opacity-25 my-2">
+                    
+                    <!-- Last Month Breakdown Dynamic Container -->
+                    <div id="profitCardBreakdown" class="small">
+                        <!-- JavaScript will dynamically insert last month's profit right here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 shadow-sm mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h6 class="mb-0 fw-bold"><i class="fas fa-history me-2 text-primary"></i>Individual Sales History & Product Search</h6>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <input type="date" id="dateFrom" class="form-control form-control-sm" placeholder="From">
+                <input type="date" id="dateTo" class="form-control form-control-sm" placeholder="To">
+                <button id="downloadFilteredPDF" class="btn btn-primary btn-sm"><i class="fas fa-file-pdf me-1"></i>PDF Range</button>
+                <button id="downloadAllPDF" class="btn btn-secondary btn-sm"><i class="fas fa-file-pdf me-1"></i>Download All</button>
+            </div>
+        </div>
+
+        <!-- Product & Sales Search Bar -->
+        <div class="input-group mb-3">
+            <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+            <input type="text" id="salesSearchInput" class="form-control border-start-0" placeholder="Search sales by product name (e.g. Tusker), customer, or receipt code...">
+            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('salesSearchInput').value=''; window.filterSalesTable();">Clear Search</button>
+        </div>
+
+        <!-- Dynamic Product Search Summary Alert Banner -->
+        <div id="salesSearchSummary" class="alert alert-info py-2 px-3 mb-3 d-none shadow-sm">
+            <!-- Dynamically populated by JS when searching for products -->
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="min-width: 140px;">Date & Time</th>
+                        <th style="min-width: 110px;">Customer</th>
+                        <th style="min-width: 320px;">Items & Quantities Sold</th>
+                        <th style="min-width: 130px;">Total Amount</th>
+                        <th style="min-width: 140px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="salesTable"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="card p-3 mb-4 shadow-sm">
+        <h6 class="fw-bold"><i class="fas fa-calendar-day me-2 text-primary"></i>Daily Product Sales Summary</h6>
+        <div id="dailySalesContainer"></div>
+    </div>
+
+</div>
+
+<!-- Edit Product Modal -->
+<div class="modal fade" id="editProductModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="bg-dark p-3 text-white modal-content">
+      <h5>Edit Product</h5>
+      <input id="editProdName" class="mb-2 form-control" placeholder="Name">
+      <input id="editProdBuyingPrice" type="number" class="mb-2 form-control" placeholder="Buying Price">
+      <input id="editProdPrice" type="number" class="mb-2 form-control" placeholder="Selling Price">
+      <input id="editProdStock" type="number" class="mb-2 form-control" placeholder="Stock">
+      <input id="editProdMin" type="number" class="mb-2 form-control" placeholder="Min alert">
+      <button id="saveEditBtn" class="w-100 btn btn-success">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Target Config Modal -->
+<div class="modal fade" id="targetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white py-2">
+        <h5 class="modal-title fs-6"><i class="fas fa-bullseye me-2"></i>Configure Monthly Sales Target</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Set target expected sales either as a percentage of total expected inventory value or a fixed amount in KSh.</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">Target Calculation Mode</label>
+          <select id="targetModeSelect" class="form-select" onchange="window.toggleTargetInputMode()">
+            <option value="percentage" selected>Percentage of Total Expected Stock Value (%)</option>
+            <option value="fixed">Fixed Target Amount (KSh)</option>
+          </select>
+        </div>
+        <div class="mb-3" id="targetPercentageGroup">
+          <label class="form-label small fw-bold">Target Percentage (%)</label>
+          <div class="input-group">
+            <input type="number" id="targetPercentageInput" class="form-control" placeholder="e.g. 50" min="1" max="500" value="50">
+            <span class="input-group-text">%</span>
+          </div>
+          <div class="form-text">e.g. 50% means target sales = half of current inventory expected value.</div>
+        </div>
+        <div class="mb-3 d-none" id="targetFixedGroup">
+          <label class="form-label small fw-bold">Fixed Monthly Target Amount (KSh)</label>
+          <div class="input-group">
+            <span class="input-group-text">KSh</span>
+            <input type="number" id="targetFixedInput" class="form-control" placeholder="e.g. 100000">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.saveTargetSettings()">Save Target</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Realtime Staff Notifications Modal -->
+<div class="modal fade" id="notificationsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-white border-secondary">
+      <div class="modal-header bg-dark text-white border-secondary py-2 d-flex justify-content-between align-items-center">
+        <h5 class="modal-title fs-6 text-white mb-0"><i class="fas fa-bell me-2 text-warning"></i>System Activity & Restock Notifications</h5>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-outline-light btn-sm py-0 px-2" style="font-size: 11px;" onclick="window.markAllNotifsAsRead()">
+            <i class="fas fa-check-double me-1"></i>Mark All Read
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 admin-only d-none" style="font-size: 11px;" onclick="window.clearAllNotifications()">
+            <i class="fas fa-trash-alt me-1"></i>Clear All
+          </button>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+      </div>
+      <div class="modal-body p-3 bg-dark text-white">
+        <div id="notificationsList" class="list-group list-group-flush bg-dark">
+          <!-- Dynamically populated real-time restock & product notifications -->
+        </div>
+      </div>
+      <div class="modal-footer bg-dark text-white border-secondary py-2 d-flex justify-content-between">
+        <button type="button" class="btn btn-outline-success btn-sm text-white" onclick="if(typeof downloadRestocksPdfBtn !== 'undefined') downloadRestocksPdfBtn.click(); else window.downloadSingleTablePdf('restock_table_1', 'Restock History', 'Restock_Report');">
+          <i class="fas fa-file-pdf me-1"></i> Download Full Restock History PDF
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+    <!-- Toast Container (Centered via CSS) -->
+<div class="toast-container position-fixed p-3">
+  <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header" id="toastHeader">
+      <strong class="me-auto" id="toastTitle">Notification</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastBody"></div>
+  </div>
+</div>
+<div class="tab-pane fade" id="staffManagementTab" role="tabpanel">
+    
+    <div class="card my-4">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">👥 Staff Profile Management System</h5>
+        </div>
+        
+        <div class="card-body">
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <input type="text" id="staffName" class="form-control" placeholder="Full Employee Name">
+                </div>
+                <div class="col-md-3">
+                    <input type="email" id="staffEmail" class="form-control" placeholder="Email (Login ID)">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" id="staffPassword" class="form-control" placeholder="Operational Password">
+                </div>
+                <div class="col-md-2">
+                    <select id="staffRole" class="form-select">
+                        <option value="staff" selected>Staff Member</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button id="addStaffBtn" class="btn btn-primary w-100" onclick="window.saveStaffMember()">Save</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Employee Profile</th>
+                            <th>Email Username</th>
+                            <th>Assigned Tier</th>
+                            <th>Status</th>
+                            <th>Operational Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+<div class="tab-pane fade" id="attendanceTab">
+    <div class="p-3">
+        <h4>Staff Clock in & out</h4>
+        
+        <div class="mb-3">
+           <button onclick="window.clockIn()" class="btn btn-success">Clock In</button>
+<button onclick="window.clockOut()" class="btn btn-danger">Clock Out</button>
+        </div>
+        
+        <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5>Records</h5>
+                <button class="btn btn-primary mb-3 admin-only d-none" onclick="exportAttendance()">Download PDF Report</button>
+            </div>
+            
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th class="admin-only d-none">Staff</th>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th class="admin-only d-none">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceTable"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<style>
+/* Centering and Dark Theme (As before) */
+.toast-container { top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: 350px; z-index: 9999; }
+#liveToast { border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); background: #2c3e50; color: #ecf0f1; border: none; overflow: hidden; }
+.toast-body { padding: 25px; text-align: center; color: white; }
+
+/* The Success Tick Animation */
+.checkmark-circle { width: 50px; height: 50px; margin: 0 auto 15px; border-radius: 50%; stroke: #2ecc71; stroke-width: 4; stroke-miterlimit: 10; fill: none; animation: scale .3s ease-in-out; }
+.checkmark { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke .6s cubic-bezier(0.65, 0, 0.45, 1) forwards .3s; }
+@keyframes stroke { 100% { stroke-dashoffset: 0; } }
+@keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+
+/* Spinner */
+.spinner-loader { width: 40px; height: 40px; border: 4px solid #34495e; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+<script src="main.js"></script>
+</body>
+</html>
