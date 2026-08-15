@@ -1692,6 +1692,7 @@ function initLogsListeners() {
 
     const hideBtnClass = isAdmin() ? '' : 'd-none';
     const currentStockMap = {};
+    window.historicalStockLogCache = window.historicalStockLogCache || {};
 
     window.db.collection("products").onSnapshot(snapshot => {
         snapshot.forEach(doc => {
@@ -1893,6 +1894,9 @@ function initLogsListeners() {
                         } else if (data.previousStock !== undefined) {
                             prevStockNum = parseFloat(data.previousStock);
                             afterStockNum = prevStockNum + qtyVal;
+                        } else if (window.historicalStockLogCache[id]) {
+                            prevStockNum = window.historicalStockLogCache[id].prevStockNum;
+                            afterStockNum = window.historicalStockLogCache[id].afterStockNum;
                         } else {
                             const matchedStock = currentStockMap[id] ?? currentStockMap[itemName] ?? currentStockMap[data.productId];
                             if (matchedStock !== undefined) {
@@ -1902,6 +1906,7 @@ function initLogsListeners() {
                                 prevStockNum = 0;
                                 afterStockNum = qtyVal;
                             }
+                            window.historicalStockLogCache[id] = { prevStockNum, afterStockNum };
                         }
 
                         const stockBeforeValStr = window.toMixedFraction(prevStockNum);
