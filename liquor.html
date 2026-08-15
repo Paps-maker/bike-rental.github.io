@@ -445,23 +445,53 @@
     <button id="clearCartBtn" class="btn btn-secondary">Clear Cart</button>
   </div>
 
-  <div id="paymentSection" class="mt-3 p-3 d-none card">
-    <div class="row g-2">
-      <div class="col-md-4">
-        <label class="small-muted">Transaction Code</label>
-        <input id="transCode" type="text" class="form-control" placeholder="e.g. MPESA12345">
-      </div>
-      <div class="col-md-4">
-        <label class="small-muted">Payment Method</label>
-        <select id="paymentMethod" class="form-select">
-          <option value="mpesa">M-PESA</option>
-          <option value="cash">Cash</option>
-          <option value="card">Card</option>
-        </select>
-      </div>
-      <div class="d-flex align-items-end gap-2 col-md-4">
-        <button id="paymentCompleteBtn" class="btn btn-warning">Payment Completed</button>
-        <button id="cancelPaymentBtn" class="btn btn-outline-secondary">Cancel</button>
+  <!-- Payment Checkout Modal Popup -->
+  <div class="modal fade" id="paymentModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title fw-bold"><i class="fas fa-cash-register me-2"></i>Checkout & Complete Payment</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-dark border d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <span class="text-muted small d-block">Customer:</span>
+              <strong id="modalCustomerName" class="fs-6 text-light">Guest</strong>
+            </div>
+            <div class="text-end">
+              <span class="text-muted small d-block">Total Amount:</span>
+              <strong id="modalTotalAmount" class="fs-4 text-warning">KSh 0.00</strong>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small-muted fw-bold">Cart Items Summary</label>
+            <div id="modalCartSummary" class="border rounded p-2 bg-dark text-light" style="max-height: 150px; overflow-y: auto; font-size: 0.88rem;"></div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6 mb-2">
+              <label class="form-label small-muted fw-bold">Payment Method</label>
+              <select id="paymentMethod" class="form-select">
+                <option value="Cash">Cash</option>
+                <option value="M-PESA">M-PESA</option>
+                <option value="Card">Card</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-2">
+              <label class="form-label small-muted fw-bold">Transaction Code (Optional)</label>
+              <input id="transCode" type="text" class="form-control" placeholder="e.g. QX12345678">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="cancelPaymentBtn" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" id="paymentCompleteBtn" class="btn btn-success fw-bold px-4">
+            <i class="fas fa-check-circle me-1"></i>Complete Payment
+          </button>
+        </div>
       </div>
     </div>
   </div>
