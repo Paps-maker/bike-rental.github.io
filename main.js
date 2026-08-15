@@ -186,6 +186,14 @@ function showToast(title, message, type = 'loading') {
     toast.show();
 }
 
+function hideToast() {
+    const toastEl = document.getElementById('liveToast');
+    if (toastEl) {
+        const inst = bootstrap.Toast.getInstance(toastEl);
+        if (inst) inst.hide();
+    }
+}
+
 /**
  * Real-time listener for Admin Target Settings
  */
@@ -2160,16 +2168,21 @@ window.selectProd = (id, name, price) => {
 
 if (addToCartBtn) {
     addToCartBtn.onclick = () => {
-        const prodData = selectedProduct
-            ? window.productsCache.find(p => p.id === selectedProduct.id)?.data()
-            : window.productsCache.find(p => p.id === posProductEl.value)?.data();
+        let targetDoc = null;
+        if (selectedProduct && selectedProduct.id) {
+            targetDoc = window.productsCache.find(p => p.id === selectedProduct.id);
+        } else if (posProductEl && posProductEl.value) {
+            targetDoc = window.productsCache.find(p => p.id === posProductEl.value);
+        }
 
-        if (!prodData) return alert("Please select a product");
+        if (!targetDoc) return alert("Please select a product");
+        const prodData = targetDoc.data();
+        const prodId = targetDoc.id;
 
         const parseQty = (val) => {
             if (typeof val === 'string' && val.includes('/')) {
                 const parts = val.split('/');
-                if (parts.length === 2) {
+                if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1])) && parseFloat(parts[1]) !== 0) {
                     return parseFloat(parts[0]) / parseFloat(parts[1]);
                 }
             }
@@ -2184,7 +2197,7 @@ if (addToCartBtn) {
         if (requestedQty > currentStock) return alert(`Insufficient stock! Only ${currentStock} available.`);
 
         cart.push({
-            id: prodData.id || (selectedProduct ? selectedProduct.id : posProductEl.value),
+            id: prodId,
             name: prodData.name,
             price: parseFloat(prodData.price),
             qty: requestedQty
@@ -2225,8 +2238,44 @@ if (saveCustomerBtn) {
 }
 
 if (clearCartBtn) clearCartBtn.onclick = () => { cart = []; renderCart(); };
-if (checkoutBtn) checkoutBtn.onclick = () => { if (cart.length === 0) return alert("Cart is empty"); if (paymentSection) paymentSection.classList.remove("d-none"); };
-if (cancelPaymentBtn) cancelPaymentBtn.onclick = () => { if (paymentSection) paymentSection.classList.add("d-none"); };
+
+if (checkoutBtn) {
+    checkoutBtn.onclick = () => {
+        if (cart.length === 0) return Swal.fire("Cart Empty", "Please add items to cart before proceeding to checkout.", "warning");
+
+        const posCustEl = document.getElementById("posCustomer");
+        const customerName = (posCustEl && posCustEl.value && posCustEl.value !== "")
+            ? posCustEl.selectedOptions[0].text
+            : "Guest";
+
+        const runningTotal = cart.reduce((sum, c) => sum + (c.price * c.qty), 0);
+
+        const modalCustEl = document.getElementById("modalCustomerName");
+        const modalTotalEl = document.getElementById("modalTotalAmount");
+        const modalCartSummary = document.getElementById("modalCartSummary");
+
+        if (modalCustEl) modalCustEl.textContent = customerName;
+        if (modalTotalEl) modalTotalEl.textContent = `KSh ${runningTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        if (modalCartSummary) {
+            modalCartSummary.innerHTML = cart.map(i => `
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-secondary">
+                    <div>
+                        <strong>${i.name}</strong>
+                        <span class="badge bg-secondary ms-1">x ${window.toMixedFraction(i.qty)}</span>
+                    </div>
+                    <span class="fw-bold text-warning">KSh ${(i.price * i.qty).toFixed(2)}</span>
+                </div>
+            `).join('');
+        }
+
+        const paymentModalEl = document.getElementById("paymentModal");
+        if (paymentModalEl) {
+            const modal = bootstrap.Modal.getInstance(paymentModalEl) || new bootstrap.Modal(paymentModalEl);
+            modal.show();
+        }
+    };
+}
 
 
 /* ==========================================================================
@@ -2235,73 +2284,139 @@ if (cancelPaymentBtn) cancelPaymentBtn.onclick = () => { if (paymentSection) pay
 
 if (paymentCompleteBtn) {
     paymentCompleteBtn.onclick = async () => {
-        if (cart.length === 0) return showToast("Warning", "Cart is empty", "error");
+        if (cart.length === 0) return Swal.fire("Warning", "Cart is empty", "error");
+        if (paymentCompleteBtn.disabled) return;
+
+        paymentCompleteBtn.disabled = true;
+        const originalText = paymentCompleteBtn.innerHTML;
+        paymentCompleteBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i> Processing...`;
 
         const posCustEl = document.getElementById("posCustomer");
         const customerName = (posCustEl && posCustEl.value && posCustEl.value !== "")
             ? posCustEl.selectedOptions[0].text
             : "Guest";
 
-        if (paymentSection) paymentSection.classList.add("d-none");
-        showToast("Processing", "Finalizing your sale...", "loading");
+        const paymentMethodEl = document.getElementById("paymentMethod");
+        const transCodeEl = document.getElementById("transCode");
 
-        (async () => {
-            try {
-                const processedItems = [];
-                let totalAmount = 0;
+        // Close payment modal during processing attempt
+        const paymentModalEl = document.getElementById("paymentModal");
+        if (paymentModalEl) {
+            const inst = bootstrap.Modal.getInstance(paymentModalEl);
+            if (inst) inst.hide();
+        }
 
-                for (const c of cart) {
-                    const snap = await window.db.collection("products").doc(c.id).get();
-                    const pData = snap.data();
+        if (typeof hideToast === 'function') hideToast();
 
-                    if (!pData) throw new Error(`Product ${c.name} not found.`);
+        const processCheckout = async () => {
+            const processedItems = [];
+            let totalAmount = 0;
+            const batch = window.db.batch();
 
-                    const currentStock = parseFloat(pData.stock) || 0;
-                    if (currentStock < c.qty) throw new Error(`${c.name} has insufficient stock.`);
+            // 1. Fetch current product data & validate stock levels
+            for (const c of cart) {
+                const prodRef = window.db.collection("products").doc(c.id);
+                const snap = await prodRef.get();
 
-                    const sellPrice = parseFloat(c.price) || 0;
-                    const qty = parseFloat(c.qty) || 0;
+                if (!snap.exists) throw new Error(`Product "${c.name}" not found in inventory.`);
+                const pData = snap.data();
 
-                    totalAmount += (sellPrice * qty);
+                const currentStock = parseFloat(pData.stock) || 0;
+                const requestedQty = parseFloat(c.qty) || 0;
 
-                    processedItems.push({
-                        name: c.name,
-                        price: sellPrice,
-                        qty: qty,
-                        cost: parseFloat(pData.buyPrice) || 0
-                    });
+                if (currentStock < requestedQty) {
+                    throw new Error(`Insufficient stock for "${c.name}". Available: ${currentStock}, Requested: ${requestedQty}`);
                 }
 
-                await window.db.collection("sales").add({
-                    customer: customerName,
-                    items: processedItems,
-                    total: totalAmount,
-                    payment: paymentMethod ? paymentMethod.value : "Cash",
-                    transaction: transCode ? transCode.value : "",
-                    date: new Date()
+                const sellPrice = parseFloat(c.price) || 0;
+                totalAmount += (sellPrice * requestedQty);
+
+                processedItems.push({
+                    id: c.id,
+                    name: c.name,
+                    price: sellPrice,
+                    qty: requestedQty,
+                    cost: parseFloat(pData.buyPrice) || 0
                 });
 
-                for (const c of cart) {
-                    const prodRef = window.db.collection("products").doc(c.id);
-                    await window.db.runTransaction(async (t) => {
-                        const snap = await t.get(prodRef);
-                        const currentStock = parseFloat(snap.data().stock) || 0;
-                        t.update(prodRef, { stock: Math.max(currentStock - c.qty, 0) });
-                    });
-                }
-
-                cart = [];
-                renderCart();
-                if (transCode) transCode.value = "";
-                if (posCustEl) posCustEl.value = "";
-
-                showToast("Success", "Sale completed and stock updated!", "success");
-
-            } catch (e) {
-                showToast("Error", e.message, "error");
-                if (paymentSection) paymentSection.classList.remove("d-none");
+                // Batch stock reduction
+                const newStock = Math.max(currentStock - requestedQty, 0);
+                batch.update(prodRef, { stock: newStock });
             }
-        })();
+
+            // 2. Add Sale transaction record to batch
+            const saleRef = window.db.collection("sales").doc();
+            batch.set(saleRef, {
+                customer: customerName,
+                items: processedItems,
+                total: totalAmount,
+                payment: paymentMethodEl ? paymentMethodEl.value : "Cash",
+                transaction: transCodeEl ? transCodeEl.value : "",
+                date: new Date()
+            });
+
+            // 3. Execute atomic batch write (all or nothing)
+            await batch.commit();
+        };
+
+        // 10-Second Timeout Race Controller
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("NETWORK_TIMEOUT")), 10000);
+        });
+
+        try {
+            await Promise.race([processCheckout(), timeoutPromise]);
+
+            // Clear cart & reset inputs
+            cart = [];
+            renderCart();
+            if (transCodeEl) transCodeEl.value = "";
+            if (posCustEl) posCustEl.value = "";
+
+            if (typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible()) Swal.close();
+
+            Swal.fire({
+                title: "Payment Completed!",
+                text: "Sale recorded successfully and inventory stock updated.",
+                icon: "success",
+                confirmButtonColor: "#198754"
+            });
+
+        } catch (e) {
+            console.error("Checkout processing error:", e);
+            if (typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible()) Swal.close();
+
+            if (e.message === "NETWORK_TIMEOUT" || e.name === "FirebaseError" || (e.message && (e.message.includes("offline") || e.message.includes("network")))) {
+                Swal.fire({
+                    title: "Network Connection Timeout",
+                    html: `
+                        <div class="text-start">
+                            <p class="text-danger fw-bold"><i class="fas fa-wifi me-2"></i>Network is slow or disconnected.</p>
+                            <p>No payment or stock reduction was recorded for this transaction.</p>
+                            <p class="mb-0 text-muted"><strong>Action Required:</strong> Please check your internet connection and click <strong>'Complete Payment'</strong> again to retry cleanly.</p>
+                        </div>
+                    `,
+                    icon: "warning",
+                    confirmButtonText: "Retry Payment",
+                    confirmButtonColor: "#ffc107"
+                }).then(() => {
+                    if (paymentModalEl) {
+                        const modal = bootstrap.Modal.getInstance(paymentModalEl) || new bootstrap.Modal(paymentModalEl);
+                        modal.show();
+                    }
+                });
+            } else {
+                Swal.fire("Checkout Failed", e.message, "error").then(() => {
+                    if (paymentModalEl) {
+                        const modal = bootstrap.Modal.getInstance(paymentModalEl) || new bootstrap.Modal(paymentModalEl);
+                        modal.show();
+                    }
+                });
+            }
+        } finally {
+            paymentCompleteBtn.disabled = false;
+            paymentCompleteBtn.innerHTML = originalText;
+        }
     };
 }
 
@@ -2619,43 +2734,153 @@ window.db.collection("sales").orderBy("date", "desc").onSnapshot(snap => {
 });
 
 /**
+ * Helper to prompt admin with choice to either Restock Items OR Delete Record Only
+ */
+async function promptDeletionOptions(title, text) {
+    return await Swal.fire({
+        title: title,
+        html: `
+            <div class="text-start">
+                <p class="mb-3">${text}</p>
+                <div class="card p-2 bg-light border text-dark font-sans small mb-1">
+                    <div class="fw-bold mb-1 text-primary"><i class="fas fa-question-circle me-1"></i>Choose Deletion Action:</div>
+                    <div class="mb-1"><strong>1. Delete & Restock Items:</strong> Deletes transaction AND returns sold quantities back to inventory stock.</div>
+                    <div><strong>2. Delete Record Only:</strong> Permanently deletes record to free space without altering inventory stock.</div>
+                </div>
+            </div>
+        `,
+        icon: "warning",
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: '<i class="fas fa-boxes me-1"></i> Delete & Restock Items',
+        confirmButtonColor: '#198754',
+        denyButtonText: '<i class="fas fa-trash-alt me-1"></i> Delete Record Only',
+        denyButtonColor: '#6c757d',
+        cancelButtonText: 'Cancel',
+        cancelButtonColor: '#3085d6'
+    });
+}
+
+/**
+ * Helper to display SweetAlert popup showing exact restocked items and new stock counts
+ */
+function showRestockedAlert(restockedItems, titleText = "Transaction Deleted & Stock Restored") {
+    if (!restockedItems || restockedItems.length === 0) {
+        return Swal.fire("Deleted!", titleText, "success");
+    }
+
+    const itemsHtml = restockedItems.map(item => `
+        <div class="d-flex justify-content-between align-items-center py-2 px-3 border-bottom text-dark">
+            <div class="text-start">
+                <strong class="d-block text-dark">${item.name}</strong>
+                <small class="text-muted">Restocked: <span class="badge bg-success">+${window.toMixedFraction(item.qtyRestocked)}</span></small>
+            </div>
+            <div class="text-end">
+                <small class="text-secondary d-block">New Inventory Stock:</small>
+                <strong class="text-primary fs-6">${window.toMixedFraction(item.newStock)}</strong>
+            </div>
+        </div>
+    `).join('');
+
+    Swal.fire({
+        title: titleText,
+        html: `
+            <div class="text-start mb-2 text-secondary">
+                <i class="fas fa-boxes me-1 text-success"></i> The following items have been added back into inventory:
+            </div>
+            <div class="border rounded bg-light" style="max-height: 220px; overflow-y: auto;">
+                ${itemsHtml}
+            </div>
+        `,
+        icon: "success",
+        confirmButtonColor: "#198754"
+    });
+}
+
+/**
  * Deletes all sales for a specific historical month (Admin only)
  */
 window.deleteMonthProfit = async (monthKey) => {
     if (!isAdmin()) return Swal.fire("Access Denied", "Admins only", "error");
 
-    const result = await Swal.fire({
-        title: `Delete all records for ${monthKey}?`,
-        text: `This will permanently delete all sales transactions recorded in ${monthKey}.`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: `Yes, delete ${monthKey} sales`
+    const salesToDelete = (window.allSales || []).filter(s => {
+        const mKey = s.date.toDate().toLocaleString('default', { month: 'long', year: 'numeric' });
+        return mKey === monthKey;
     });
 
-    if (result.isConfirmed) {
-        try {
-            const batch = window.db.batch();
-            const salesToDelete = (window.allSales || []).filter(s => {
-                const mKey = s.date.toDate().toLocaleString('default', { month: 'long', year: 'numeric' });
-                return mKey === monthKey;
-            });
+    if (salesToDelete.length === 0) {
+        return Swal.fire("Notice", "No records found for this month.", "info");
+    }
 
-            if (salesToDelete.length === 0) {
-                return Swal.fire("Notice", "No records found for this month.", "info");
+    const result = await promptDeletionOptions(
+        `Delete All Sales for ${monthKey}?`,
+        `You are about to delete <strong>${salesToDelete.length} sales records</strong> for ${monthKey}.`
+    );
+
+    if (!result.isConfirmed && !result.isDenied) return;
+    const shouldRestock = result.isConfirmed;
+
+    try {
+        const batch = window.db.batch();
+        const restockMap = {};
+
+        salesToDelete.forEach(s => {
+            const docRef = window.db.collection("sales").doc(s.id);
+            batch.delete(docRef);
+
+            if (shouldRestock && Array.isArray(s.items)) {
+                s.items.forEach(item => {
+                    const qty = parseFloat(item.qty) || 0;
+                    if (qty <= 0) return;
+
+                    let prodDoc = null;
+                    if (item.id) {
+                        prodDoc = window.productsCache.find(p => p.id === item.id);
+                    }
+                    if (!prodDoc && window.productsCache) {
+                        prodDoc = window.productsCache.find(p => p.data().name.trim().toLowerCase() === (item.name || "").trim().toLowerCase());
+                    }
+
+                    if (prodDoc) {
+                        if (!restockMap[prodDoc.id]) {
+                            restockMap[prodDoc.id] = {
+                                docId: prodDoc.id,
+                                name: item.name,
+                                currentStock: parseFloat(prodDoc.data().stock) || 0,
+                                qtyRestocked: 0
+                            };
+                        }
+                        restockMap[prodDoc.id].qtyRestocked += qty;
+                    }
+                });
             }
+        });
 
-            salesToDelete.forEach(s => {
-                const docRef = window.db.collection("sales").doc(s.id);
-                batch.delete(docRef);
+        const restockedItems = [];
+        if (shouldRestock) {
+            Object.values(restockMap).forEach(info => {
+                const newStock = info.currentStock + info.qtyRestocked;
+                const prodRef = window.db.collection("products").doc(info.docId);
+                batch.update(prodRef, { stock: newStock });
+
+                restockedItems.push({
+                    name: info.name,
+                    qtyRestocked: info.qtyRestocked,
+                    newStock: newStock
+                });
             });
-            await batch.commit();
-            Swal.fire("Deleted!", `Successfully deleted ${salesToDelete.length} sales records for ${monthKey}.`, "success");
-        } catch (err) {
-            console.error("Error deleting monthly profit records:", err);
-            Swal.fire("Error", "Could not delete month records: " + err.message, "error");
         }
+
+        await batch.commit();
+
+        if (shouldRestock) {
+            showRestockedAlert(restockedItems, `${monthKey} Sales Deleted & Stock Restored`);
+        } else {
+            Swal.fire("Monthly Records Deleted", `Successfully deleted ${salesToDelete.length} sales records for ${monthKey} (inventory stock remains unchanged).`, "success");
+        }
+    } catch (err) {
+        console.error("Error deleting monthly profit records:", err);
+        Swal.fire("Error", "Could not delete month records: " + err.message, "error");
     }
 };
 
@@ -2853,31 +3078,62 @@ window.deleteItemFromSale = async (saleId, itemIndex) => {
     }
 
     const itemToDelete = sale.items[itemIndex];
-    const confirmResult = await Swal.fire({
-        title: "Remove Item?",
-        text: `Are you sure you want to remove "${itemToDelete.name}" (${window.toMixedFraction(itemToDelete.qty)} units) from this transaction?`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Yes, remove item"
-    });
+    const result = await promptDeletionOptions(
+        "Remove Item from Sale?",
+        `You are about to remove <strong>"${itemToDelete.name}"</strong> (${window.toMixedFraction(itemToDelete.qty)} units) from this transaction.`
+    );
 
-    if (!confirmResult.isConfirmed) return;
+    if (!result.isConfirmed && !result.isDenied) return;
+    const shouldRestock = result.isConfirmed;
 
     try {
+        const batch = window.db.batch();
+        const saleRef = window.db.collection("sales").doc(saleId);
         const updatedItems = sale.items.filter((_, idx) => idx !== itemIndex);
 
         if (updatedItems.length === 0) {
-            await window.db.collection("sales").doc(saleId).delete();
-            Swal.fire("Sale Deleted", "The last item was removed, so the entire transaction was deleted.", "success");
+            batch.delete(saleRef);
         } else {
             const newTotal = updatedItems.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseFloat(i.qty) || 0), 0);
-            await window.db.collection("sales").doc(saleId).update({
+            batch.update(saleRef, {
                 items: updatedItems,
                 total: newTotal
             });
-            Swal.fire("Item Removed", `"${itemToDelete.name}" was removed from the sale.`, "success");
+        }
+
+        const restockedItems = [];
+        const qty = parseFloat(itemToDelete.qty) || 0;
+
+        if (shouldRestock && qty > 0) {
+            let prodDoc = null;
+            if (itemToDelete.id) {
+                prodDoc = window.productsCache.find(p => p.id === itemToDelete.id);
+            }
+            if (!prodDoc && window.productsCache) {
+                prodDoc = window.productsCache.find(p => p.data().name.trim().toLowerCase() === (itemToDelete.name || "").trim().toLowerCase());
+            }
+
+            if (prodDoc) {
+                const currentStock = parseFloat(prodDoc.data().stock) || 0;
+                const newStock = currentStock + qty;
+                const prodRef = window.db.collection("products").doc(prodDoc.id);
+
+                batch.update(prodRef, { stock: newStock });
+
+                restockedItems.push({
+                    name: itemToDelete.name,
+                    qtyRestocked: qty,
+                    newStock: newStock
+                });
+            }
+        }
+
+        await batch.commit();
+
+        if (shouldRestock) {
+            showRestockedAlert(restockedItems, "Item Removed & Stock Restored");
+        } else {
+            Swal.fire("Item Removed", `"${itemToDelete.name}" removed from sale record (inventory stock remains unchanged).`, "success");
         }
     } catch (err) {
         console.error("Error removing item: ", err);
@@ -2889,21 +3145,60 @@ window.deleteItemFromSale = async (saleId, itemIndex) => {
 window.deleteSale = async (id) => {
     if (!isAdmin()) return Swal.fire("Access Denied", "Admins only", "error");
 
-    const confirmResult = await Swal.fire({
-        title: "Delete Sale Transaction?",
-        text: "Are you sure you want to permanently delete this sale transaction?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Yes, delete sale"
-    });
+    const sale = (window.allSales || []).find(s => s.id === id);
+    if (!sale) return Swal.fire("Error", "Sale transaction not found.", "error");
 
-    if (!confirmResult.isConfirmed) return;
+    const result = await promptDeletionOptions(
+        "Delete Sale Transaction?",
+        `You are about to delete transaction recorded for <strong>${sale.customer || 'Guest'}</strong> (Total: KSh ${(sale.total || 0).toLocaleString()}).`
+    );
+
+    if (!result.isConfirmed && !result.isDenied) return;
+    const shouldRestock = result.isConfirmed;
 
     try {
-        await window.db.collection("sales").doc(id).delete();
-        Swal.fire("Deleted", "Transaction deleted successfully.", "success");
+        const batch = window.db.batch();
+        const saleRef = window.db.collection("sales").doc(id);
+        batch.delete(saleRef);
+
+        const restockedItems = [];
+
+        if (shouldRestock && sale && Array.isArray(sale.items)) {
+            for (const item of sale.items) {
+                const qty = parseFloat(item.qty) || 0;
+                if (qty <= 0) continue;
+
+                let prodDoc = null;
+                if (item.id) {
+                    prodDoc = window.productsCache.find(p => p.id === item.id);
+                }
+                if (!prodDoc && window.productsCache) {
+                    prodDoc = window.productsCache.find(p => p.data().name.trim().toLowerCase() === (item.name || "").trim().toLowerCase());
+                }
+
+                if (prodDoc) {
+                    const currentStock = parseFloat(prodDoc.data().stock) || 0;
+                    const newStock = currentStock + qty;
+                    const prodRef = window.db.collection("products").doc(prodDoc.id);
+
+                    batch.update(prodRef, { stock: newStock });
+
+                    restockedItems.push({
+                        name: item.name,
+                        qtyRestocked: qty,
+                        newStock: newStock
+                    });
+                }
+            }
+        }
+
+        await batch.commit();
+
+        if (shouldRestock) {
+            showRestockedAlert(restockedItems, "Transaction Deleted & Stock Restored");
+        } else {
+            Swal.fire("Deleted", "Sale record permanently deleted (inventory stock remains unchanged).", "success");
+        }
     } catch (error) {
         console.error("Error deleting sale: ", error);
         Swal.fire("Error", "Failed to delete transaction: " + error.message, "error");
@@ -2914,33 +3209,78 @@ window.deleteSale = async (id) => {
 window.deleteDay = async (dateStr) => {
     if (!isAdmin()) return Swal.fire("Access Denied", "Admins only", "error");
 
-    const confirmResult = await Swal.fire({
-        title: `Delete all records for ${dateStr}?`,
-        text: `Are you sure you want to delete ALL sales records recorded on ${dateStr}? This action cannot be undone.`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: `Yes, delete all sales for ${dateStr}`
-    });
+    const salesToDelete = (window.allSales || []).filter(s => s.date.toDate().toLocaleDateString('en-GB') === dateStr);
 
-    if (!confirmResult.isConfirmed) return;
+    if (salesToDelete.length === 0) {
+        return Swal.fire("Notice", "No sales records found for this date.", "info");
+    }
+
+    const result = await promptDeletionOptions(
+        `Delete All Sales for ${dateStr}?`,
+        `You are about to delete <strong>${salesToDelete.length} sales transaction records</strong> for ${dateStr}.`
+    );
+
+    if (!result.isConfirmed && !result.isDenied) return;
+    const shouldRestock = result.isConfirmed;
 
     try {
         const batch = window.db.batch();
-        const salesToDelete = (window.allSales || []).filter(s => s.date.toDate().toLocaleDateString('en-GB') === dateStr);
-
-        if (salesToDelete.length === 0) {
-            return Swal.fire("Notice", "No sales records found for this date.", "info");
-        }
+        const restockMap = {};
 
         salesToDelete.forEach(s => {
             const docRef = window.db.collection("sales").doc(s.id);
             batch.delete(docRef);
+
+            if (shouldRestock && Array.isArray(s.items)) {
+                s.items.forEach(item => {
+                    const qty = parseFloat(item.qty) || 0;
+                    if (qty <= 0) return;
+
+                    let prodDoc = null;
+                    if (item.id) {
+                        prodDoc = window.productsCache.find(p => p.id === item.id);
+                    }
+                    if (!prodDoc && window.productsCache) {
+                        prodDoc = window.productsCache.find(p => p.data().name.trim().toLowerCase() === (item.name || "").trim().toLowerCase());
+                    }
+
+                    if (prodDoc) {
+                        if (!restockMap[prodDoc.id]) {
+                            restockMap[prodDoc.id] = {
+                                docId: prodDoc.id,
+                                name: item.name,
+                                currentStock: parseFloat(prodDoc.data().stock) || 0,
+                                qtyRestocked: 0
+                            };
+                        }
+                        restockMap[prodDoc.id].qtyRestocked += qty;
+                    }
+                });
+            }
         });
 
+        const restockedItems = [];
+        if (shouldRestock) {
+            Object.values(restockMap).forEach(info => {
+                const newStock = info.currentStock + info.qtyRestocked;
+                const prodRef = window.db.collection("products").doc(info.docId);
+                batch.update(prodRef, { stock: newStock });
+
+                restockedItems.push({
+                    name: info.name,
+                    qtyRestocked: info.qtyRestocked,
+                    newStock: newStock
+                });
+            });
+        }
+
         await batch.commit();
-        Swal.fire("Deleted!", `Successfully deleted ${salesToDelete.length} sales records for ${dateStr}.`, "success");
+
+        if (shouldRestock) {
+            showRestockedAlert(restockedItems, `Daily Sales for ${dateStr} Deleted & Stock Restored`);
+        } else {
+            Swal.fire("Daily Sales Deleted", `${salesToDelete.length} sales records deleted for ${dateStr} (inventory stock remains unchanged).`, "success");
+        }
     } catch (error) {
         console.error("Error deleting daily sales: ", error);
         Swal.fire("Error", "Failed to delete daily records: " + error.message, "error");
